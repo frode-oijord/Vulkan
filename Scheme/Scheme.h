@@ -29,6 +29,14 @@ namespace scm {
   class Env;
   typedef std::shared_ptr<Env> env_ptr;
 
+  const Symbol _if("if");
+  const Symbol _true("#t");
+  const Symbol _false("#f");
+  const Symbol _quote("quote");
+  const Symbol _begin("begin");
+  const Symbol _lambda("lambda");
+  const Symbol _define("define");
+
   struct If {
     std::any test, conseq, alt;
   };
@@ -76,67 +84,56 @@ namespace scm {
     return args;
   }
 
-  fun_ptr plus = [](const List & lst)
-  {
+  fun_ptr plus = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::plus<Number>());
   };
 
-  fun_ptr minus = [](const List & lst)
-  {
+  fun_ptr minus = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::minus<Number>());
   };
 
-  fun_ptr divides = [](const List & lst)
-  {
+  fun_ptr divides = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::divides<Number>());
   };
 
-  fun_ptr multiplies = [](const List & lst)
-  {
+  fun_ptr multiplies = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::multiplies<Number>());
   };
 
-  fun_ptr greater = [](const List & lst)
-  {
+  fun_ptr greater = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return Boolean(args[0] > args[1]);
   };
 
-  fun_ptr less = [](const List & lst)
-  {
+  fun_ptr less = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return Boolean(args[0] < args[1]);
   };
 
-  fun_ptr equal = [](const List & lst)
-  {
+  fun_ptr equal = [](const List & lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return Boolean(args[0] == args[1]);
   };
 
-  fun_ptr car = [](const List & lst)
-  {
+  fun_ptr car = [](const List & lst) {
     auto l = std::any_cast<lst_ptr>(lst.front());
     return l->front();
   };
 
-  fun_ptr cdr = [](const List & lst)
-  {
+  fun_ptr cdr = [](const List & lst) {
     auto l = std::any_cast<lst_ptr>(lst.front());
     return std::make_shared<List>(next(l->begin()), l->end());
   };
 
-  fun_ptr list = [](const List & lst)
-  {
+  fun_ptr list = [](const List & lst) {
     return std::make_shared<List>(lst.begin(), lst.end());
   };
 
-  fun_ptr length = [](const List & lst)
-  {
+  fun_ptr length = [](const List & lst) {
     auto l = std::any_cast<lst_ptr>(lst.front());
     return static_cast<Number>(l->size());
   };
@@ -214,19 +211,19 @@ void print(std::any exp)
     std::cout << s;
   }
   else if (exp.type() == typeid(Begin)) {
-    std::cout << "begin";
+    std::cout << _begin;
   }
   else if (exp.type() == typeid(Define)) {
-    std::cout << "define";
+    std::cout << _define;
   }
   else if (exp.type() == typeid(Lambda)) {
-    std::cout << "lambda";
+    std::cout << _lambda;
   }
   else if (exp.type() == typeid(If)) {
-    std::cout << "if";
+    std::cout << _if;
   }
   else if (exp.type() == typeid(Quote)) {
-    std::cout << "quote";
+    std::cout << _quote;
   }
   else if (exp.type() == typeid(fun_ptr)) {
     std::cout << "function";
@@ -270,8 +267,8 @@ std::any eval(std::any exp, env_ptr env)
       return quote.exp;
     }
     if (exp.type() == typeid(If)) {
-      auto _if = std::any_cast<If>(exp);
-      exp = std::any_cast<Boolean>(eval(_if.test, env)) ? _if.conseq : _if.alt;
+      auto if_ = std::any_cast<If>(exp);
+      exp = std::any_cast<Boolean>(eval(if_.test, env)) ? if_.conseq : if_.alt;
     } 
     else if (exp.type() == typeid(Begin)) {
       auto begin = std::any_cast<Begin>(exp);
@@ -325,31 +322,31 @@ inline std::any parse(std::any exp)
     if (list[0].type() == typeid(Symbol)) {
       auto token = std::any_cast<Symbol>(list[0]);
 
-      if (token == Symbol("quote")) {
+      if (token == _quote) {
         if (list.size() != 2) {
           throw std::invalid_argument("wrong number of arguments to quote");
         }
         return Quote{ list[1] };
       }
-      if (token == Symbol("if")) {
+      if (token == _if) {
         if (list.size() != 4) {
           throw std::invalid_argument("wrong number of arguments to if");
         }
         return If{ list[1], list[2], list[3] };
       }
-      if (token == Symbol("lambda")) {
+      if (token == _lambda) {
         if (list.size() != 3) {
           throw std::invalid_argument("wrong Number of arguments to lambda");
         }
         return Lambda{ list[1], list[2] };
       }
-      if (token == Symbol("begin")) {
+      if (token == _begin) {
         if (list.size() < 2) {
           throw std::invalid_argument("wrong Number of arguments to begin");
         }
         return Begin{ std::make_shared<List>(list) };
       }
-      if (token == Symbol("define")) {
+      if (token == _define) {
         if (list.size() < 3 || list.size() > 4) {
           throw std::invalid_argument("wrong number of arguments to define");
         }
@@ -359,19 +356,18 @@ inline std::any parse(std::any exp)
         if (list.size() == 3) {
           return Define{ std::any_cast<Symbol>(list[1]), list[2] };
         }
-        auto lambda = Lambda{ list[2], list[3] };
-        return Define{ std::any_cast<Symbol>(list[1]), lambda };
+        return Define{ std::any_cast<Symbol>(list[1]), Lambda{ list[2], list[3] } };
       }
     }
     return std::make_shared<List>(list);
   }
 
   auto token = std::any_cast<std::string>(exp);
-  if (token == "#t") {
-    return Boolean(true);
+  if (token == _true) {
+    return true;
   }
-  if (token == "#f") {
-    return Boolean(false);
+  if (token == _false) {
+    return false;
   }
   if (token.front() == '"' && token.back() == '"') {
     return String(token.substr(1, token.size() - 2));
