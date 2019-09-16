@@ -611,11 +611,11 @@ public:
   Shader() = delete;
   virtual ~Shader() = default;
 
-  explicit Shader(std::string filename, const VkShaderStageFlagBits stage):
+  explicit Shader(std::string glsl, const VkShaderStageFlagBits stage):
     stage(stage)
   {
-    std::ifstream input(filename, std::ios::in);
-    std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
+    //std::ifstream input(filename, std::ios::in);
+    //std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
 
     shaderc_shader_kind kind = [stage]() 
     {
@@ -639,7 +639,7 @@ public:
 
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
-    shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(glsl, kind, filename.c_str(), options);
+    shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(glsl, kind, "", options);
 
     if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
       throw std::runtime_error(module.GetErrorMessage());
