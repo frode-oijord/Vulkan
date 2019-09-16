@@ -299,20 +299,6 @@ std::any eval(std::any exp, env_ptr env)
   }
 }
 
-std::any ast(std::istream_iterator<std::string> & it)
-{
-  if (*it == "(") {
-    List list;
-    while (*(++it) != ")") {
-      list.push_back(ast(it));
-    }
-    return list;
-  }
-  else {
-    return *it;
-  }
-}
-
 inline std::any parse(std::any exp)
 {
   if (exp.type() == typeid(List)) {
@@ -379,14 +365,63 @@ inline std::any parse(std::any exp)
   return Symbol(token);
 }
 
+std::any ast(std::vector<std::string>::iterator& token)
+{
+  if (*token == "(") {
+    List list;
+    while (*(++token) != ")") {
+      list.push_back(ast(token));
+    }
+    return list;
+  }
+  else {
+    return *token;
+  }
+}
+
+std::any ast(std::istream_iterator<std::string>& it)
+{
+  if (*it == "(") {
+    List list;
+    while (*(++it) != ")") {
+      list.push_back(ast(it));
+    }
+    return list;
+  }
+  else {
+    return *it;
+  }
+}
+
 std::any read(std::string input)
 {
   input = std::regex_replace(input, std::regex(R"([(])"), " ( ");
   input = std::regex_replace(input, std::regex(R"([)])"), " ) ");
 
-  std::istringstream iss(input);
-  std::istream_iterator<std::string> tokens(iss);
+  std::vector<std::string> tokens;
+  std::regex re(" ");
+  std::sregex_token_iterator it(input.begin(), input.end(), re, -1);
+  for (it; it != std::sregex_token_iterator(); ++it) {
 
-  return parse(ast(tokens));
+    std::string token = *it;
+    token.erase(std::remove(token.begin(), token.end(), '\n'), token.end());
+
+    if (token == "[[") {
+      std::string str("\"");
+      while (*(++it) != "]]") {
+        str += *it;
+        str += " ";
+      }
+      str += "\"";
+      tokens.push_back(str);
+    }
+    else {
+      if (!token.empty()) {
+        tokens.push_back(token);
+      }
+    }
+  }
+
+  return parse(ast(tokens.begin()));
 };
 } // namespace scm

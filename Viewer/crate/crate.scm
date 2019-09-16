@@ -66,10 +66,44 @@
             (uint32 0)
             VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)))
 
+   (define vertex [[
+      #version 450
+
+      layout(std140, binding = 0) uniform Transform {
+         mat4 ModelViewMatrix;
+         mat4 ProjectionMatrix;
+      };
+
+      layout(location = 0) in vec3 Position;
+      layout(location = 0) out vec2 texCoord;
+
+      out gl_PerVertex {
+      vec4 gl_Position;
+      };
+
+      void main() 
+      {
+         texCoord = Position.xy;
+         gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
+      }
+   ]])
+
+   (define fragment [[
+      #version 450
+
+      layout(binding = 1) uniform sampler2D Texture;
+      layout(location = 0) in vec2 texCoord;
+      layout(location = 0) out vec4 FragColor;
+
+      void main() {
+         FragColor = texture(Texture, texCoord);
+      }
+   ]])
+
    (separator
       (texture2d "crate/texture.ktx")
-      (shader "crate/vertex.glsl" VK_SHADER_STAGE_VERTEX_BIT)
-      (shader "crate/fragment.glsl" VK_SHADER_STAGE_FRAGMENT_BIT)
+      (shader vertex VK_SHADER_STAGE_VERTEX_BIT)
+      (shader fragment VK_SHADER_STAGE_FRAGMENT_BIT)
       (indexed-shape 
          (bufferdata-uint32 0 1 3 3 2 0 4 6 7 7 5 4 0 4 5 5 1 0 6 2 3 3 7 6 0 2 6 6 4 0 1 5 7 7 3 1)
          (bufferdata-float 0 0 0 0 0 1 0 1 0 0 1 1 1 0 0 1 0 1 1 1 0 1 1 1))))
