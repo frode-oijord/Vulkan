@@ -389,7 +389,6 @@ std::any ast(std::istream_iterator<std::string>& it)
     return list;
   }
   else {
-    std::cout << *it << " ";
     return *it;
   }
 }
