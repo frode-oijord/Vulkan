@@ -9,6 +9,7 @@
 #include <boost/fusion/include/io.hpp>
 
 #include <map>
+#include <tuple>
 #include <string>
 #include <chrono>
 #include <iostream>
@@ -16,7 +17,6 @@
 #include <string>
 #include <complex>
 
-class symbol : public std::string {};
 
 // AST definition
 namespace client {
@@ -26,7 +26,7 @@ namespace client {
 
     struct expr;
 
-    struct expr_value : x3::variant<symbol, double, std::string, x3::forward_ast<expr>> {
+    struct expr_value : x3::variant<scm::Symbol, scm::Boolean, scm::Number, std::string, x3::forward_ast<expr>> {
       using base_type::base_type;
       using base_type::operator=;
     };
@@ -69,12 +69,16 @@ namespace client {
         std::cout << '"' << text << '"' << std::endl;
       }
 
-      void operator()(double const& number) const {
+      void operator()(scm::Number const& number) const {
         std::cout << number << std::endl;
       }
 
-      void operator()(symbol const& sym) const {
+      void operator()(scm::Symbol const& sym) const {
         std::cout << sym << std::endl;
+      }
+
+      void operator()(scm::Boolean const& b) const {
+        std::cout << b << std::endl;
       }
 
       void tab(int spaces) const {
@@ -89,27 +93,37 @@ namespace client {
 
 namespace client {
   namespace parser {
+
     namespace x3 = boost::spirit::x3;
     namespace ascii = boost::spirit::x3::ascii;
 
     using x3::lit;
     using x3::alnum;
+    using x3::alpha;
     using x3::lexeme;
     using x3::double_;
 
     using ascii::char_;
     using ascii::string;
 
-    x3::rule<class expr_value, ast::expr_value> expr_value = "expr_value";
-    x3::rule<class expr, ast::expr> expr = "expr";
+    struct bool_table : x3::symbols<bool> {
+      bool_table() {
+        add("#t", true)
+           ("#f", false);
+      }
+    } const boolean;
 
-    auto const _symbol = alnum;
+    x3::rule<class expr, ast::expr> expr = "expr";
+    x3::rule<class symbol, scm::Symbol> const symbol = "symbol";
+    x3::rule<class expr_value, ast::expr_value> expr_value = "expr_value";
+
     auto const number = double_;
+    auto const symbol_def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
     auto const quoted_string = lexeme['"' >> *(char_ - '"') >> '"'];
-    auto const expr_value_def = _symbol | number | quoted_string | expr;
+    auto const expr_value_def = symbol | boolean | number | quoted_string | expr;
     auto const expr_def = '(' >> *expr_value >> ')';
 
-    BOOST_SPIRIT_DEFINE(expr_value, expr);
+    BOOST_SPIRIT_DEFINE(expr, symbol, expr_value);
   }
 }
 int main(int, char **)

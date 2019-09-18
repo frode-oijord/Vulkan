@@ -23,6 +23,7 @@ namespace scm {
   typedef std::string String;
 
   struct Symbol : public std::string {
+    Symbol() = default;
     explicit Symbol(const String & s) : std::string(s) {}
   };
 
