@@ -12,6 +12,10 @@
 #include <functional>
 #include <unordered_map>
 
+#include <boost/spirit/home/x3.hpp>
+#include <boost/spirit/home/x3/support/ast/variant.hpp>
+#include <boost/fusion/include/adapt_struct.hpp>
+
 namespace scm {
 
   typedef std::vector<std::any> List;
@@ -301,11 +305,11 @@ std::any eval(std::any exp, env_ptr env)
   }
 }
 
-inline std::any parse(std::any exp)
+inline std::any expand(std::any exp)
 {
   if (exp.type() == typeid(List)) {
     auto list = std::any_cast<List>(exp);
-    std::transform(list.begin(), list.end(), list.begin(), parse);
+    std::transform(list.begin(), list.end(), list.begin(), expand);
 
     if (list[0].type() == typeid(Symbol)) {
       auto token = std::any_cast<Symbol>(list[0]);
@@ -362,63 +366,94 @@ inline std::any parse(std::any exp)
   return std::any_cast<Symbol>(exp);
 }
 
-std::any ast(std::vector<std::string>::iterator& token)
+namespace x3 = boost::spirit::x3;
+
+// AST definition
+namespace ast
 {
-  if (*token == "(") {
-    List list;
-    while (*(++token) != ")") {
-      list.push_back(ast(token));
+  struct expr_value : x3::variant<
+    scm::Symbol,
+    scm::Boolean,
+    scm::Number,
+    std::string,
+    x3::forward_ast<struct expr>> {
+
+    using base_type::base_type;
+    using base_type::operator=;
+  };
+
+  struct expr {
+    std::vector<expr_value> values;
+  };
+
+  struct scm_transform {
+    typedef std::any result_type;
+
+    std::any operator()(expr const& ast) const
+    {
+      scm::List list;
+      for (auto& value : ast.values) {
+        list.push_back(boost::apply_visitor(scm_transform(), value));
+      }
+      return list;
     }
-    return list;
-  }
-  else {
-    return *token;
-  }
+
+    std::any operator()(std::string const& value) const {
+      return value;
+    }
+    std::any operator()(scm::Number const& value) const {
+      return value;
+    }
+    std::any operator()(scm::Symbol const& value) const {
+      return value;
+    }
+    std::any operator()(scm::Boolean const& value) const {
+      return value;
+    }
+  };
 }
 
-std::any ast(std::istream_iterator<std::string>& it)
-{
-  if (*it == "(") {
-    List list;
-    while (*(++it) != ")") {
-      list.push_back(ast(it));
+namespace grammar {
+  using x3::lexeme;
+  using x3::double_;
+
+  using x3::ascii::char_;
+  using x3::ascii::string;
+
+  struct bool_table : x3::symbols<bool> {
+    bool_table() {
+      add("#t", true) ("#f", false);
     }
-    return list;
-  }
-  else {
-    return *it;
-  }
+  } const boolean;
+
+  x3::rule<class expr, ast::expr> expr = "expr";
+  x3::rule<class symbol, scm::Symbol> const symbol = "symbol";
+  x3::rule<class expr_value, ast::expr_value> expr_value = "expr_value";
+
+  auto const number = double_;
+  auto const symbol_def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
+  auto const multi_string = lexeme["[[" >> *(char_ - "]]") >> "]]"];
+  auto const quoted_string = lexeme['"' >> *(char_ - '"') >> '"'];
+  auto const expr_value_def = number | boolean | quoted_string | multi_string | symbol | expr;
+  auto const expr_def = '(' >> *expr_value >> ')';
+
+  BOOST_SPIRIT_DEFINE(expr, symbol, expr_value)
 }
 
-std::any read(std::string input)
+template <typename Iterator>
+std::any read(Iterator iter, Iterator end)
 {
-  input = std::regex_replace(input, std::regex(R"([(])"), " ( ");
-  input = std::regex_replace(input, std::regex(R"([)])"), " ) ");
+  ast::expr ast;
+  bool ok = phrase_parse(iter, end, grammar::expr, x3::ascii::space, ast);
 
-  std::vector<std::string> tokens;
-  std::regex re(" ");
-  std::sregex_token_iterator it(input.begin(), input.end(), re, -1);
-  for (it; it != std::sregex_token_iterator(); ++it) {
-
-    std::string token = *it;
-    token.erase(std::remove(token.begin(), token.end(), '\n'), token.end());
-
-    if (token == "[[") {
-      std::string str("\"");
-      while (*(++it) != "]]") {
-        str += *it;
-        str += " ";
-      }
-      str += "\"";
-      tokens.push_back(str);
-    }
-    else {
-      if (!token.empty()) {
-        tokens.push_back(token);
-      }
-    }
+  if (ok && iter == end) {
+    ast::scm_transform transform;
+    return scm::expand(transform(ast));
   }
-
-  return parse(ast(tokens.begin()));
-};
+  Iterator some = iter + 30;
+  std::string context(iter, (some > end) ? end : some);
+  throw std::runtime_error("Parsing failed\n stopped at:" + context);
+}
 } // namespace scm
+
+BOOST_FUSION_ADAPT_STRUCT(scm::ast::expr, values)

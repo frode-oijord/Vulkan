@@ -238,7 +238,7 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     std::istreambuf_iterator<char>() 
   };
 
-  std::any exp = scm::read(code);
+  std::any exp = scm::read(code.begin(), code.end());
   std::any sep = scm::eval(exp, env);
   return std::any_cast<std::shared_ptr<Node>>(sep);
 }

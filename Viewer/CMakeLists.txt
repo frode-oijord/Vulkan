@@ -19,6 +19,7 @@ else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
 endif(WIN32)
 
+include_directories($ENV{BOOST_ROOT})
 include_directories(${PROJECT_SOURCE_DIR}/../../glm)
 include_directories(${PROJECT_SOURCE_DIR}/../../gli)
 include_directories(${PROJECT_SOURCE_DIR}/../)
