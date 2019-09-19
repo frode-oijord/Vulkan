@@ -238,7 +238,8 @@ void print(std::any exp)
       std::cout << " ";
     }
     std::cout << ")";
-  } else {
+  } 
+  else {
     std::cout << "()";
   }
 }
@@ -349,21 +350,16 @@ inline std::any parse(std::any exp)
     return std::make_shared<List>(list);
   }
 
-  auto token = std::any_cast<std::string>(exp);
-  if (token == _true) {
-    return true;
+  if (exp.type() == typeid(Boolean)) {
+    return std::any_cast<Boolean>(exp);
   }
-  if (token == _false) {
-    return false;
+  if (exp.type() == typeid(std::string)) {
+    return std::any_cast<std::string>(exp);
   }
-  if (token.front() == '"' && token.back() == '"') {
-    return String(token.substr(1, token.size() - 2));
+  if (exp.type() == typeid(Number)) {
+    return std::any_cast<Number>(exp);
   }
-  std::regex match_number(R"(^[+-]?([0-9]*[.])?[0-9]+$)");
-  if (std::regex_match(token, match_number)) {
-    return Number(std::stod(token));
-  }
-  return Symbol(token);
+  return std::any_cast<Symbol>(exp);
 }
 
 std::any ast(std::vector<std::string>::iterator& token)
