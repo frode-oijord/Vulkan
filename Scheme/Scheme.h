@@ -305,75 +305,64 @@ namespace scm {
     }
   }
 
-  inline std::any expand(std::any exp)
-  {
-    if (exp.type() == typeid(List)) {
-      auto list = std::any_cast<List>(exp);
-      std::transform(list.begin(), list.end(), list.begin(), expand);
-
-      if (list[0].type() == typeid(Symbol)) {
-        auto token = std::any_cast<Symbol>(list[0]);
-
-        if (token == _quote) {
-          if (list.size() != 2) {
-            throw std::invalid_argument("wrong number of arguments to quote");
-          }
-          return Quote{ list[1] };
-        }
-        if (token == _if) {
-          if (list.size() != 4) {
-            throw std::invalid_argument("wrong number of arguments to if");
-          }
-          return If{ list[1], list[2], list[3] };
-        }
-        if (token == _lambda) {
-          if (list.size() != 3) {
-            throw std::invalid_argument("wrong Number of arguments to lambda");
-          }
-          return Lambda{ list[1], list[2] };
-        }
-        if (token == _begin) {
-          if (list.size() < 2) {
-            throw std::invalid_argument("wrong Number of arguments to begin");
-          }
-          return Begin{ std::make_shared<List>(list) };
-        }
-        if (token == _define) {
-          if (list.size() < 3 || list.size() > 4) {
-            throw std::invalid_argument("wrong number of arguments to define");
-          }
-          if (list[1].type() != typeid(Symbol)) {
-            throw std::invalid_argument("first argument to define must be a Symbol");
-          }
-          if (list.size() == 3) {
-            return Define{ std::any_cast<Symbol>(list[1]), list[2] };
-          }
-          return Define{ std::any_cast<Symbol>(list[1]), Lambda{ list[2], list[3] } };
-        }
-      }
-      return std::make_shared<List>(list);
-    }
-
-    return exp;
-  }
-
-
   typedef std::variant<Number, String, Symbol, Boolean, std::vector<struct value>> value_t;
 
   struct value : value_t {
     using base_type = value_t;
     using base_type::variant;
 
-    friend std::any scm(base_type const& v) {
+    friend std::any expand(base_type const& v) {
       struct {
         std::any operator()(Boolean const& v) const { return v; }
         std::any operator()(String const& v) const { return v; }
         std::any operator()(Symbol const& v) const { return v; }
         std::any operator()(Number const& v) const { return v; }
-        std::any operator()(std::vector<value> const& v) const {
+        std::any operator()(std::vector<value> const& v) const 
+        {
           scm::List list(v.size());
-          std::transform(v.begin(), v.end(), list.begin(), scm);
-          return list;
+          std::transform(v.begin(), v.end(), list.begin(), expand);
+
+          if (list[0].type() == typeid(Symbol)) {
+            auto token = std::any_cast<Symbol>(list[0]);
+
+            if (token == _quote) {
+              if (list.size() != 2) {
+                throw std::invalid_argument("wrong number of arguments to quote");
+              }
+              return Quote{ list[1] };
+            }
+            if (token == _if) {
+              if (list.size() != 4) {
+                throw std::invalid_argument("wrong number of arguments to if");
+              }
+              return If{ list[1], list[2], list[3] };
+            }
+            if (token == _lambda) {
+              if (list.size() != 3) {
+                throw std::invalid_argument("wrong Number of arguments to lambda");
+              }
+              return Lambda{ list[1], list[2] };
+            }
+            if (token == _begin) {
+              if (list.size() < 2) {
+                throw std::invalid_argument("wrong Number of arguments to begin");
+              }
+              return Begin{ std::make_shared<List>(list) };
+            }
+            if (token == _define) {
+              if (list.size() < 3 || list.size() > 4) {
+                throw std::invalid_argument("wrong number of arguments to define");
+              }
+              if (list[1].type() != typeid(Symbol)) {
+                throw std::invalid_argument("first argument to define must be a Symbol");
+              }
+              if (list.size() == 3) {
+                return Define{ std::any_cast<Symbol>(list[1]), list[2] };
+              }
+              return Define{ std::any_cast<Symbol>(list[1]), Lambda{ list[2], list[3] } };
+            }
+          }
+          return std::make_shared<List>(list);
         }
       } vis;
 
@@ -383,7 +372,7 @@ namespace scm {
 
     friend std::ostream& operator<<(std::ostream& os, base_type const& v) {
       struct {
-        std::ostream& operator()(Boolean const& b) const { return _os << (b ? "#t" : "#f"); }
+        std::ostream& operator()(Boolean const& b) const { return _os << (b ? _true : _false); }
         std::ostream& operator()(String const& s) const { return _os << "\"" << s << "\""; }
         std::ostream& operator()(Symbol const& s) const { return _os << s; }
         std::ostream& operator()(Number const& f) const { return _os << f; }
@@ -414,7 +403,7 @@ namespace scm {
 
     struct bool_table : x3::symbols<bool> {
       bool_table() {
-        add("#t", true) ("#f", false);
+        add(_true, true) (_false, false);
       }
     } const boolean_;
 
@@ -424,7 +413,8 @@ namespace scm {
     auto const symbol__def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
     const auto list__def = '(' >> *value_ >> ')';
 
-    const auto value__def = number_
+    const auto value__def
+      = number_
       | string_
       | boolean_
       | multi_string_
@@ -441,7 +431,7 @@ namespace scm {
   {
     value val;
     if (parse(begin, end, parser::entry_point, val)) {
-      return expand(scm(val));
+      return expand(val);
     }
     throw std::runtime_error("Parse failed, remaining input: " + std::string(begin, end));
   }
