@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 
-int main(int, char **)
+int main(int, char**)
 {
   std::cout << "Innovator Scheme REPL" << std::endl;
   scm::env_ptr env = scm::global_env();
@@ -19,7 +19,7 @@ int main(int, char **)
       exp = scm::eval(exp, env);
       scm::print(exp); std::cout << std::endl;
     }
-    catch (std::exception & e) {
+    catch (std::exception& e) {
       std::cerr << e.what() << std::endl;
     }
   }

@@ -6,21 +6,21 @@
 #include <memory>
 #include <sstream>
 #include <numeric>
+#include <variant>
 #include <iostream>
 #include <typeinfo>
 #include <algorithm>
 #include <functional>
 #include <unordered_map>
 
+#include <boost/fusion/adapted.hpp>
 #include <boost/spirit/home/x3.hpp>
-#include <boost/spirit/home/x3/support/ast/variant.hpp>
-#include <boost/fusion/include/adapt_struct.hpp>
 
 namespace scm {
 
   typedef std::vector<std::any> List;
   typedef std::shared_ptr<List> lst_ptr;
-  typedef std::function<std::any(const List & args)> fun_ptr;
+  typedef std::function<std::any(const List& args)> fun_ptr;
 
   typedef bool Boolean;
   typedef double Number;
@@ -28,7 +28,7 @@ namespace scm {
 
   struct Symbol : public std::string {
     Symbol() = default;
-    explicit Symbol(const String & s) : std::string(s) {}
+    explicit Symbol(const String& s) : std::string(s) {}
   };
 
   class Env;
@@ -69,7 +69,7 @@ namespace scm {
   };
 
   template <typename T>
-  std::vector<T> any_cast(const List & lst)
+  std::vector<T> any_cast(const List& lst)
   {
     std::vector<T> args(lst.size());
     std::transform(lst.begin(), lst.end(), args.begin(),
@@ -82,63 +82,63 @@ namespace scm {
   {
     std::vector<T> args(lst.size());
     std::transform(lst.begin(), lst.end(), args.begin(),
-      [](std::any exp) { 
-      double num = any_cast<double>(exp);
-      return static_cast<T>(num);
-    });
+      [](std::any exp) {
+        double num = any_cast<double>(exp);
+        return static_cast<T>(num);
+      });
     return args;
   }
 
-  fun_ptr plus = [](const List & lst) {
+  fun_ptr plus = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::plus<Number>());
   };
 
-  fun_ptr minus = [](const List & lst) {
+  fun_ptr minus = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::minus<Number>());
   };
 
-  fun_ptr divides = [](const List & lst) {
+  fun_ptr divides = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::divides<Number>());
   };
 
-  fun_ptr multiplies = [](const List & lst) {
+  fun_ptr multiplies = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return std::accumulate(next(args.begin()), args.end(), args.front(), std::multiplies<Number>());
   };
 
-  fun_ptr greater = [](const List & lst) {
+  fun_ptr greater = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return Boolean(args[0] > args[1]);
   };
 
-  fun_ptr less = [](const List & lst) {
+  fun_ptr less = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return Boolean(args[0] < args[1]);
   };
 
-  fun_ptr equal = [](const List & lst) {
+  fun_ptr equal = [](const List& lst) {
     std::vector<Number> args = any_cast<Number>(lst);
     return Boolean(args[0] == args[1]);
   };
 
-  fun_ptr car = [](const List & lst) {
+  fun_ptr car = [](const List& lst) {
     auto l = std::any_cast<lst_ptr>(lst.front());
     return l->front();
   };
 
-  fun_ptr cdr = [](const List & lst) {
+  fun_ptr cdr = [](const List& lst) {
     auto l = std::any_cast<lst_ptr>(lst.front());
     return std::make_shared<List>(next(l->begin()), l->end());
   };
 
-  fun_ptr list = [](const List & lst) {
+  fun_ptr list = [](const List& lst) {
     return std::make_shared<List>(lst.begin(), lst.end());
   };
 
-  fun_ptr length = [](const List & lst) {
+  fun_ptr length = [](const List& lst) {
     auto l = std::any_cast<lst_ptr>(lst.front());
     return static_cast<Number>(l->size());
   };
@@ -150,7 +150,7 @@ namespace scm {
     {}
     ~Env() = default;
 
-    explicit Env(const std::any & parm, const List & args, env_ptr outer)
+    explicit Env(const std::any& parm, const List& args, env_ptr outer)
       : outer(std::move(outer))
     {
       if (parm.type() == typeid(lst_ptr)) {
@@ -200,260 +200,259 @@ namespace scm {
     });
   }
 
-void print(std::any exp) 
-{
-  if (exp.type() == typeid(Number)) {
-    std::cout << std::any_cast<Number>(exp);
-  } 
-  else if (exp.type() == typeid(Symbol)) {
-    std::cout << std::any_cast<Symbol>(exp);
-  }
-  else if (exp.type() == typeid(String)) {
-    std::cout << std::any_cast<String>(exp);
-  }
-  else if (exp.type() == typeid(Boolean)) {
-    std::string s = std::any_cast<Boolean>(exp) ? "#t" : "#f";
-    std::cout << s;
-  }
-  else if (exp.type() == typeid(Begin)) {
-    std::cout << _begin;
-  }
-  else if (exp.type() == typeid(Define)) {
-    std::cout << _define;
-  }
-  else if (exp.type() == typeid(Lambda)) {
-    std::cout << _lambda;
-  }
-  else if (exp.type() == typeid(If)) {
-    std::cout << _if;
-  }
-  else if (exp.type() == typeid(Quote)) {
-    std::cout << _quote;
-  }
-  else if (exp.type() == typeid(fun_ptr)) {
-    std::cout << "function";
-  }
-  else if (exp.type() == typeid(lst_ptr)) {
-    auto & list = *std::any_cast<lst_ptr>(exp);
-
-    std::cout << "(";
-    for (auto s : list) {
-      print(s);
-      std::cout << " ";
+  void print(std::any exp)
+  {
+    if (exp.type() == typeid(Number)) {
+      std::cout << std::any_cast<Number>(exp);
     }
-    std::cout << ")";
-  } 
-  else {
-    std::cout << "()";
-  }
-}
+    else if (exp.type() == typeid(Symbol)) {
+      std::cout << std::any_cast<Symbol>(exp);
+    }
+    else if (exp.type() == typeid(String)) {
+      std::cout << std::any_cast<String>(exp);
+    }
+    else if (exp.type() == typeid(Boolean)) {
+      std::string s = std::any_cast<Boolean>(exp) ? "#t" : "#f";
+      std::cout << s;
+    }
+    else if (exp.type() == typeid(Begin)) {
+      std::cout << _begin;
+    }
+    else if (exp.type() == typeid(Define)) {
+      std::cout << _define;
+    }
+    else if (exp.type() == typeid(Lambda)) {
+      std::cout << _lambda;
+    }
+    else if (exp.type() == typeid(If)) {
+      std::cout << _if;
+    }
+    else if (exp.type() == typeid(Quote)) {
+      std::cout << _quote;
+    }
+    else if (exp.type() == typeid(fun_ptr)) {
+      std::cout << "function";
+    }
+    else if (exp.type() == typeid(lst_ptr)) {
+      auto& list = *std::any_cast<lst_ptr>(exp);
 
-std::any eval(std::any exp, env_ptr env)
-{
-  while (true) {
-    if (exp.type() == typeid(Number) ||
+      std::cout << "(";
+      for (auto s : list) {
+        print(s);
+        std::cout << " ";
+      }
+      std::cout << ")";
+    }
+    else {
+      std::cout << "()";
+    }
+  }
+
+  std::any eval(std::any exp, env_ptr env)
+  {
+    while (true) {
+      if (exp.type() == typeid(Number) ||
         exp.type() == typeid(String) ||
         exp.type() == typeid(Boolean)) {
-       return exp;
-    }
-    if (exp.type() == typeid(Symbol)) {
-      auto symbol = std::any_cast<Symbol>(exp);
-      return env->get(symbol);
-    }
-    if (exp.type() == typeid(Define)) {
-      auto define = std::any_cast<Define>(exp);
-      return env->inner[define.sym] = eval(define.exp, env);
-    }
-    if (exp.type() == typeid(Lambda)) {
-      auto lambda = std::any_cast<Lambda>(exp);
-      return Function{ lambda.parms, lambda.body, env };
-    }
-    if (exp.type() == typeid(Quote)) {
-      auto quote = std::any_cast<Quote>(exp);
-      return quote.exp;
-    }
-    if (exp.type() == typeid(If)) {
-      auto if_ = std::any_cast<If>(exp);
-      exp = std::any_cast<Boolean>(eval(if_.test, env)) ? if_.conseq : if_.alt;
-    } 
-    else if (exp.type() == typeid(Begin)) {
-      auto begin = std::any_cast<Begin>(exp);
-      std::transform(next(begin.exps->begin()), begin.exps->end(), begin.exps->begin(),
-        std::bind(eval, std::placeholders::_1, env));
-      exp = begin.exps->back();
-    } 
-    else {
-      auto list = std::any_cast<lst_ptr>(exp);
-      auto call = List(list->size());
-
-      std::transform(list->begin(), list->end(), call.begin(),
-        std::bind(eval, std::placeholders::_1, env));
-
-      auto func = call.front();
-      auto args = List(next(call.begin()), call.end());
-
-      if (func.type() == typeid(Function)) {
-        auto function = std::any_cast<Function>(func);
-        exp = function.body;
-        env = std::make_shared<Env>(function.parms, args, function.env);
+        return exp;
+      }
+      if (exp.type() == typeid(Symbol)) {
+        auto symbol = std::any_cast<Symbol>(exp);
+        return env->get(symbol);
+      }
+      if (exp.type() == typeid(Define)) {
+        auto define = std::any_cast<Define>(exp);
+        return env->inner[define.sym] = eval(define.exp, env);
+      }
+      if (exp.type() == typeid(Lambda)) {
+        auto lambda = std::any_cast<Lambda>(exp);
+        return Function{ lambda.parms, lambda.body, env };
+      }
+      if (exp.type() == typeid(Quote)) {
+        auto quote = std::any_cast<Quote>(exp);
+        return quote.exp;
+      }
+      if (exp.type() == typeid(If)) {
+        auto if_ = std::any_cast<If>(exp);
+        exp = std::any_cast<Boolean>(eval(if_.test, env)) ? if_.conseq : if_.alt;
+      }
+      else if (exp.type() == typeid(Begin)) {
+        auto begin = std::any_cast<Begin>(exp);
+        std::transform(next(begin.exps->begin()), begin.exps->end(), begin.exps->begin(),
+          std::bind(eval, std::placeholders::_1, env));
+        exp = begin.exps->back();
       }
       else {
-        auto function = std::any_cast<fun_ptr>(func);
-        return function(args);
+        auto list = std::any_cast<lst_ptr>(exp);
+        auto call = List(list->size());
+
+        std::transform(list->begin(), list->end(), call.begin(),
+          std::bind(eval, std::placeholders::_1, env));
+
+        auto func = call.front();
+        auto args = List(next(call.begin()), call.end());
+
+        if (func.type() == typeid(Function)) {
+          auto function = std::any_cast<Function>(func);
+          exp = function.body;
+          env = std::make_shared<Env>(function.parms, args, function.env);
+        }
+        else {
+          auto function = std::any_cast<fun_ptr>(func);
+          return function(args);
+        }
       }
     }
   }
-}
 
-inline std::any expand(std::any exp)
-{
-  if (exp.type() == typeid(List)) {
-    auto list = std::any_cast<List>(exp);
-    std::transform(list.begin(), list.end(), list.begin(), expand);
+  inline std::any expand(std::any exp)
+  {
+    if (exp.type() == typeid(List)) {
+      auto list = std::any_cast<List>(exp);
+      std::transform(list.begin(), list.end(), list.begin(), expand);
 
-    if (list[0].type() == typeid(Symbol)) {
-      auto token = std::any_cast<Symbol>(list[0]);
+      if (list[0].type() == typeid(Symbol)) {
+        auto token = std::any_cast<Symbol>(list[0]);
 
-      if (token == _quote) {
-        if (list.size() != 2) {
-          throw std::invalid_argument("wrong number of arguments to quote");
+        if (token == _quote) {
+          if (list.size() != 2) {
+            throw std::invalid_argument("wrong number of arguments to quote");
+          }
+          return Quote{ list[1] };
         }
-        return Quote{ list[1] };
+        if (token == _if) {
+          if (list.size() != 4) {
+            throw std::invalid_argument("wrong number of arguments to if");
+          }
+          return If{ list[1], list[2], list[3] };
+        }
+        if (token == _lambda) {
+          if (list.size() != 3) {
+            throw std::invalid_argument("wrong Number of arguments to lambda");
+          }
+          return Lambda{ list[1], list[2] };
+        }
+        if (token == _begin) {
+          if (list.size() < 2) {
+            throw std::invalid_argument("wrong Number of arguments to begin");
+          }
+          return Begin{ std::make_shared<List>(list) };
+        }
+        if (token == _define) {
+          if (list.size() < 3 || list.size() > 4) {
+            throw std::invalid_argument("wrong number of arguments to define");
+          }
+          if (list[1].type() != typeid(Symbol)) {
+            throw std::invalid_argument("first argument to define must be a Symbol");
+          }
+          if (list.size() == 3) {
+            return Define{ std::any_cast<Symbol>(list[1]), list[2] };
+          }
+          return Define{ std::any_cast<Symbol>(list[1]), Lambda{ list[2], list[3] } };
+        }
       }
-      if (token == _if) {
-        if (list.size() != 4) {
-          throw std::invalid_argument("wrong number of arguments to if");
-        }
-        return If{ list[1], list[2], list[3] };
-      }
-      if (token == _lambda) {
-        if (list.size() != 3) {
-          throw std::invalid_argument("wrong Number of arguments to lambda");
-        }
-        return Lambda{ list[1], list[2] };
-      }
-      if (token == _begin) {
-        if (list.size() < 2) {
-          throw std::invalid_argument("wrong Number of arguments to begin");
-        }
-        return Begin{ std::make_shared<List>(list) };
-      }
-      if (token == _define) {
-        if (list.size() < 3 || list.size() > 4) {
-          throw std::invalid_argument("wrong number of arguments to define");
-        }
-        if (list[1].type() != typeid(Symbol)) {
-          throw std::invalid_argument("first argument to define must be a Symbol");
-        }
-        if (list.size() == 3) {
-          return Define{ std::any_cast<Symbol>(list[1]), list[2] };
-        }
-        return Define{ std::any_cast<Symbol>(list[1]), Lambda{ list[2], list[3] } };
-      }
+      return std::make_shared<List>(list);
     }
-    return std::make_shared<List>(list);
+
+    if (exp.type() == typeid(Boolean)) {
+      return std::any_cast<Boolean>(exp);
+    }
+    if (exp.type() == typeid(std::string)) {
+      return std::any_cast<std::string>(exp);
+    }
+    if (exp.type() == typeid(Number)) {
+      return std::any_cast<Number>(exp);
+    }
+    return std::any_cast<Symbol>(exp);
   }
 
-  if (exp.type() == typeid(Boolean)) {
-    return std::any_cast<Boolean>(exp);
-  }
-  if (exp.type() == typeid(std::string)) {
-    return std::any_cast<std::string>(exp);
-  }
-  if (exp.type() == typeid(Number)) {
-    return std::any_cast<Number>(exp);
-  }
-  return std::any_cast<Symbol>(exp);
-}
 
-namespace x3 = boost::spirit::x3;
+  typedef std::variant<Number, String, Symbol, Boolean, std::vector<struct value>> value_t;
 
-// AST definition
-namespace ast
-{
-  struct expr_value : x3::variant<
-    scm::Symbol,
-    scm::Boolean,
-    scm::Number,
-    std::string,
-    x3::forward_ast<struct expr>> {
+  struct value : value_t {
+    using base_type = value_t;
+    using base_type::variant;
 
-    using base_type::base_type;
-    using base_type::operator=;
+    std::any scm() const {
+      struct {
+        std::any operator()(Boolean const& v) const { return v; }
+        std::any operator()(String const& v) const { return v; }
+        std::any operator()(Symbol const& v) const { return v; }
+        std::any operator()(Number const& v) const { return v; }
+        std::any operator()(std::vector<value> const& v) const {
+          scm::List list;
+          for (auto& value : v) {
+            list.push_back(value.scm());
+          }
+          return list;
+        }
+      } vis;
+
+      return std::visit(vis, *this);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, base_type const& v) {
+      struct {
+        std::ostream& operator()(Boolean const& b) const { return _os << (b ? "#t" : "#f"); }
+        std::ostream& operator()(String const& s) const { return _os << "\"" << s << "\""; }
+        std::ostream& operator()(Symbol const& s) const { return _os << s; }
+        std::ostream& operator()(Number const& f) const { return _os << f; }
+        std::ostream& operator()(std::vector<value> const& v) const {
+          _os << "(";
+          for (auto& el : v) _os << el << " ";
+          return _os << ')';
+        }
+        std::ostream& _os;
+      } vis{ os };
+
+      return std::visit(vis, v);
+    }
   };
 
-  struct expr {
-    std::vector<expr_value> values;
-  };
+  namespace parser {
+    namespace x3 = boost::spirit::x3;
+    using x3::char_;
+    using x3::lexeme;
+    using x3::double_;
 
-  struct scm_transform {
-    typedef std::any result_type;
+    x3::rule<struct symbol_class, Symbol> symbol_ = "symbol";
+    x3::rule<struct number_class, Number> number_ = "number";
+    x3::rule<struct string_class, String> string_ = "string";
+    x3::rule<struct value_class, value> const value_ = "value";
+    x3::rule<struct list_class, std::vector<value> > list_ = "list";
+    x3::rule<struct multi_string_class, String> multi_string_ = "multi_string";
 
-    std::any operator()(expr const& ast) const
-    {
-      scm::List list;
-      for (auto& value : ast.values) {
-        list.push_back(boost::apply_visitor(scm_transform(), value));
+    struct bool_table : x3::symbols<bool> {
+      bool_table() {
+        add("#t", true) ("#f", false);
       }
-      return list;
-    }
+    } const boolean_;
 
-    std::any operator()(std::string const& value) const {
-      return value;
-    }
-    std::any operator()(scm::Number const& value) const {
-      return value;
-    }
-    std::any operator()(scm::Symbol const& value) const {
-      return value;
-    }
-    std::any operator()(scm::Boolean const& value) const {
-      return value;
-    }
-  };
-}
+    auto const number__def = double_;
+    auto const string__def = lexeme['"' >> *(char_ - '"') >> '"'];
+    auto const multi_string__def = lexeme["[[" >> *(char_ - "]]") >> "]]"];
+    auto const symbol__def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
+    const auto list__def = '(' >> *value_ >> ')';
 
-namespace grammar {
-  using x3::lexeme;
-  using x3::double_;
+    const auto value__def = number_
+      | string_
+      | boolean_
+      | multi_string_
+      | symbol_
+      | list_;
 
-  using x3::ascii::char_;
-  using x3::ascii::string;
+    BOOST_SPIRIT_DEFINE(value_, number_, string_, multi_string_, symbol_, list_)
 
-  struct bool_table : x3::symbols<bool> {
-    bool_table() {
-      add("#t", true) ("#f", false);
-    }
-  } const boolean;
-
-  x3::rule<class expr, ast::expr> expr = "expr";
-  x3::rule<class symbol, scm::Symbol> const symbol = "symbol";
-  x3::rule<class expr_value, ast::expr_value> expr_value = "expr_value";
-
-  auto const number = double_;
-  auto const symbol_def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
-  auto const multi_string = lexeme["[[" >> *(char_ - "]]") >> "]]"];
-  auto const quoted_string = lexeme['"' >> *(char_ - '"') >> '"'];
-  auto const expr_value_def = number | boolean | quoted_string | multi_string | symbol | expr;
-  auto const expr_def = '(' >> *expr_value >> ')';
-
-  BOOST_SPIRIT_DEFINE(expr, symbol, expr_value)
-}
-
-template <typename Iterator>
-std::any read(Iterator iter, Iterator end)
-{
-  ast::expr ast;
-  bool ok = phrase_parse(iter, end, grammar::expr, x3::ascii::space, ast);
-
-  if (ok && iter == end) {
-    ast::scm_transform transform;
-    return scm::expand(transform(ast));
+      const auto entry_point = x3::skip(x3::space)[value_];
   }
-  Iterator some = iter + 30;
-  std::string context(iter, (some > end) ? end : some);
-  throw std::runtime_error("Parsing failed\n stopped at:" + context);
-}
-} // namespace scm
 
-BOOST_FUSION_ADAPT_STRUCT(scm::ast::expr, values)
+  template <typename Iterator>
+  std::any read(Iterator begin, Iterator end)
+  {
+    value val;
+    if (parse(begin, end, parser::entry_point, val)) {
+      return expand(val.scm());
+    }
+    throw std::runtime_error("Parse failed, remaining input: " + std::string(begin, end));
+  }
+}
