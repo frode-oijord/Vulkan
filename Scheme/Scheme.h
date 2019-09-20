@@ -354,16 +354,7 @@ namespace scm {
       return std::make_shared<List>(list);
     }
 
-    if (exp.type() == typeid(Boolean)) {
-      return std::any_cast<Boolean>(exp);
-    }
-    if (exp.type() == typeid(std::string)) {
-      return std::any_cast<std::string>(exp);
-    }
-    if (exp.type() == typeid(Number)) {
-      return std::any_cast<Number>(exp);
-    }
-    return std::any_cast<Symbol>(exp);
+    return exp;
   }
 
 
@@ -373,23 +364,22 @@ namespace scm {
     using base_type = value_t;
     using base_type::variant;
 
-    std::any scm() const {
+    friend std::any scm(base_type const& v) {
       struct {
         std::any operator()(Boolean const& v) const { return v; }
         std::any operator()(String const& v) const { return v; }
         std::any operator()(Symbol const& v) const { return v; }
         std::any operator()(Number const& v) const { return v; }
         std::any operator()(std::vector<value> const& v) const {
-          scm::List list;
-          for (auto& value : v) {
-            list.push_back(value.scm());
-          }
+          scm::List list(v.size());
+          std::transform(v.begin(), v.end(), list.begin(), scm);
           return list;
         }
       } vis;
 
-      return std::visit(vis, *this);
+      return std::visit(vis, v);
     }
+
 
     friend std::ostream& operator<<(std::ostream& os, base_type const& v) {
       struct {
@@ -443,7 +433,7 @@ namespace scm {
 
     BOOST_SPIRIT_DEFINE(value_, number_, string_, multi_string_, symbol_, list_)
 
-      const auto entry_point = x3::skip(x3::space)[value_];
+    const auto entry_point = x3::skip(x3::space)[value_];
   }
 
   template <typename Iterator>
@@ -451,7 +441,7 @@ namespace scm {
   {
     value val;
     if (parse(begin, end, parser::entry_point, val)) {
-      return expand(val.scm());
+      return expand(scm(val));
     }
     throw std::runtime_error("Parse failed, remaining input: " + std::string(begin, end));
   }
