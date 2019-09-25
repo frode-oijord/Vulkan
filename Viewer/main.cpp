@@ -55,57 +55,21 @@ int main(int argc, char *argv[])
                                                  device_layers,
                                                  device_extensions);
 
-    auto color_attachment = std::make_shared<FramebufferAttachment>(VK_FORMAT_B8G8R8A8_UNORM,
-                                                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                                                    VK_IMAGE_ASPECT_COLOR_BIT);
+    auto color_attachment = std::make_shared<FramebufferAttachment>(
+      VK_FORMAT_B8G8R8A8_UNORM,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      VK_IMAGE_ASPECT_COLOR_BIT);
 
-    auto depth_attachment = std::make_shared<FramebufferAttachment>(VK_FORMAT_D32_SFLOAT,
-                                                                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                                                    VK_IMAGE_ASPECT_DEPTH_BIT);
+    auto depth_attachment = std::make_shared<FramebufferAttachment>(
+      VK_FORMAT_D32_SFLOAT,
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+      VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    std::vector<VkAttachmentDescription> attachment_descriptions{ {
-        0,                                                    // flags
-        color_attachment->format,                             // format
-        VK_SAMPLE_COUNT_1_BIT,                                // samples
-        VK_ATTACHMENT_LOAD_OP_CLEAR,                          // loadOp
-        VK_ATTACHMENT_STORE_OP_STORE,                         // storeOp
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,                      // stencilLoadOp
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,                     // stencilStoreOp
-        VK_IMAGE_LAYOUT_UNDEFINED,                            // initialLayout
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL              // finalLayout
-      }, {
-        0,                                                    // flags
-        depth_attachment->format,                             // format
-        VK_SAMPLE_COUNT_1_BIT,                                // samples
-        VK_ATTACHMENT_LOAD_OP_CLEAR,                          // loadOp
-        VK_ATTACHMENT_STORE_OP_STORE,                         // storeOp
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,                      // stencilLoadOp
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,                     // stencilStoreOp
-        VK_IMAGE_LAYOUT_UNDEFINED,                            // initialLayout
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL      // finalLayout
-    } };
-
-    std::vector<std::shared_ptr<SubpassObject>> subpass_objects{
-      std::make_shared<SubpassObject>(
-        0,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        std::vector<VkAttachmentReference>{},
-        std::vector<VkAttachmentReference>{ { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL } },
-        std::vector<VkAttachmentReference>{},
-        VkAttachmentReference{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL },
-        std::vector<uint32_t>{}) 
-    };
-
-    std::shared_ptr<Group> renderpass = std::make_shared<RenderpassObject>(
-      attachment_descriptions,
-      subpass_objects);
-
-    std::vector<std::shared_ptr<FramebufferAttachment>> attachments{
+    auto framebuffer = std::make_shared<FramebufferObject>();
+    framebuffer->children = {
       color_attachment,
       depth_attachment,
     };
-
-    auto framebuffer = std::make_shared<FramebufferObject>(attachments);
 
     auto viewmatrix = std::make_shared<ViewMatrix>(glm::dvec3(0, 2, 4), 
                                                    glm::dvec3(0, 0, 0), 
@@ -113,6 +77,7 @@ int main(int argc, char *argv[])
 
     auto projmatrix = std::make_shared<ProjMatrix>(1000.0f, 0.1f, 1.0f, 0.7f);
 
+    auto renderpass = std::make_shared<Renderpass>();
     renderpass->children = {
       framebuffer,
       viewmatrix,
@@ -120,7 +85,46 @@ int main(int argc, char *argv[])
       eval_file("crate/crate.scm")
     };
 
-    VulkanWindow window(vulkan, device, color_attachment, renderpass, viewmatrix);
+    auto subpass = std::make_shared<SubpassDescription>(
+      0,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      std::vector<VkAttachmentReference>{},
+      std::vector<VkAttachmentReference>{ { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL } },
+      std::vector<VkAttachmentReference>{},
+      VkAttachmentReference{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL },
+      std::vector<uint32_t>{});
+
+    auto color_attachment_desc = std::make_shared<RenderpassAttachment>(
+      0,                                                    // flags
+      color_attachment->format,                             // format
+      VK_SAMPLE_COUNT_1_BIT,                                // samples
+      VK_ATTACHMENT_LOAD_OP_CLEAR,                          // loadOp
+      VK_ATTACHMENT_STORE_OP_STORE,                         // storeOp
+      VK_ATTACHMENT_LOAD_OP_DONT_CARE,                      // stencilLoadOp
+      VK_ATTACHMENT_STORE_OP_DONT_CARE,                     // stencilStoreOp
+      VK_IMAGE_LAYOUT_UNDEFINED,                            // initialLayout
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);            // finalLayout
+
+    auto depth_attachment_desc = std::make_shared<RenderpassAttachment>(
+      0,                                                    // flags
+      depth_attachment->format,                             // format
+      VK_SAMPLE_COUNT_1_BIT,                                // samples
+      VK_ATTACHMENT_LOAD_OP_CLEAR,                          // loadOp
+      VK_ATTACHMENT_STORE_OP_STORE,                         // storeOp
+      VK_ATTACHMENT_LOAD_OP_DONT_CARE,                      // stencilLoadOp
+      VK_ATTACHMENT_STORE_OP_DONT_CARE,                     // stencilStoreOp
+      VK_IMAGE_LAYOUT_UNDEFINED,                            // initialLayout
+      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);    // finalLayout
+
+    auto scene = std::make_shared<Group>();
+    scene->children = {
+      subpass,
+      color_attachment_desc,
+      depth_attachment_desc,
+      renderpass
+    };
+
+    VulkanWindow window(vulkan, device, color_attachment, scene, viewmatrix);
     return window.show();
   }
   catch (std::exception & e) {

@@ -49,6 +49,10 @@ struct State {
   std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
   std::vector<VkVertexInputAttributeDescription> vertex_attributes;
 
+  std::vector<VkImageView> framebuffer_attachments;
+  std::vector<VkSubpassDescription> subpass_descriptions;
+  std::vector<VkAttachmentDescription> attachment_descriptions;
+
   VulkanIndexBufferDescription index_buffer_description;
   std::vector<VkBuffer> vertex_attribute_buffers;
   std::vector<VkDeviceSize> vertex_attribute_buffer_offsets;

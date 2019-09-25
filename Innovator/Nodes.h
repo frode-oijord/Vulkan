@@ -1258,7 +1258,7 @@ private:
   VkDeviceSize offset;
 };
 
-class FramebufferAttachment {
+class FramebufferAttachment : public Node {
 public:
   NO_COPY_OR_ASSIGNMENT(FramebufferAttachment)
   virtual ~FramebufferAttachment() = default;
@@ -1274,7 +1274,8 @@ public:
     };
   }
 
-  VkImageView alloc(RenderManager * context)
+private:
+  void doAlloc(RenderManager* context) override
   {
     VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
     this->image = std::make_shared<VulkanImage>(context->device,
@@ -1301,7 +1302,8 @@ public:
                                                         VK_IMAGE_VIEW_TYPE_2D,
                                                         this->component_mapping,
                                                         this->subresource_range);
-    return this->imageview->view;
+
+    context->state.framebuffer_attachments.push_back(this->imageview->view);
   }
 
 public:
@@ -1322,26 +1324,21 @@ public:
   std::shared_ptr<VulkanImageView> imageview;
 };
 
-class FramebufferObject : public Node {
+class FramebufferObject : public Group {
 public:
   NO_COPY_OR_ASSIGNMENT(FramebufferObject)
   virtual ~FramebufferObject() = default;
 
-  FramebufferObject(std::vector<std::shared_ptr<FramebufferAttachment>> attachments)
-    : attachments(attachments)
+  FramebufferObject()
   {}
 
 private:
   void doAlloc(RenderManager* context) override
   {
-    std::vector<VkImageView> imageviews;
-    for (auto attachment : this->attachments) {
-      imageviews.push_back(attachment->alloc(context));
-    }
-
+    Group::doAlloc(context);
     this->framebuffer = std::make_unique<VulkanFramebuffer>(context->device,
                                                             context->state.renderpass,
-                                                            imageviews,
+                                                            context->state.framebuffer_attachments,
                                                             context->extent,
                                                             1);
   }
@@ -1353,20 +1350,21 @@ private:
 
 public:
   std::unique_ptr<VulkanFramebuffer> framebuffer;
-  std::vector<std::shared_ptr<FramebufferAttachment>> attachments;
 };
 
-class SubpassObject {
+class SubpassDescription : public Node {
 public:
-  NO_COPY_OR_ASSIGNMENT(SubpassObject)
+  NO_COPY_OR_ASSIGNMENT(SubpassDescription)
+  SubpassDescription() = delete;
+  virtual ~SubpassDescription() = default;
 
-    SubpassObject(VkSubpassDescriptionFlags flags,
-                  VkPipelineBindPoint bind_point,
-                  std::vector<VkAttachmentReference> input_attachments,
-                  std::vector<VkAttachmentReference> color_attachments,
-                  std::vector<VkAttachmentReference> resolve_attachments,
-                  VkAttachmentReference depth_stencil_attachment,
-                  std::vector<uint32_t> preserve_attachments) :
+  SubpassDescription(VkSubpassDescriptionFlags flags,
+                     VkPipelineBindPoint bind_point,
+                     std::vector<VkAttachmentReference> input_attachments,
+                     std::vector<VkAttachmentReference> color_attachments,
+                     std::vector<VkAttachmentReference> resolve_attachments,
+                     VkAttachmentReference depth_stencil_attachment,
+                     std::vector<uint32_t> preserve_attachments) :
     input_attachments(input_attachments),
     color_attachments(color_attachments),
     resolve_attachments(resolve_attachments),
@@ -1390,6 +1388,11 @@ public:
   VkSubpassDescription description;
 
 private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.subpass_descriptions.push_back(this->description);
+  }
+
   std::vector<VkAttachmentReference> input_attachments;
   std::vector<VkAttachmentReference> color_attachments;
   std::vector<VkAttachmentReference> resolve_attachments;
@@ -1397,20 +1400,40 @@ private:
   std::vector<uint32_t> preserve_attachments;
 };
 
-class RenderpassObject : public Group {
+class RenderpassAttachment: public Node {
 public:
-  NO_COPY_OR_ASSIGNMENT(RenderpassObject)
-  virtual ~RenderpassObject() = default;
+  NO_COPY_OR_ASSIGNMENT(RenderpassAttachment)
+  virtual ~RenderpassAttachment() = default;
 
-  RenderpassObject(std::vector<VkAttachmentDescription> attachments,
-                   std::vector<std::shared_ptr<SubpassObject>> subpasses) :
-    attachments(std::move(attachments)),
-    subpasses(std::move(subpasses))
+  RenderpassAttachment(VkAttachmentDescriptionFlags flags,
+                       VkFormat format,
+                       VkSampleCountFlagBits samples,
+                       VkAttachmentLoadOp loadOp,
+                       VkAttachmentStoreOp storeOp,
+                       VkAttachmentLoadOp stencilLoadOp,
+                       VkAttachmentStoreOp stencilStoreOp,
+                       VkImageLayout initialLayout,
+                       VkImageLayout finalLayout)
   {
-    for (auto & subpass : this->subpasses) {
-      this->subpass_descriptions.push_back(subpass->description);
-    }
+    this->description = {
+      flags, format, samples, loadOp, storeOp, stencilLoadOp, stencilStoreOp, initialLayout, finalLayout
+    };
   }
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.attachment_descriptions.push_back(this->description);
+  }
+
+  VkAttachmentDescription description;
+};
+
+class Renderpass : public Group {
+public:
+  NO_COPY_OR_ASSIGNMENT(Renderpass)
+  virtual ~Renderpass() = default;
+  Renderpass() = default;
 
 private:
   void doAlloc(RenderManager* context) override
@@ -1421,8 +1444,8 @@ private:
     this->rendering_finished = std::make_unique<VulkanSemaphore>(context->device);
 
     this->renderpass = std::make_shared<VulkanRenderpass>(context->device,
-                                                          this->attachments,
-                                                          this->subpass_descriptions);
+                                                          context->state.attachment_descriptions,
+                                                          context->state.subpass_descriptions);
 
     context->state.renderpass = this->renderpass;
     Group::doAlloc(context);
@@ -1493,9 +1516,6 @@ private:
                                  this->render_fence->fence);
   }
 
-  std::vector<VkAttachmentDescription> attachments;
-  std::vector<std::shared_ptr<SubpassObject>> subpasses;
-  std::vector<VkSubpassDescription> subpass_descriptions;
   VkQueue render_queue{ nullptr };
   std::unique_ptr<VulkanSemaphore> rendering_finished;
   std::unique_ptr<VulkanCommandBuffers> render_command;  
