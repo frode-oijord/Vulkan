@@ -25,9 +25,10 @@ int main(int argc, char *argv[])
 #endif
     };
 
-    auto vulkan = std::make_shared<VulkanInstance>("Innovator",
-                                                    instance_layers,
-                                                    instance_extensions);
+    auto vulkan = std::make_shared<VulkanInstance>(
+      "Innovator",
+      instance_layers,
+      instance_extensions);
 
 #ifdef DEBUG
     auto debugcb = std::make_unique<VulkanDebugCallback>(
@@ -50,10 +51,11 @@ int main(int argc, char *argv[])
     VkPhysicalDeviceFeatures device_features;
     ::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
 
-    auto device = std::make_shared<VulkanDevice>(vulkan,
-                                                 device_features,
-                                                 device_layers,
-                                                 device_extensions);
+    auto device = std::make_shared<VulkanDevice>(
+      vulkan,
+      device_features,
+      device_layers,
+      device_extensions);
 
     auto color_attachment = std::make_shared<FramebufferAttachment>(
       VK_FORMAT_B8G8R8A8_UNORM,
@@ -71,11 +73,13 @@ int main(int argc, char *argv[])
       depth_attachment,
     };
 
-    auto viewmatrix = std::make_shared<ViewMatrix>(glm::dvec3(0, 2, 4), 
-                                                   glm::dvec3(0, 0, 0), 
-                                                   glm::dvec3(0, 1, 0));
+    auto viewmatrix = std::make_shared<ViewMatrix>(
+      glm::dvec3(0, 2, 4), 
+      glm::dvec3(0, 0, 0), 
+      glm::dvec3(0, 1, 0));
 
-    auto projmatrix = std::make_shared<ProjMatrix>(1000.0f, 0.1f, 1.0f, 0.7f);
+    auto projmatrix = std::make_shared<ProjMatrix>(
+      1000.0f, 0.1f, 1.0f, 0.7f);
 
     auto renderpass = std::make_shared<Renderpass>();
     renderpass->children = {
