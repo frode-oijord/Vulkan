@@ -144,11 +144,12 @@ public:
 
   VulkanWindow(std::shared_ptr<VulkanInstance> vulkan,
                std::shared_ptr<VulkanDevice> device,
-               std::shared_ptr<FramebufferAttachment> color_attachment,
-               std::shared_ptr<Group> scene,
-               std::shared_ptr<ViewMatrix> viewmatrix) :
-    viewmatrix(std::move(viewmatrix))
+               std::shared_ptr<Group> scene)
   {
+    this->viewmatrix = find_first<ViewMatrix>(scene);
+    auto framebuffer = find_first<Framebuffer>(scene);
+    auto color_attachment = std::dynamic_pointer_cast<FramebufferAttachment>(framebuffer->children[0]);
+
     this->surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
     VkSurfaceCapabilitiesKHR surface_capabilities = this->surface->getSurfaceCapabilities(device);
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;

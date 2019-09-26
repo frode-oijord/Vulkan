@@ -101,6 +101,23 @@
    ]])
 
    (separator
+      (framebuffer
+         (framebufferattachment 
+            VK_FORMAT_B8G8R8A8_UNORM
+            (imageusageflags VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT VK_IMAGE_USAGE_TRANSFER_SRC_BIT VK_IMAGE_USAGE_SAMPLED_BIT)
+            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT))
+         (framebufferattachment
+            VK_FORMAT_D32_SFLOAT
+            (imageusageflags VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+            (imageaspectflags VK_IMAGE_ASPECT_DEPTH_BIT)))
+
+      (viewmatrix 
+         0 2 4 
+         0 0 0 
+         0 1 0)
+
+      (projmatrix 1000 0.1 1.0 0.7)
+
       (texture2d "crate/texture.ktx")
       (shader vertex VK_SHADER_STAGE_VERTEX_BIT)
       (shader fragment VK_SHADER_STAGE_FRAGMENT_BIT)

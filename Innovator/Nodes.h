@@ -99,6 +99,14 @@ public:
   ViewMatrix() = delete;
   virtual ~ViewMatrix() = default;
 
+  ViewMatrix(double m0, double m1, double m2, 
+             double m3, double m4, double m5, 
+             double m6, double m7, double m8) :
+    ViewMatrix(glm::dvec3(m0, m1, m2), 
+               glm::dvec3(m3, m4, m5), 
+               glm::dvec3(m6, m7, m8))
+  {}
+
   ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
     : mat(glm::lookAt(eye, target, up))
   {}
@@ -134,7 +142,7 @@ public:
   ProjMatrix() = delete;
   virtual ~ProjMatrix() = default;
 
-  ProjMatrix(float farplane, float nearplane, float aspectratio, float fieldofview)
+  ProjMatrix(double farplane, double nearplane, double aspectratio, double fieldofview)
     : farplane(farplane),
       nearplane(nearplane),
       aspectratio(aspectratio),
@@ -149,8 +157,8 @@ public:
 private:
   void doResize(RenderManager* context) override
   {
-    this->aspectratio = static_cast<float>(context->extent.width) /
-                        static_cast<float>(context->extent.height);
+    this->aspectratio = static_cast<double>(context->extent.width) /
+                        static_cast<double>(context->extent.height);
 
     this->mat = glm::perspective(this->fieldofview,
                                  this->aspectratio,
@@ -165,10 +173,10 @@ private:
 
   glm::dmat4 mat;
 
-  float farplane;
-  float nearplane;
-  float aspectratio;
-  float fieldofview;
+  double farplane;
+  double nearplane;
+  double aspectratio;
+  double fieldofview;
 };
 
 
@@ -1324,12 +1332,13 @@ public:
   std::shared_ptr<VulkanImageView> imageview;
 };
 
-class FramebufferObject : public Group {
+class Framebuffer : public Group {
 public:
-  NO_COPY_OR_ASSIGNMENT(FramebufferObject)
-  virtual ~FramebufferObject() = default;
+  NO_COPY_OR_ASSIGNMENT(Framebuffer)
+  virtual ~Framebuffer() = default;
 
-  FramebufferObject()
+  explicit Framebuffer(std::vector<std::shared_ptr<Node>> attachments) :
+    Group(std::move(attachments))
   {}
 
 private:
@@ -1358,8 +1367,7 @@ public:
   SubpassDescription() = delete;
   virtual ~SubpassDescription() = default;
 
-  SubpassDescription(VkSubpassDescriptionFlags flags,
-                     VkPipelineBindPoint bind_point,
+  SubpassDescription(VkPipelineBindPoint bind_point,
                      std::vector<VkAttachmentReference> input_attachments,
                      std::vector<VkAttachmentReference> color_attachments,
                      std::vector<VkAttachmentReference> resolve_attachments,
@@ -1372,7 +1380,7 @@ public:
     preserve_attachments(preserve_attachments)
   {
     this->description = {
-      flags,                                                    // flags
+      0,                                                        // flags
       bind_point,                                               // pipelineBindPoint
       static_cast<uint32_t>(this->input_attachments.size()),    // inputAttachmentCount
       this->input_attachments.data(),                           // pInputAttachments
@@ -1447,6 +1455,11 @@ private:
                                                           context->state.attachment_descriptions,
                                                           context->state.subpass_descriptions);
 
+    this->framebuffer = find_first<Framebuffer>(shared_from_this());
+    if (!this->framebuffer) {
+      throw std::runtime_error("RenderpassObject::doRender(): Renderpass does not contain a framebuffer!");
+    }
+
     context->state.renderpass = this->renderpass;
     Group::doAlloc(context);
   }
@@ -1475,13 +1488,6 @@ private:
       throw std::runtime_error("RenderpassObject::doRender(): Nothing to render!");
     }
 
-    std::shared_ptr<FramebufferObject> framebuffer = 
-      std::dynamic_pointer_cast<FramebufferObject>(this->children[0]);
-
-    if (!framebuffer) {
-      throw std::runtime_error("RenderpassObject::doRender(): Renderpass does not contain a framebuffer!");
-    }
-
     const VkRect2D renderarea{
       { 0, 0 },                 // offset
       renderer->extent          // extent
@@ -1498,7 +1504,7 @@ private:
       VulkanCommandBufferScope commandbuffer(this->render_command->buffer());
 
       VulkanRenderPassScope renderpass_scope(this->renderpass->renderpass,
-                                             framebuffer->framebuffer->framebuffer,
+                                             this->framebuffer->framebuffer->framebuffer,
                                              renderarea,
                                              clearvalues,
                                              this->render_command->buffer());
@@ -1521,6 +1527,7 @@ private:
   std::unique_ptr<VulkanCommandBuffers> render_command;  
   std::shared_ptr<VulkanFence> render_fence;
   std::shared_ptr<VulkanRenderpass> renderpass;
+  std::shared_ptr<Framebuffer> framebuffer;
 };
 
 class SwapchainObject : public Node {

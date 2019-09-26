@@ -26,7 +26,7 @@ std::shared_ptr<BaseType> make_shared_object(const List & lst)
 template <typename Type, typename... Arg, std::size_t... i>
 Type make_object_impl(const List & lst, std::index_sequence<i...>)
 {
-  return Type(std::any_cast<Arg>(lst[i])...);
+  return Type(std::any_cast<Arg>(lst[i])... );
 }
 
 template <typename Type, typename... Arg>
@@ -85,17 +85,22 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "int32", fun_ptr(make_object<int32_t, Number>) },
     { "uint32", fun_ptr(make_object<uint32_t, Number>) },
     { "count", fun_ptr(count) },
+    { "viewmatrix", fun_ptr(node<ViewMatrix, Number, Number, Number, Number, Number, Number, Number, Number, Number> ) },
+    { "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) },
+    { "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) },
     { "shader", fun_ptr(node<Shader, std::string, VkShaderStageFlagBits>) },
     { "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode>) },
     { "textureimage", fun_ptr(node<TextureImage, std::string>) },
     { "image", fun_ptr(node<Image, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) },
     { "imageview", fun_ptr(node<ImageView, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle>) },
     { "group", fun_ptr(shared_from_node_list<Group, std::shared_ptr<Node>>) },
+    { "framebufferattachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) },
     { "separator", fun_ptr(shared_from_node_list<Separator, std::shared_ptr<Node>>) },
     { "bufferdata-float", fun_ptr(bufferdata<float>) },
     { "bufferdata-uint32", fun_ptr(bufferdata<uint32_t>) },
     { "bufferusageflags", fun_ptr(flags<VkBufferUsageFlags, VkBufferUsageFlagBits>) },
     { "imageusageflags", fun_ptr(flags<VkImageUsageFlags, VkImageUsageFlagBits>) },
+    { "imageaspectflags", fun_ptr(flags<VkImageAspectFlags, VkImageAspectFlagBits>) },
     { "imagecreateflags", fun_ptr(flags<VkImageCreateFlags, VkImageCreateFlagBits>) },
     { "cpumemorybuffer", fun_ptr(node<CpuMemoryBuffer, VkBufferUsageFlags>) },
     { "gpumemorybuffer", fun_ptr(node<GpuMemoryBuffer, VkBufferUsageFlags>) },
@@ -161,6 +166,9 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL_KHR", VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL },
     { "VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL_KHR", VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL },
 
+    { "VK_IMAGE_ASPECT_COLOR_BIT", VK_IMAGE_ASPECT_COLOR_BIT },
+    { "VK_IMAGE_ASPECT_DEPTH_BIT", VK_IMAGE_ASPECT_DEPTH_BIT },
+
     { "VK_IMAGE_USAGE_TRANSFER_SRC_BIT", VK_IMAGE_USAGE_TRANSFER_SRC_BIT },
     { "VK_IMAGE_USAGE_TRANSFER_DST_BIT", VK_IMAGE_USAGE_TRANSFER_DST_BIT },
     { "VK_IMAGE_USAGE_SAMPLED_BIT", VK_IMAGE_USAGE_SAMPLED_BIT },
@@ -211,6 +219,9 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY },
     { "VK_PRIMITIVE_TOPOLOGY_PATCH_LIST", VK_PRIMITIVE_TOPOLOGY_PATCH_LIST },
 
+    { "VK_PIPELINE_BIND_POINT_GRAPHICS", VK_PIPELINE_BIND_POINT_GRAPHICS },
+    { "VK_PIPELINE_BIND_POINT_COMPUTE", VK_PIPELINE_BIND_POINT_COMPUTE },
+
     { "VK_INDEX_TYPE_UINT16", VK_INDEX_TYPE_UINT16 },
     { "VK_INDEX_TYPE_UINT32", VK_INDEX_TYPE_UINT32 },
 
@@ -220,9 +231,11 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "VK_FORMAT_R32_UINT", VK_FORMAT_R32_UINT },
     { "VK_FORMAT_R32_SINT", VK_FORMAT_R32_SINT },
     { "VK_FORMAT_R32_SFLOAT", VK_FORMAT_R32_SFLOAT },
+    { "VK_FORMAT_D32_SFLOAT", VK_FORMAT_D32_SFLOAT },
     { "VK_FORMAT_R32G32_UINT", VK_FORMAT_R32G32_UINT },
     { "VK_FORMAT_R32G32_SINT", VK_FORMAT_R32G32_SINT },
     { "VK_FORMAT_R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT },
+    { "VK_FORMAT_B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM },
     { "VK_FORMAT_R32G32B32_UINT", VK_FORMAT_R32G32B32_UINT },
     { "VK_FORMAT_R32G32B32_SINT", VK_FORMAT_R32G32B32_SINT },
     { "VK_FORMAT_R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT },

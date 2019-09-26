@@ -57,40 +57,12 @@ int main(int argc, char *argv[])
       device_layers,
       device_extensions);
 
-    auto color_attachment = std::make_shared<FramebufferAttachment>(
-      VK_FORMAT_B8G8R8A8_UNORM,
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_IMAGE_ASPECT_COLOR_BIT);
-
-    auto depth_attachment = std::make_shared<FramebufferAttachment>(
-      VK_FORMAT_D32_SFLOAT,
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-      VK_IMAGE_ASPECT_DEPTH_BIT);
-
-    auto framebuffer = std::make_shared<FramebufferObject>();
-    framebuffer->children = {
-      color_attachment,
-      depth_attachment,
-    };
-
-    auto viewmatrix = std::make_shared<ViewMatrix>(
-      glm::dvec3(0, 2, 4), 
-      glm::dvec3(0, 0, 0), 
-      glm::dvec3(0, 1, 0));
-
-    auto projmatrix = std::make_shared<ProjMatrix>(
-      1000.0f, 0.1f, 1.0f, 0.7f);
-
     auto renderpass = std::make_shared<Renderpass>();
     renderpass->children = {
-      framebuffer,
-      viewmatrix,
-      projmatrix,
       eval_file("crate/crate.scm")
     };
 
     auto subpass = std::make_shared<SubpassDescription>(
-      0,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
       std::vector<VkAttachmentReference>{},
       std::vector<VkAttachmentReference>{ { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL } },
@@ -100,7 +72,7 @@ int main(int argc, char *argv[])
 
     auto color_attachment_desc = std::make_shared<RenderpassAttachment>(
       0,                                                    // flags
-      color_attachment->format,                             // format
+      VK_FORMAT_B8G8R8A8_UNORM,                             // format
       VK_SAMPLE_COUNT_1_BIT,                                // samples
       VK_ATTACHMENT_LOAD_OP_CLEAR,                          // loadOp
       VK_ATTACHMENT_STORE_OP_STORE,                         // storeOp
@@ -111,7 +83,7 @@ int main(int argc, char *argv[])
 
     auto depth_attachment_desc = std::make_shared<RenderpassAttachment>(
       0,                                                    // flags
-      depth_attachment->format,                             // format
+      VK_FORMAT_D32_SFLOAT,                                 // format
       VK_SAMPLE_COUNT_1_BIT,                                // samples
       VK_ATTACHMENT_LOAD_OP_CLEAR,                          // loadOp
       VK_ATTACHMENT_STORE_OP_STORE,                         // storeOp
@@ -128,7 +100,7 @@ int main(int argc, char *argv[])
       renderpass
     };
 
-    VulkanWindow window(vulkan, device, color_attachment, scene, viewmatrix);
+    VulkanWindow window(vulkan, device, scene);
     return window.show();
   }
   catch (std::exception & e) {
