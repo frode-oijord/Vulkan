@@ -1413,8 +1413,7 @@ public:
   NO_COPY_OR_ASSIGNMENT(RenderpassAttachment)
   virtual ~RenderpassAttachment() = default;
 
-  RenderpassAttachment(VkAttachmentDescriptionFlags flags,
-                       VkFormat format,
+  RenderpassAttachment(VkFormat format,
                        VkSampleCountFlagBits samples,
                        VkAttachmentLoadOp loadOp,
                        VkAttachmentStoreOp storeOp,
@@ -1424,7 +1423,7 @@ public:
                        VkImageLayout finalLayout)
   {
     this->description = {
-      flags, format, samples, loadOp, storeOp, stencilLoadOp, stencilStoreOp, initialLayout, finalLayout
+      0, format, samples, loadOp, storeOp, stencilLoadOp, stencilStoreOp, initialLayout, finalLayout
     };
   }
 
@@ -1441,7 +1440,9 @@ class Renderpass : public Group {
 public:
   NO_COPY_OR_ASSIGNMENT(Renderpass)
   virtual ~Renderpass() = default;
-  Renderpass() = default;
+  Renderpass(std::vector<std::shared_ptr<Node>> children) :
+    Group(std::move(children))
+  {}
 
 private:
   void doAlloc(RenderManager* context) override

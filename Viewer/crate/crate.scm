@@ -101,26 +101,47 @@
    ]])
 
    (separator
-      (framebuffer
-         (framebufferattachment 
-            VK_FORMAT_B8G8R8A8_UNORM
-            (imageusageflags VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT VK_IMAGE_USAGE_TRANSFER_SRC_BIT VK_IMAGE_USAGE_SAMPLED_BIT)
-            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT))
-         (framebufferattachment
-            VK_FORMAT_D32_SFLOAT
-            (imageusageflags VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
-            (imageaspectflags VK_IMAGE_ASPECT_DEPTH_BIT)))
+      (renderpass-attachment
+         VK_FORMAT_B8G8R8A8_UNORM
+         VK_SAMPLE_COUNT_1_BIT
+         VK_ATTACHMENT_LOAD_OP_CLEAR
+         VK_ATTACHMENT_STORE_OP_STORE
+         VK_ATTACHMENT_LOAD_OP_DONT_CARE
+         VK_ATTACHMENT_STORE_OP_DONT_CARE
+         VK_IMAGE_LAYOUT_UNDEFINED
+         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 
-      (viewmatrix 
-         0 2 4 
-         0 0 0 
-         0 1 0)
+      (renderpass-attachment
+         VK_FORMAT_D32_SFLOAT
+         VK_SAMPLE_COUNT_1_BIT
+         VK_ATTACHMENT_LOAD_OP_CLEAR
+         VK_ATTACHMENT_STORE_OP_STORE
+         VK_ATTACHMENT_LOAD_OP_DONT_CARE
+         VK_ATTACHMENT_STORE_OP_DONT_CARE
+         VK_IMAGE_LAYOUT_UNDEFINED
+         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
 
-      (projmatrix 1000 0.1 1.0 0.7)
+      (renderpass
+         (framebuffer
+            (framebufferattachment 
+               VK_FORMAT_B8G8R8A8_UNORM
+               (imageusageflags VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT VK_IMAGE_USAGE_TRANSFER_SRC_BIT VK_IMAGE_USAGE_SAMPLED_BIT)
+               (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT))
+            (framebufferattachment
+               VK_FORMAT_D32_SFLOAT
+               (imageusageflags VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+               (imageaspectflags VK_IMAGE_ASPECT_DEPTH_BIT)))
 
-      (texture2d "crate/texture.ktx")
-      (shader vertex VK_SHADER_STAGE_VERTEX_BIT)
-      (shader fragment VK_SHADER_STAGE_FRAGMENT_BIT)
-      (indexed-shape 
-         (bufferdata-uint32 0 1 3 3 2 0 4 6 7 7 5 4 0 4 5 5 1 0 6 2 3 3 7 6 0 2 6 6 4 0 1 5 7 7 3 1)
-         (bufferdata-float 0 0 0 0 0 1 0 1 0 0 1 1 1 0 0 1 0 1 1 1 0 1 1 1))))
+         (viewmatrix 
+            0 2 4 
+            0 0 0 
+            0 1 0)
+
+         (projmatrix 1000 0.1 1.0 0.7)
+
+         (texture2d "crate/texture.ktx")
+         (shader vertex VK_SHADER_STAGE_VERTEX_BIT)
+         (shader fragment VK_SHADER_STAGE_FRAGMENT_BIT)
+         (indexed-shape 
+            (bufferdata-uint32 0 1 3 3 2 0 4 6 7 7 5 4 0 4 5 5 1 0 6 2 3 3 7 6 0 2 6 6 4 0 1 5 7 7 3 1)
+            (bufferdata-float 0 0 0 0 0 1 0 1 0 0 1 1 1 0 0 1 0 1 1 1 0 1 1 1)))))

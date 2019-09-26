@@ -76,6 +76,7 @@ Flags flags(const List& lst) {
   return flags;
 }
 
+
 std::shared_ptr<Node> eval_file(const std::string & filename)
 {
   env_ptr env = scm::global_env();
@@ -85,6 +86,8 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "int32", fun_ptr(make_object<int32_t, Number>) },
     { "uint32", fun_ptr(make_object<uint32_t, Number>) },
     { "count", fun_ptr(count) },
+    { "renderpass-attachment", fun_ptr(node<RenderpassAttachment, VkFormat, VkSampleCountFlagBits, VkAttachmentLoadOp, VkAttachmentStoreOp, VkAttachmentLoadOp, VkAttachmentStoreOp, VkImageLayout, VkImageLayout>) },
+    { "renderpass", fun_ptr(shared_from_node_list<Renderpass, std::shared_ptr<Node>>) },
     { "viewmatrix", fun_ptr(node<ViewMatrix, Number, Number, Number, Number, Number, Number, Number, Number, Number> ) },
     { "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) },
     { "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) },
@@ -114,6 +117,13 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "VK_FILTER_NEAREST", VK_FILTER_NEAREST },
     { "VK_FILTER_LINEAR", VK_FILTER_LINEAR },
     { "VK_FILTER_CUBIC_IMG", VK_FILTER_CUBIC_IMG },
+
+    { "VK_ATTACHMENT_LOAD_OP_LOAD", VK_ATTACHMENT_LOAD_OP_LOAD },
+    { "VK_ATTACHMENT_LOAD_OP_CLEAR", VK_ATTACHMENT_LOAD_OP_CLEAR },
+    { "VK_ATTACHMENT_LOAD_OP_DONT_CARE", VK_ATTACHMENT_LOAD_OP_DONT_CARE },
+
+    { "VK_ATTACHMENT_STORE_OP_STORE", VK_ATTACHMENT_STORE_OP_STORE },
+    { "VK_ATTACHMENT_STORE_OP_DONT_CARE", VK_ATTACHMENT_STORE_OP_DONT_CARE },
 
     { "VK_SAMPLER_MIPMAP_MODE_NEAREST", VK_SAMPLER_MIPMAP_MODE_NEAREST },
     { "VK_SAMPLER_MIPMAP_MODE_LINEAR", VK_SAMPLER_MIPMAP_MODE_LINEAR },
