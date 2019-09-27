@@ -18,6 +18,8 @@ struct State {
   class BufferData * bufferdata{ nullptr };
   class VulkanTextureImage* texture{ nullptr };
   std::shared_ptr<VulkanRenderpass> renderpass{ nullptr };
+  std::shared_ptr<VulkanFramebuffer> framebuffer{ nullptr };
+
   VkExtent2D extent{ 0, 0 };
 
   VkPipelineRasterizationStateCreateInfo rasterization_state{
@@ -48,6 +50,13 @@ struct State {
   std::vector<VkPushConstantRange> push_constant_ranges;
   std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
   std::vector<VkVertexInputAttributeDescription> vertex_attributes;
+
+  std::vector<VkAttachmentReference> input_attachments;
+  std::vector<VkAttachmentReference> color_attachments;
+  std::vector<VkAttachmentReference> resolve_attachments;
+  VkAttachmentReference depth_stencil_attachment;
+  std::vector<uint32_t> preserve_attachments;
+  VkPipelineBindPoint bind_point;
 
   std::vector<VkImageView> framebuffer_attachments;
   std::vector<VkSubpassDescription> subpass_descriptions;

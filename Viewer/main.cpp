@@ -57,17 +57,8 @@ int main(int argc, char *argv[])
       device_layers,
       device_extensions);
 
-    auto subpass = std::make_shared<SubpassDescription>(
-      VK_PIPELINE_BIND_POINT_GRAPHICS,
-      std::vector<VkAttachmentReference>{},
-      std::vector<VkAttachmentReference>{ { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL } },
-      std::vector<VkAttachmentReference>{},
-      VkAttachmentReference{ 1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL },
-      std::vector<uint32_t>{});
-
     auto scene = std::make_shared<Group>();
     scene->children = {
-      subpass,
       eval_file("crate/crate.scm")
     };
 

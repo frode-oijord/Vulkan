@@ -619,7 +619,7 @@ public:
   Shader() = delete;
   virtual ~Shader() = default;
 
-  explicit Shader(std::string glsl, const VkShaderStageFlagBits stage):
+  explicit Shader(const VkShaderStageFlagBits stage, std::string glsl):
     stage(stage)
   {
     //std::ifstream input(filename, std::ios::in);
@@ -1337,8 +1337,8 @@ public:
   NO_COPY_OR_ASSIGNMENT(Framebuffer)
   virtual ~Framebuffer() = default;
 
-  explicit Framebuffer(std::vector<std::shared_ptr<Node>> attachments) :
-    Group(std::move(attachments))
+  explicit Framebuffer(std::vector<std::shared_ptr<Node>> children) :
+    Group(std::move(children))
   {}
 
 private:
@@ -1350,6 +1350,7 @@ private:
                                                             context->state.framebuffer_attachments,
                                                             context->extent,
                                                             1);
+    context->state.framebuffer = this->framebuffer;
   }
 
   void doResize(RenderManager * context) override
@@ -1358,54 +1359,142 @@ private:
   }
 
 public:
-  std::unique_ptr<VulkanFramebuffer> framebuffer;
+  std::shared_ptr<VulkanFramebuffer> framebuffer;
 };
 
-class SubpassDescription : public Node {
+class InputAttachment : public Node {
+public:
+  NO_COPY_OR_ASSIGNMENT(InputAttachment)
+  virtual ~InputAttachment() = default;
+  explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
+    attachment({ attachment, layout })
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.input_attachments.push_back(this->attachment);
+  }
+
+  VkAttachmentReference attachment;
+};
+
+
+class ColorAttachment : public Node {
+public:
+  NO_COPY_OR_ASSIGNMENT(ColorAttachment)
+  virtual ~ColorAttachment() = default;
+  explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
+    attachment({ attachment, layout })
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.color_attachments.push_back(this->attachment);
+  }
+
+  VkAttachmentReference attachment;
+};
+
+
+class ResolveAttachment : public Node {
+public:
+  NO_COPY_OR_ASSIGNMENT(ResolveAttachment)
+  virtual ~ResolveAttachment() = default;
+  explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
+    attachment({ attachment, layout })
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.resolve_attachments.push_back(this->attachment);
+  }
+
+  VkAttachmentReference attachment;
+};
+
+class DepthStencilAttachment : public Node {
+public:
+  NO_COPY_OR_ASSIGNMENT(DepthStencilAttachment)
+  virtual ~DepthStencilAttachment() = default;
+  explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
+    attachment({ attachment, layout })
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.depth_stencil_attachment = this->attachment;
+  }
+
+  VkAttachmentReference attachment;
+};
+
+class PreserveAttachment : public Node {
+public:
+  NO_COPY_OR_ASSIGNMENT(PreserveAttachment)
+  virtual ~PreserveAttachment() = default;
+  explicit PreserveAttachment(uint32_t attachment) :
+    attachment(attachment)
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.preserve_attachments.push_back(this->attachment);
+  }
+
+  uint32_t attachment;
+};
+
+class PipelineBindpoint : public Node {
+public:
+  NO_COPY_OR_ASSIGNMENT(PipelineBindpoint)
+  virtual ~PipelineBindpoint() = default;
+  explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
+    bind_point(bind_point)
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    context->state.bind_point = this->bind_point;
+  }
+
+  VkPipelineBindPoint bind_point;
+};
+
+
+class SubpassDescription : public Group {
 public:
   NO_COPY_OR_ASSIGNMENT(SubpassDescription)
   SubpassDescription() = delete;
   virtual ~SubpassDescription() = default;
 
-  SubpassDescription(VkPipelineBindPoint bind_point,
-                     std::vector<VkAttachmentReference> input_attachments,
-                     std::vector<VkAttachmentReference> color_attachments,
-                     std::vector<VkAttachmentReference> resolve_attachments,
-                     VkAttachmentReference depth_stencil_attachment,
-                     std::vector<uint32_t> preserve_attachments) :
-    input_attachments(input_attachments),
-    color_attachments(color_attachments),
-    resolve_attachments(resolve_attachments),
-    depth_stencil_attachment(depth_stencil_attachment),
-    preserve_attachments(preserve_attachments)
-  {
-    this->description = {
-      0,                                                        // flags
-      bind_point,                                               // pipelineBindPoint
-      static_cast<uint32_t>(this->input_attachments.size()),    // inputAttachmentCount
-      this->input_attachments.data(),                           // pInputAttachments
-      static_cast<uint32_t>(this->color_attachments.size()),    // colorAttachmentCount
-      this->color_attachments.data(),                           // pColorAttachments
-      this->resolve_attachments.data(),                         // pResolveAttachments
-      &this->depth_stencil_attachment,                          // pDepthStencilAttachment
-      static_cast<uint32_t>(this->preserve_attachments.size()), // preserveAttachmentCount
-      this->preserve_attachments.data()                         // pPreserveAttachments
-    };
-  }
-
-  VkSubpassDescription description;
+  SubpassDescription(std::vector<std::shared_ptr<Node>> children) :
+    Group(std::move(children))
+  {}
 
 private:
   void doAlloc(RenderManager* context) override
   {
-    context->state.subpass_descriptions.push_back(this->description);
-  }
+    Group::doAlloc(context);
 
-  std::vector<VkAttachmentReference> input_attachments;
-  std::vector<VkAttachmentReference> color_attachments;
-  std::vector<VkAttachmentReference> resolve_attachments;
-  VkAttachmentReference depth_stencil_attachment;
-  std::vector<uint32_t> preserve_attachments;
+    context->state.subpass_descriptions.push_back({
+        0,                                                                 // flags
+        context->state.bind_point,                                         // pipelineBindPoint
+        static_cast<uint32_t>(context->state.input_attachments.size()),    // inputAttachmentCount
+        context->state.input_attachments.data(),                           // pInputAttachments
+        static_cast<uint32_t>(context->state.color_attachments.size()),    // colorAttachmentCount
+        context->state.color_attachments.data(),                           // pColorAttachments
+        context->state.resolve_attachments.data(),                         // pResolveAttachments
+        &context->state.depth_stencil_attachment,                          // pDepthStencilAttachment
+        static_cast<uint32_t>(context->state.preserve_attachments.size()), // preserveAttachmentCount
+        context->state.preserve_attachments.data()                         // pPreserveAttachments
+    });
+  }
 };
 
 class RenderpassAttachment: public Node {
@@ -1423,7 +1512,15 @@ public:
                        VkImageLayout finalLayout)
   {
     this->description = {
-      0, format, samples, loadOp, storeOp, stencilLoadOp, stencilStoreOp, initialLayout, finalLayout
+      0, 
+      format, 
+      samples, 
+      loadOp, 
+      storeOp, 
+      stencilLoadOp, 
+      stencilStoreOp, 
+      initialLayout, 
+      finalLayout
     };
   }
 
@@ -1434,6 +1531,79 @@ private:
   }
 
   VkAttachmentDescription description;
+};
+
+class RenderpassScope : public Group {
+public:
+  NO_COPY_OR_ASSIGNMENT(RenderpassScope)
+  virtual ~RenderpassScope() = default;
+  RenderpassScope(std::vector<std::shared_ptr<Node>> children) :
+    Group(std::move(children))
+  {}
+
+private:
+  void doAlloc(RenderManager* context) override
+  {
+    Group::doAlloc(context);
+
+    this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
+    this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
+    this->render_fence = std::make_unique<VulkanFence>(context->device);
+    this->rendering_finished = std::make_unique<VulkanSemaphore>(context->device);
+
+    this->renderpass = context->state.renderpass;
+    this->framebuffer = context->state.framebuffer;
+  }
+
+  void doResize(RenderManager* context) override
+  {
+    Group::doResize(context);
+    this->framebuffer = context->state.framebuffer;
+  }
+
+  void doRender(SceneRenderer * renderer) override
+  {
+    const VkRect2D renderarea{
+      { 0, 0 },                 // offset
+      renderer->extent          // extent
+    };
+
+    const std::vector<VkClearValue> clearvalues{
+      { { { 0.0f, 0.0f, 0.0f, 0.0f } } },
+      { { { 1.0f, 0 } } }
+    };
+
+    {
+      renderer->command = this->render_command.get();
+
+      VulkanCommandBufferScope commandbuffer(this->render_command->buffer());
+
+      VulkanRenderPassScope renderpass_scope(this->renderpass->renderpass,
+                                             this->framebuffer->framebuffer,
+                                             renderarea,
+                                             clearvalues,
+                                             this->render_command->buffer());
+
+      Group::doRender(renderer);
+    }
+
+    FenceScope fence(renderer->device->device, this->render_fence->fence);
+
+    std::vector<VkSemaphore> wait_semaphores{};
+    std::vector<VkSemaphore> signal_semaphores = { this->rendering_finished->semaphore };
+
+    this->render_command->submit(this->render_queue,
+                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                 this->render_fence->fence);
+  }
+
+
+  VkQueue render_queue{ nullptr };
+  std::unique_ptr<VulkanSemaphore> rendering_finished;
+  std::unique_ptr<VulkanCommandBuffers> render_command;
+  std::shared_ptr<VulkanFence> render_fence;
+  std::shared_ptr<VulkanRenderpass> renderpass;
+  std::shared_ptr<VulkanFramebuffer> framebuffer;
 };
 
 class Renderpass : public Group {
@@ -1447,22 +1617,11 @@ public:
 private:
   void doAlloc(RenderManager* context) override
   {
-    this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
-    this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
-    this->render_fence = std::make_unique<VulkanFence>(context->device);
-    this->rendering_finished = std::make_unique<VulkanSemaphore>(context->device);
-
+    Group::doAlloc(context);
     this->renderpass = std::make_shared<VulkanRenderpass>(context->device,
                                                           context->state.attachment_descriptions,
                                                           context->state.subpass_descriptions);
-
-    this->framebuffer = find_first<Framebuffer>(shared_from_this());
-    if (!this->framebuffer) {
-      throw std::runtime_error("RenderpassObject::doRender(): Renderpass does not contain a framebuffer!");
-    }
-
     context->state.renderpass = this->renderpass;
-    Group::doAlloc(context);
   }
 
   void doResize(RenderManager* context) override
@@ -1483,52 +1642,7 @@ private:
     Group::doRecord(recorder);
   }
 
-  void doRender(SceneRenderer * renderer) override
-  {
-    if (this->children.empty()) {
-      throw std::runtime_error("RenderpassObject::doRender(): Nothing to render!");
-    }
-
-    const VkRect2D renderarea{
-      { 0, 0 },                 // offset
-      renderer->extent          // extent
-    };
-
-    const std::vector<VkClearValue> clearvalues{
-      { { { 0.0f, 0.0f, 0.0f, 0.0f } } },
-      { { { 1.0f, 0 } } }
-    };
-
-    {
-      renderer->command = this->render_command.get();
-
-      VulkanCommandBufferScope commandbuffer(this->render_command->buffer());
-
-      VulkanRenderPassScope renderpass_scope(this->renderpass->renderpass,
-                                             this->framebuffer->framebuffer->framebuffer,
-                                             renderarea,
-                                             clearvalues,
-                                             this->render_command->buffer());
-
-      Group::doRender(renderer);
-    }
-
-    FenceScope fence(renderer->device->device, this->render_fence->fence);
-
-    std::vector<VkSemaphore> wait_semaphores{};
-    std::vector<VkSemaphore> signal_semaphores = { this->rendering_finished->semaphore };
-
-    this->render_command->submit(this->render_queue,
-                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                 this->render_fence->fence);
-  }
-
-  VkQueue render_queue{ nullptr };
-  std::unique_ptr<VulkanSemaphore> rendering_finished;
-  std::unique_ptr<VulkanCommandBuffers> render_command;  
-  std::shared_ptr<VulkanFence> render_fence;
   std::shared_ptr<VulkanRenderpass> renderpass;
-  std::shared_ptr<Framebuffer> framebuffer;
 };
 
 class SwapchainObject : public Node {
@@ -1543,7 +1657,8 @@ public:
       color_attachment(std::move(color_attachment)),
       surface(surface),
       surface_format(surface_format),
-      present_mode(present_mode)
+      present_mode(present_mode),
+      present_queue(nullptr)
   {}
 
 private:
