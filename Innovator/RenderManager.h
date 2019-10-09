@@ -54,77 +54,35 @@ public:
   VkExtent2D extent;  
 };
 
-class MemoryAllocator {
-public:
-  NO_COPY_OR_ASSIGNMENT(MemoryAllocator)
-  ~MemoryAllocator() = default;
-
-  MemoryAllocator() = delete;
-
-  std::vector<std::shared_ptr<ImageObject>> imageobjects;
-  std::vector<std::shared_ptr<BufferObject>> bufferobjects;
-};
-
-class RenderManager {
-public:
-  typedef std::function<void(RenderManager *)> alloc_callback;
-
-  NO_COPY_OR_ASSIGNMENT(RenderManager)
-  RenderManager() = delete;
-
-  explicit RenderManager(std::shared_ptr<VulkanInstance> vulkan,
-                         std::shared_ptr<VulkanDevice> device,
-                         VkExtent2D extent) :
-      vulkan(std::move(vulkan)),
-      device(std::move(device)),
-      extent(extent),
-      fence(std::make_unique<VulkanFence>(this->device)),
-      command(std::make_unique<VulkanCommandBuffers>(this->device)),
-      pipelinecache(std::make_shared<VulkanPipelineCache>(this->device))
+struct TraversalContext {
+  TraversalContext(std::shared_ptr<VulkanInstance> vulkan,
+                   std::shared_ptr<VulkanDevice> device,
+                   VkExtent2D extent) :
+    vulkan(std::move(vulkan)),
+    device(std::move(device)),
+    extent(extent),
+    fence(std::make_unique<VulkanFence>(this->device)),
+    command(std::make_unique<VulkanCommandBuffers>(this->device)),
+    pipelinecache(std::make_shared<VulkanPipelineCache>(this->device))
   {
     this->queue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT);
   }
 
-  virtual ~RenderManager() 
+  virtual ~TraversalContext()
   {
     try {
       THROW_ON_ERROR(vkDeviceWaitIdle(this->device->device));
-    } 
-    catch (std::exception & e) {
+    }
+    catch (std::exception& e) {
       std::cerr << e.what() << std::endl;
     }
   }
 
-  void init(Node * root)
-  {
-    this->alloc(root);
-    this->stage(root);
-    this->pipeline(root);
-    this->record(root);
-  }
-
-  void redraw(Node * root)
-  {
-    try {
-      this->render(root);
-      this->present(root);
-    }
-    catch (VkException &) {
-      // recreate swapchain, try again next frame
-      //this->resize(root, this->extent);
-    }
-  }
-
-  void resize(Node * root, VkExtent2D extent)
+  void resize(VkExtent2D extent)
   {
     // make sure all work submitted is done before we start recreating stuff
     THROW_ON_ERROR(vkDeviceWaitIdle(this->device->device));
-
     this->extent = extent;
-
-    this->resize(root);
-    this->record(root);
-    this->redraw(root);
   }
 
   void begin_alloc()
@@ -135,7 +93,7 @@ public:
 
   void end_alloc()
   {
-    for (auto & image_object : this->imageobjects) {
+    for (auto& image_object : this->imageobjects) {
       const auto memory = std::make_shared<VulkanMemory>(
         this->device,
         image_object->memory_requirements.size,
@@ -145,7 +103,7 @@ public:
       image_object->bind(memory, offset);
     }
 
-    for (auto & buffer_object : this->bufferobjects) {
+    for (auto& buffer_object : this->bufferobjects) {
       const auto memory = std::make_shared<VulkanMemory>(
         this->device,
         buffer_object->memory_requirements.size,
@@ -156,7 +114,7 @@ public:
     }
   }
 
-  void traverse(std::function<void()> action) 
+  void traverse(std::function<void()> action)
   {
     this->state = State();
 
@@ -170,57 +128,8 @@ public:
     FenceScope fence_scope(this->device->device, this->fence->fence);
 
     this->command->submit(this->queue,
-                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                          this->fence->fence);
-  }
-
-  void alloc(Node * root)
-  {    
-    this->traverse([&]() {
-      root->alloc(this);
-    });
-  }
-
-  void resize(Node * root)
-  {
-    this->traverse([&]() {
-      root->resize(this);
-    });
-  }
-
-  void stage(Node * root)
-  {
-    this->traverse([&]() {
-      root->stage(this);
-    });
-  }
-
-  void pipeline(Node * root)
-  {
-    this->traverse([&]() {
-      root->pipeline(this);
-    });
-  }
-
-  void record(Node * root)
-  {
-    this->traverse([&]() {
-      root->record(this);
-    });
-  }
-
-  void render(Node * root) const
-  {
-    SceneRenderer renderer(this->vulkan, 
-                           this->device, 
-                           this->extent);
-
-    root->render(&renderer);
-  }
-
-  void present(Node * root)
-  {
-    root->present(this);
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      this->fence->fence);
   }
 
   std::shared_ptr<VulkanInstance> vulkan;
@@ -236,4 +145,91 @@ public:
 
   std::vector<std::shared_ptr<ImageObject>> imageobjects;
   std::vector<std::shared_ptr<BufferObject>> bufferobjects;
+};
+
+class Scene {
+public:
+  NO_COPY_OR_ASSIGNMENT(Scene)
+  Scene() = delete;
+  virtual ~Scene() = default;
+
+  explicit Scene(std::shared_ptr<Group> root) :
+    root(std::move(root))    
+  {}
+
+  void init(std::shared_ptr<VulkanInstance> vulkan,
+            std::shared_ptr<VulkanDevice> device,
+            VkExtent2D extent)
+  {
+    this->context = std::make_shared<TraversalContext>(vulkan, device, extent);
+
+    this->alloc();
+    this->stage();
+    this->pipeline();
+    this->record();
+  }
+
+  void redraw()
+  {
+    try {
+      SceneRenderer renderer(this->context->vulkan,
+                             this->context->device,
+                             this->context->extent);
+
+      this->root->render(&renderer);
+      this->root->present(this->context.get());
+    }
+    catch (VkException &) {
+      // recreate swapchain, try again next frame
+      //this->resize(root, this->extent);
+    }
+  }
+
+  void resize(VkExtent2D extent)
+  {
+    this->context->resize(extent);
+
+    this->resize();
+    this->record();
+    this->redraw();
+  }
+
+  void alloc()
+  {    
+    this->context->traverse([&]() {
+      this->root->alloc(this->context.get());
+    });
+  }
+
+  void resize()
+  {
+    this->context->traverse([&]() {
+      this->root->resize(this->context.get());
+    });
+  }
+
+  void stage()
+  {
+    this->context->traverse([&]() {
+      this->root->stage(this->context.get());
+    });
+  }
+
+  void pipeline()
+  {
+    this->context->traverse([&]() {
+      this->root->pipeline(this->context.get());
+    });
+  }
+
+  void record()
+  {
+    this->context->traverse([&]() {
+      this->root->record(this->context.get());
+    });
+  }
+
+  std::shared_ptr<Group> root;
+  std::shared_ptr<TraversalContext> context;
+
 };

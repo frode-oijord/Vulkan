@@ -200,42 +200,24 @@ namespace scm {
   const Symbol _lambda("lambda");
   const Symbol _define("define");
 
-  void print(std::any exp)
+  template <typename T>
+  bool print(const std::any exp)
   {
-    if (exp.type() == typeid(Number)) {
-      std::cout << std::any_cast<Number>(exp);
+    if (exp.type() == typeid(T)) {
+      std::cout << std::any_cast<T>(exp);
+      return true;
     }
-    else if (exp.type() == typeid(Symbol)) {
-      std::cout << std::any_cast<Symbol>(exp);
+    return false;
+  }
+  
+  void print(const std::any exp)
+  {
+    if (print<Number>(exp) ||
+        print<Symbol>(exp) ||
+        print<String>(exp) ||
+        print<Boolean>(exp)) {
     }
-    else if (exp.type() == typeid(String)) {
-      std::cout << std::any_cast<String>(exp);
-    }
-    else if (exp.type() == typeid(Boolean)) {
-      std::cout << (std::any_cast<Boolean>(exp) ? _true : _false);
-    }
-    else if (exp.type() == typeid(Begin)) {
-      std::cout << _begin;
-    }
-    else if (exp.type() == typeid(Define)) {
-      std::cout << _define;
-    }
-    else if (exp.type() == typeid(Lambda)) {
-      std::cout << _lambda;
-    }
-    else if (exp.type() == typeid(If)) {
-      std::cout << _if;
-    }
-    else if (exp.type() == typeid(Quote)) {
-      std::cout << _quote;
-    }
-    else if (exp.type() == typeid(fun_ptr)) {
-      std::cout << "function";
-    }
-    else if (exp.type() == typeid(Function)) {
-      std::cout << "Function";
-    }
-    else {
+    else if (exp.type() == typeid(lst_ptr)) {
       auto& list = *std::any_cast<lst_ptr>(exp);
       std::cout << "(";
       for (auto s : list) {
@@ -243,6 +225,9 @@ namespace scm {
         std::cout << " ";
       }
       std::cout << ")";
+    }
+    else {
+      std::cout << exp.type().name();
     }
   }
 
@@ -362,23 +347,6 @@ namespace scm {
   struct value : value_t {
     using base_type = value_t;
     using base_type::variant;
-
-    friend std::ostream& operator<<(std::ostream& os, base_type const& v) {
-      struct {
-        std::ostream& operator()(Boolean const& b) const { return _os << (b ? _true : _false); }
-        std::ostream& operator()(String const& s) const { return _os << "\"" << s << "\""; }
-        std::ostream& operator()(Symbol const& s) const { return _os << s; }
-        std::ostream& operator()(Number const& f) const { return _os << f; }
-        std::ostream& operator()(std::vector<value> const& v) const {
-          _os << "(";
-          for (auto& el : v) _os << el << " ";
-          return _os << ')';
-        }
-        std::ostream& _os;
-      } visitor{ os };
-
-      return std::visit(visitor, v);
-    }
   };
 
   std::any expand(value const& v) {

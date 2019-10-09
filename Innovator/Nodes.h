@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Innovator/RenderManager.h>
+#include <Innovator/VulkanSurface.h>
 #include <Innovator/Wrapper.h>
 #include <Innovator/Node.h>
 #include <Innovator/Defines.h>
@@ -49,34 +50,34 @@ public:
   {}
 
 protected:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
-    StateScope<RenderManager, State> scope(context);
+    StateScope<TraversalContext, State> scope(context);
     Group::doAlloc(context);
   }
 
-  void doResize(RenderManager * context) override
+  void doResize(TraversalContext* context) override
   {
-    StateScope<RenderManager, State> scope(context);
+    StateScope<TraversalContext, State> scope(context);
     Group::doResize(context);
   }
 
-  void doStage(RenderManager * context) override
+  void doStage(TraversalContext* context) override
   {
-    StateScope<RenderManager, State> scope(context);
+    StateScope<TraversalContext, State> scope(context);
     Group::doStage(context);
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* context) override
   {
-    StateScope<RenderManager, State> scope(creator);
-    Group::doPipeline(creator);
+    StateScope<TraversalContext, State> scope(context);
+    Group::doPipeline(context);
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* context) override
   {
-    StateScope<RenderManager, State> scope(recorder);
-    Group::doRecord(recorder);
+    StateScope<TraversalContext, State> scope(context);
+    Group::doRecord(context);
   }
 
   void doRender(SceneRenderer * renderer) override
@@ -85,9 +86,9 @@ protected:
     Group::doRender(renderer);
   }
 
-  void doPresent(RenderManager * context) override
+  void doPresent(TraversalContext* context) override
   {
-    StateScope<RenderManager, State> scope(context);
+    StateScope<TraversalContext, State> scope(context);
     Group::doPresent(context);
   }
 };
@@ -155,7 +156,7 @@ public:
   }
 
 private:
-  void doResize(RenderManager* context) override
+  void doResize(TraversalContext* context) override
   {
     this->aspectratio = static_cast<double>(context->extent.width) /
                         static_cast<double>(context->extent.height);
@@ -217,22 +218,22 @@ public:
   }
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.bufferdata = this;
   }
 
-  void doStage(RenderManager * context) override
+  void doStage(TraversalContext* context) override
   {
     context->state.bufferdata = this;
   }
 
-  void doPipeline(RenderManager * context) override
+  void doPipeline(TraversalContext* context) override
   {
     context->state.bufferdata = this;
   }
 
-  void doRecord(RenderManager * context) override
+  void doRecord(TraversalContext* context) override
   {
     context->state.bufferdata = this;
   }
@@ -336,7 +337,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -349,19 +350,19 @@ private:
     context->bufferobjects.push_back(this->buffer);
   }
 
-  void doStage(RenderManager * context) override
+  void doStage(TraversalContext* context) override
   {
     context->state.buffer = this->buffer->buffer->buffer;
     MemoryMap memmap(this->buffer->memory.get(), context->state.bufferdata->size(), this->buffer->offset);
     context->state.bufferdata->copy(memmap.mem);
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* creator) override
   {
     creator->state.buffer = this->buffer->buffer->buffer;
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* recorder) override
   {
     recorder->state.buffer = this->buffer->buffer->buffer;
   }
@@ -383,7 +384,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -396,7 +397,7 @@ private:
     context->bufferobjects.push_back(this->buffer);
   }
 
-  void doStage(RenderManager * context) override
+  void doStage(TraversalContext* context) override
   {
     std::vector<VkBufferCopy> regions = { {
         0,                                                   // srcOffset
@@ -411,12 +412,12 @@ private:
                     regions.data());
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* creator) override
   {
     creator->state.buffer = this->buffer->buffer->buffer;
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* recorder) override
   {
     recorder->state.buffer = this->buffer->buffer->buffer;
   }
@@ -436,7 +437,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -449,7 +450,7 @@ private:
     context->bufferobjects.push_back(this->buffer);
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* creator) override
   {
     creator->state.buffer = this->buffer->buffer->buffer;
   }
@@ -480,11 +481,11 @@ public:
   {}
 
 private:
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* context) override
   {
-    recorder->state.index_buffer_description = {
+    context->state.index_buffer_description = {
       this->type,
-      recorder->state.buffer
+      context->state.buffer
     };
   }
 
@@ -507,12 +508,12 @@ public:
   {}
 
 private:
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* creator) override
   {
     creator->state.vertex_attributes.push_back(this->vertex_input_attribute_description);
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* recorder) override
   {
     recorder->state.vertex_attribute_buffers.push_back(recorder->state.buffer);
     recorder->state.vertex_attribute_buffer_offsets.push_back(0);
@@ -536,7 +537,7 @@ public:
   {}
 
 private:
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* creator) override
   {
     creator->state.vertex_input_bindings.push_back({
       this->binding,
@@ -565,7 +566,7 @@ public:
   {}
 
 private:
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* creator) override
   {
     creator->state.descriptor_pool_sizes.push_back({
       this->descriptorType,                // type 
@@ -656,14 +657,14 @@ public:
   }
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->shader = std::make_unique<VulkanShaderModule>(context->device, this->spv);
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* context) override
   {
-    creator->state.shader_stage_infos.push_back({
+    context->state.shader_stage_infos.push_back({
       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, // sType 
       nullptr,                                             // pNext
       0,                                                   // flags (reserved for future use)
@@ -701,7 +702,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->sampler = std::make_unique<VulkanSampler>(context->device,
                                                     this->mag_filter,
@@ -721,9 +722,9 @@ private:
                                                     VK_FALSE);
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* context) override
   {
-    creator->state.sampler = this->sampler->sampler;
+    context->state.sampler = this->sampler->sampler;
   }
 
   std::unique_ptr<VulkanSampler> sampler;
@@ -762,25 +763,25 @@ public:
   }
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.bufferdata = this;
     context->state.texture = this->texture.get();
   }
 
-  void doStage(RenderManager* context) override
+  void doStage(TraversalContext* context) override
   {
     context->state.bufferdata = this;
     context->state.texture = this->texture.get();
   }
 
-  void doPipeline(RenderManager* context) override
+  void doPipeline(TraversalContext* context) override
   {
     context->state.bufferdata = this;
     context->state.texture = this->texture.get();
   }
 
-  void doRecord(RenderManager* context) override
+  void doRecord(TraversalContext* context) override
   {
     context->state.bufferdata = this;
     context->state.texture = this->texture.get();
@@ -809,7 +810,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->image = std::make_shared<VulkanImage>(context->device,
                                                 context->state.texture->image_type(),
@@ -827,7 +828,7 @@ private:
     context->imageobjects.push_back(this->image_object);
   }
 
-  void doStage(RenderManager* context) override
+  void doStage(TraversalContext* context) override
   {
     context->state.image = this->image->image;
     VulkanTextureImage* texture = context->state.texture;
@@ -905,7 +906,7 @@ private:
     }
   }
 
-  void doPipeline(RenderManager * context) override
+  void doPipeline(TraversalContext* context) override
   {
     context->state.imageLayout = this->layout;
   }
@@ -934,7 +935,7 @@ public:
   {}
 
 private:
-  void doStage(RenderManager* context) override
+  void doStage(TraversalContext* context) override
   {
     this->view = std::make_unique<VulkanImageView>(context->device,
                                                    context->state.image,
@@ -944,7 +945,7 @@ private:
                                                    context->state.texture->subresource_range());
   }
 
-  void doPipeline(RenderManager* context) override
+  void doPipeline(TraversalContext* context) override
   {
     context->state.imageView = this->view->view;
   }
@@ -964,9 +965,9 @@ public:
   {}
   
 private:
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* context) override
   {
-    creator->state.rasterization_state.cullMode = this->cullmode;
+    context->state.rasterization_state.cullMode = this->cullmode;
   }
 
   VkCullModeFlags cullmode;
@@ -987,35 +988,35 @@ public:
   {}
 
 private:
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* context) override
   {
     this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
-      creator->device,
-      creator->state.descriptor_set_layout_bindings);
+      context->device,
+      context->state.descriptor_set_layout_bindings);
 
     this->descriptor_set = std::make_unique<VulkanDescriptorSets>(
-      creator->device,
+      context->device,
       this->descriptor_pool,
       std::vector<VkDescriptorSetLayout>{ this->descriptor_set_layout->layout });
 
     this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
-      creator->device,
+      context->device,
       std::vector<VkDescriptorSetLayout>{ this->descriptor_set_layout->layout },
-      creator->state.push_constant_ranges);
+      context->state.push_constant_ranges);
 
-    for (auto & write_descriptor_set : creator->state.write_descriptor_sets) {
+    for (auto & write_descriptor_set : context->state.write_descriptor_sets) {
       write_descriptor_set.dstSet = this->descriptor_set->descriptor_sets[0];
     }
-    this->descriptor_set->update(creator->state.write_descriptor_sets);
+    this->descriptor_set->update(context->state.write_descriptor_sets);
 
     this->pipeline = std::make_unique<VulkanComputePipeline>(
-      creator->device,
-      creator->pipelinecache->cache,
-      creator->state.shader_stage_infos[0],
+      context->device,
+      context->pipelinecache->cache,
+      context->state.shader_stage_infos[0],
       this->pipeline_layout->layout);
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* context) override
   {
     vkCmdBindDescriptorSets(this->command->buffer(),
                             VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -1060,9 +1061,9 @@ public:
   {}
 
 private:
-  virtual void execute(VkCommandBuffer command, RenderManager * recorder) = 0;
+  virtual void execute(VkCommandBuffer command, TraversalContext* context) = 0;
 
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
     this->command = std::make_unique<VulkanCommandBuffers>(
       context->device,
@@ -1070,52 +1071,52 @@ private:
       VK_COMMAND_BUFFER_LEVEL_SECONDARY);
   }
 
-  void doPipeline(RenderManager * creator) override
+  void doPipeline(TraversalContext* context) override
   {
     auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
-      creator->device,
-      creator->state.descriptor_pool_sizes);
+      context->device,
+      context->state.descriptor_pool_sizes);
 
     this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
-      creator->device,
-      creator->state.descriptor_set_layout_bindings);
+      context->device,
+      context->state.descriptor_set_layout_bindings);
 
     std::vector<VkDescriptorSetLayout> descriptor_set_layouts{ 
       this->descriptor_set_layout->layout 
     };
 
     this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
-      creator->device,
+      context->device,
       descriptor_set_layouts,
-      creator->state.push_constant_ranges);
+      context->state.push_constant_ranges);
 
     this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
-      creator->device,
+      context->device,
       descriptor_pool,
       descriptor_set_layouts);
 
-    for (auto & write_descriptor_set : creator->state.write_descriptor_sets) {
+    for (auto & write_descriptor_set : context->state.write_descriptor_sets) {
       write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
     }
-    this->descriptor_sets->update(creator->state.write_descriptor_sets);
+    this->descriptor_sets->update(context->state.write_descriptor_sets);
 
     this->pipeline = std::make_unique<VulkanGraphicsPipeline>(
-      creator->device,
-      creator->state.renderpass->renderpass,
-      creator->pipelinecache->cache,
+      context->device,
+      context->state.renderpass->renderpass,
+      context->pipelinecache->cache,
       this->pipeline_layout->layout,
       this->topology,
-      creator->state.rasterization_state,
+      context->state.rasterization_state,
       this->dynamic_states,
-      creator->state.shader_stage_infos,
-      creator->state.vertex_input_bindings,
-      creator->state.vertex_attributes);
+      context->state.shader_stage_infos,
+      context->state.vertex_input_bindings,
+      context->state.vertex_attributes);
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* context) override
   {
     VulkanCommandBufferScope command_scope(this->command->buffer(),
-                                           recorder->state.renderpass->renderpass,
+                                           context->state.renderpass->renderpass,
                                            0,
                                            VK_NULL_HANDLE,
                                            VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
@@ -1143,14 +1144,14 @@ private:
 
     std::vector<VkRect2D> scissors{ {
       { 0, 0 },
-      recorder->extent
+      context->extent
     } };
 
     std::vector<VkViewport> viewports{ {
       0.0f,                                         // x
       0.0f,                                         // y
-      static_cast<float>(recorder->extent.width),   // width
-      static_cast<float>(recorder->extent.height),  // height
+      static_cast<float>(context->extent.width),   // width
+      static_cast<float>(context->extent.height),  // height
       0.0f,                                         // minDepth
       1.0f                                          // maxDepth
     } };
@@ -1167,11 +1168,11 @@ private:
 
     vkCmdBindVertexBuffers(this->command->buffer(), 
                            0, 
-                           static_cast<uint32_t>(recorder->state.vertex_attribute_buffers.size()),
-                           recorder->state.vertex_attribute_buffers.data(),
-                           recorder->state.vertex_attribute_buffer_offsets.data());
+                           static_cast<uint32_t>(context->state.vertex_attribute_buffers.size()),
+                           context->state.vertex_attribute_buffers.data(),
+                           context->state.vertex_attribute_buffer_offsets.data());
     
-    this->execute(this->command->buffer(), recorder);
+    this->execute(this->command->buffer(), context);
   }
 
   void doRender(SceneRenderer * renderer) override
@@ -1211,7 +1212,7 @@ public:
   {}
 
 private:
-  void execute(VkCommandBuffer command, RenderManager *) override
+  void execute(VkCommandBuffer command, TraversalContext*) override
   {
     vkCmdDraw(command, this->vertexcount, this->instancecount, this->firstvertex, this->firstinstance);
   }
@@ -1243,12 +1244,12 @@ public:
   {}
 
 private:
-  void execute(VkCommandBuffer command, RenderManager * recorder) override
+  void execute(VkCommandBuffer command, TraversalContext* context) override
   {
     vkCmdBindIndexBuffer(command, 
-                         recorder->state.index_buffer_description.buffer, 
+                         context->state.index_buffer_description.buffer, 
                          this->offset, 
-                         recorder->state.index_buffer_description.type);
+                         context->state.index_buffer_description.type);
 
     vkCmdDrawIndexed(command, 
                      this->indexcount, 
@@ -1283,7 +1284,7 @@ public:
   }
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
     this->image = std::make_shared<VulkanImage>(context->device,
@@ -1342,7 +1343,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     Group::doAlloc(context);
     this->framebuffer = std::make_unique<VulkanFramebuffer>(context->device,
@@ -1353,7 +1354,7 @@ private:
     context->state.framebuffer = this->framebuffer;
   }
 
-  void doResize(RenderManager * context) override
+  void doResize(TraversalContext* context) override
   {
     this->doAlloc(context);
   }
@@ -1371,7 +1372,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.input_attachments.push_back(this->attachment);
   }
@@ -1389,7 +1390,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.color_attachments.push_back(this->attachment);
   }
@@ -1407,7 +1408,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.resolve_attachments.push_back(this->attachment);
   }
@@ -1424,7 +1425,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.depth_stencil_attachment = this->attachment;
   }
@@ -1441,7 +1442,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.preserve_attachments.push_back(this->attachment);
   }
@@ -1458,7 +1459,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.bind_point = this->bind_point;
   }
@@ -1478,7 +1479,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     Group::doAlloc(context);
 
@@ -1525,7 +1526,7 @@ public:
   }
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     context->state.attachment_descriptions.push_back(this->description);
   }
@@ -1542,7 +1543,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     Group::doAlloc(context);
 
@@ -1555,7 +1556,7 @@ private:
     this->framebuffer = context->state.framebuffer;
   }
 
-  void doResize(RenderManager* context) override
+  void doResize(TraversalContext* context) override
   {
     Group::doResize(context);
     this->framebuffer = context->state.framebuffer;
@@ -1615,7 +1616,7 @@ public:
   {}
 
 private:
-  void doAlloc(RenderManager* context) override
+  void doAlloc(TraversalContext* context) override
   {
     Group::doAlloc(context);
     this->renderpass = std::make_shared<VulkanRenderpass>(context->device,
@@ -1624,19 +1625,19 @@ private:
     context->state.renderpass = this->renderpass;
   }
 
-  void doResize(RenderManager* context) override
+  void doResize(TraversalContext* context) override
   {
     context->state.renderpass = this->renderpass;
     Group::doResize(context);
   }
 
-  void doPipeline(RenderManager * context) override
+  void doPipeline(TraversalContext* context) override
   {
     context->state.renderpass = this->renderpass;
     Group::doPipeline(context);
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* recorder) override
   {
     recorder->state.renderpass = this->renderpass;
     Group::doRecord(recorder);
@@ -1651,37 +1652,37 @@ public:
   virtual ~SwapchainObject() = default;
 
   SwapchainObject(std::shared_ptr<FramebufferAttachment> color_attachment,
-                  VkSurfaceKHR surface,
+                  std::shared_ptr<VulkanSurface> surface,
                   VkSurfaceFormatKHR surface_format,
                   VkPresentModeKHR present_mode) :
       color_attachment(std::move(color_attachment)),
-      surface(surface),
+      surface(std::move(surface)),
       surface_format(surface_format),
       present_mode(present_mode),
       present_queue(nullptr)
   {}
 
 private:
-  void doAlloc(RenderManager * context) override
+  void doAlloc(TraversalContext* context) override
   {
-    this->present_queue = context->device->getQueue(0, this->surface);
+    this->present_queue = context->device->getQueue(0, this->surface->surface);
     this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->device);
     this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->device);
   }
 
-  void doResize(RenderManager * context) override
+  void doResize(TraversalContext* context) override
   {
     this->doStage(context);
   }
 
-  void doStage(RenderManager * context) override
+  void doStage(TraversalContext* context) override
   {
     VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : nullptr;
 
     this->swapchain = std::make_unique<VulkanSwapchain>(
       context->device,
       context->vulkan,
-      this->surface,
+      this->surface->surface,
       3,
       this->surface_format.format,
       this->surface_format.colorSpace,
@@ -1730,9 +1731,9 @@ private:
                          count, image_barriers.data());
   }
 
-  void doRecord(RenderManager * recorder) override
+  void doRecord(TraversalContext* context) override
   {
-    this->swap_buffers_command = std::make_unique<VulkanCommandBuffers>(recorder->device, 
+    this->swap_buffers_command = std::make_unique<VulkanCommandBuffers>(context->device,
                                                                         this->swapchain_images.size(),
                                                                         VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
@@ -1781,7 +1782,7 @@ private:
         0, 0, 0
       };
 
-      VkExtent3D extent3d = { recorder->extent.width, recorder->extent.height, 1 };
+      VkExtent3D extent3d = { context->extent.width, context->extent.height, 1 };
 
       VkImageCopy image_copy{
         subresource_layers,             // srcSubresource
@@ -1831,7 +1832,7 @@ private:
     }
   }
 
-  void doPresent(RenderManager * context) override
+  void doPresent(TraversalContext* context) override
   {
     THROW_ON_ERROR(context->vulkan->vkAcquireNextImage(context->device->device,
       this->swapchain->swapchain,
@@ -1864,7 +1865,7 @@ private:
   }
 
   std::shared_ptr<FramebufferAttachment> color_attachment;
-  VkSurfaceKHR surface;
+  std::shared_ptr<VulkanSurface> surface;
   VkPresentModeKHR present_mode;
   VkSurfaceFormatKHR surface_format;
   VkQueue present_queue;
@@ -1893,7 +1894,7 @@ public:
 	{}
 
 private:
-	void doAlloc(RenderManager* context) override
+	void doAlloc(TraversalContext* context) override
 	{
     this->offscreen_fence = std::make_unique<VulkanFence>(context->device);
 
@@ -1915,14 +1916,14 @@ private:
     context->imageobjects.push_back(this->image_object);
 	}
 
-  void doResize(RenderManager* context) override
+  void doResize(TraversalContext* context) override
   {
     this->doAlloc(context);
   }
 
-	void doRecord(RenderManager* recorder) override
+	void doRecord(TraversalContext* context) override
 	{
-		this->get_image_command = std::make_unique<VulkanCommandBuffers>(recorder->device);
+		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
 		VulkanCommandBufferScope command_scope(this->get_image_command->buffer());
 
     VkImageMemoryBarrier src_image_barriers[2] = { 
@@ -1968,7 +1969,7 @@ private:
       0, 0, 0
     };
 
-    VkExtent3D extent3d = { recorder->extent.width, recorder->extent.height, 1 };
+    VkExtent3D extent3d = { context->extent.width, context->extent.height, 1 };
 
     VkImageCopy image_copy{
       subresource_layers,             // srcSubresource
@@ -2019,7 +2020,7 @@ private:
                          2, dst_image_barriers);
 	}
 
-  void doPresent(RenderManager* context) override
+  void doPresent(TraversalContext* context) override
   {
     {
       FenceScope fence_scope(context->device->device, this->offscreen_fence->fence);

@@ -303,7 +303,8 @@ public:
                const VkPhysicalDeviceFeatures& device_features,
                const std::vector<const char*>& required_layers,
                const std::vector<const char*>& required_extensions) : 
-    physical_device(vulkan->selectPhysicalDevice(device_features))
+    vulkan(std::move(vulkan)),
+    physical_device(this->vulkan->selectPhysicalDevice(device_features))
   {
     std::for_each(required_layers.begin(), required_layers.end(), [&](const char * layer_name) {
       for (auto properties : physical_device.layer_properties)
@@ -390,7 +391,7 @@ public:
     return this->queues[queue_index];
   }
 
-
+  std::shared_ptr<VulkanInstance> vulkan;
   VkDevice device{ nullptr };
   VulkanPhysicalDevice physical_device;
   std::vector<VkQueue> queues;

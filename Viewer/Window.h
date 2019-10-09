@@ -140,45 +140,85 @@ protected:
 class VulkanWindow : public Window {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanWindow)
-    ~VulkanWindow() = default;
+  ~VulkanWindow() = default;
 
-  VulkanWindow(std::shared_ptr<VulkanInstance> vulkan,
-               std::shared_ptr<VulkanDevice> device,
-               std::shared_ptr<Group> scene)
+  VulkanWindow(std::shared_ptr<Group> root)
   {
-    this->viewmatrix = find_first<ViewMatrix>(scene);
-    auto color_attachment = find_first<FramebufferAttachment>(scene);
+    std::vector<const char*> instance_layers{
+#ifdef DEBUG
+      "VK_LAYER_LUNARG_standard_validation",
+#endif
+    };
 
-    this->surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
-    VkSurfaceCapabilitiesKHR surface_capabilities = this->surface->getSurfaceCapabilities(device);
+    std::vector<const char*> instance_extensions{
+      VK_KHR_SURFACE_EXTENSION_NAME,
+      VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#ifdef DEBUG
+      VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+#endif
+    };
+
+    auto vulkan = std::make_shared<VulkanInstance>(
+      "Innovator",
+      instance_layers,
+      instance_extensions);
+
+#ifdef DEBUG
+    auto debugcb = std::make_unique<VulkanDebugCallback>(
+      vulkan,
+      VK_DEBUG_REPORT_WARNING_BIT_EXT |
+      VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+      VK_DEBUG_REPORT_ERROR_BIT_EXT);
+#endif
+
+    std::vector<const char*> device_layers{
+  #ifdef DEBUG
+        "VK_LAYER_LUNARG_standard_validation",
+  #endif
+    };
+
+    std::vector<const char*> device_extensions{
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
+    VkPhysicalDeviceFeatures device_features;
+    ::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
+
+    auto device = std::make_shared<VulkanDevice>(
+      vulkan,
+      device_features,
+      device_layers,
+      device_extensions);
+
+    this->viewmatrix = find_first<ViewMatrix>(root);
+    auto color_attachment = find_first<FramebufferAttachment>(root);
+
+    auto surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
+    VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
-    this->surface->checkPresentModeSupport(device, present_mode);
-    VkSurfaceFormatKHR surface_format = this->surface->getSupportedSurfaceFormat(device, color_attachment->format);
-
-    this->rendermanager = std::make_shared<RenderManager>(
-      vulkan,
-      device,
-      surface_capabilities.currentExtent);
+    surface->checkPresentModeSupport(device, present_mode);
+    VkSurfaceFormatKHR surface_format = surface->getSupportedSurfaceFormat(device, color_attachment->format);
 
     auto swapchain = std::make_shared<SwapchainObject>(
       color_attachment,
-      this->surface->surface,
+      surface,
       surface_format,
       present_mode);
 
-    this->root = std::make_shared<Group>();
-    this->root->children = {
-      scene,
-      swapchain
-    };
+    root->children.push_back(swapchain);
 
-    this->rendermanager->init(this->root.get());
+    this->scene = std::make_shared<Scene>(root);
+
+    this->scene->init(
+      vulkan,
+      device,
+      surface_capabilities.currentExtent);
   }
 
   void redraw() override
   {
-    this->rendermanager->redraw(this->root.get());
+    this->scene->redraw();
   }
 
   void resize(int width, int height) override
@@ -187,7 +227,7 @@ public:
       static_cast<uint32_t>(width),
       static_cast<uint32_t>(height)
     };
-    this->rendermanager->resize(this->root.get(), extent);
+    this->scene->resize(extent);
   }
 
   void mousePressed(int x, int y, int button)
@@ -215,13 +255,11 @@ public:
       default: break;
       }
       this->mouse_pos = pos;
-      this->rendermanager->redraw(this->root.get());
+      this->scene->redraw();
     }
   }
 
-  std::shared_ptr<::VulkanSurface> surface;
-  std::shared_ptr<Group> root;
-  std::shared_ptr<RenderManager> rendermanager;
+  std::shared_ptr<Scene> scene;
   std::shared_ptr<ViewMatrix> viewmatrix;
 
   int button;
