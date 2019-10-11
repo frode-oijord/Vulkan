@@ -42,6 +42,7 @@ struct State {
   VkImageView imageView { nullptr };
   VkImageLayout imageLayout { VK_IMAGE_LAYOUT_UNDEFINED };
   VkSampler sampler{ nullptr };
+  VulkanCommandBuffers* command{ nullptr };
 
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
   std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
@@ -65,9 +66,7 @@ struct State {
   VulkanIndexBufferDescription index_buffer_description;
   std::vector<VkBuffer> vertex_attribute_buffers;
   std::vector<VkDeviceSize> vertex_attribute_buffer_offsets;
-};
 
-struct RenderState {
   glm::dmat4 ModelMatrix{ 1.0 };
   glm::dmat4 ViewMatrix{ 1.0 };
   glm::dmat4 ProjMatrix{ 1.0 };

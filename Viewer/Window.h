@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Innovator/Nodes.h>
-#include <Innovator/RenderManager.h>
+#include <Innovator/Context.h>
 #include <Innovator/Defines.h>
 #include <Innovator/VulkanSurface.h>
 
@@ -206,19 +206,23 @@ public:
       surface_format,
       present_mode);
 
-    root->children.push_back(swapchain);
-
-    this->scene = std::make_shared<Scene>(root);
-
-    this->scene->init(
-      vulkan,
-      device,
+    this->context = std::make_shared<Context>(
+      vulkan, 
+      device, 
       surface_capabilities.currentExtent);
+
+    this->scene = std::make_shared<Scene>();
+    this->scene->children = {
+      root,
+      swapchain
+    };
+
+    this->scene->init(this->context.get());
   }
 
   void redraw() override
   {
-    this->scene->redraw();
+    this->scene->redraw(this->context.get());
   }
 
   void resize(int width, int height) override
@@ -227,7 +231,8 @@ public:
       static_cast<uint32_t>(width),
       static_cast<uint32_t>(height)
     };
-    this->scene->resize(extent);
+    this->context->resize(extent);
+    this->scene->resize(this->context.get());
   }
 
   void mousePressed(int x, int y, int button)
@@ -255,12 +260,13 @@ public:
       default: break;
       }
       this->mouse_pos = pos;
-      this->scene->redraw();
+      this->scene->redraw(this->context.get());
     }
   }
 
   std::shared_ptr<Scene> scene;
   std::shared_ptr<ViewMatrix> viewmatrix;
+  std::shared_ptr<Context> context;
 
   int button;
   bool mouse_pressed{ false };
