@@ -720,9 +720,9 @@ public:
   NO_COPY_OR_ASSIGNMENT(VulkanCommandBuffers)
   VulkanCommandBuffers() = delete;
 
-  explicit VulkanCommandBuffers(std::shared_ptr<VulkanDevice> device, 
-                                size_t count = 1,
-                                VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+  VulkanCommandBuffers(std::shared_ptr<VulkanDevice> device, 
+                       size_t count = 1,
+                       VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY)
     : device(std::move(device))
   {
     VkCommandBufferAllocateInfo allocate_info {

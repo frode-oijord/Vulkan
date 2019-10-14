@@ -76,6 +76,7 @@ public:
   std::unique_ptr<VulkanCommandBuffers> command;
   std::shared_ptr<VulkanPipelineCache> pipelinecache;
 
+  std::unique_ptr<VulkanCommandBufferScope> command_scope;
   std::vector<ImageObject*> imageobjects;
   std::vector<BufferObject*> bufferobjects;
 
@@ -84,7 +85,7 @@ public:
     Scope(Context* self)
       : self(self)
     {
-      this->command_scope = std::make_unique<VulkanCommandBufferScope>(self->command->buffer());
+      self->command_scope = std::make_unique<VulkanCommandBufferScope>(self->command->buffer());
       self->state = State();
       self->imageobjects.clear();
       self->bufferobjects.clear();
@@ -92,7 +93,7 @@ public:
 
     ~Scope()
     {
-      this->command_scope.reset();
+      self->command_scope.reset();
 
       for (auto image_object : self->imageobjects) {
         const auto memory = std::make_shared<VulkanMemory>(
@@ -123,6 +124,5 @@ public:
     }
 
     Context* self;
-    std::unique_ptr<VulkanCommandBufferScope> command_scope;
   };
 };

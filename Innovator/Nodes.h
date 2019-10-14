@@ -116,7 +116,7 @@ protected:
 class Scene : public Group {
 public:
   NO_COPY_OR_ASSIGNMENT(Scene)
-    Scene() = default;
+  Scene() = default;
   virtual ~Scene() = default;
 
   explicit Scene(std::vector<std::shared_ptr<Node>> children) :
@@ -1654,7 +1654,7 @@ private:
   {
     const VkRect2D renderarea{
       { 0, 0 },                 // offset
-      context->extent          // extent
+      context->extent           // extent
     };
 
     const std::vector<VkClearValue> clearvalues{
