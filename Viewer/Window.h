@@ -190,7 +190,6 @@ public:
       device_layers,
       device_extensions);
 
-    this->viewmatrix = find_first<ViewMatrix>(root);
     auto color_attachment = find_first<FramebufferAttachment>(root);
 
     auto surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
@@ -237,38 +236,25 @@ public:
 
   void mousePressed(int x, int y, int button)
   {
-    this->button = button;
-    this->mouse_pos = { static_cast<float>(x), static_cast<float>(y) };
-    this->mouse_pressed = true;
+    this->context->event = std::make_shared<MousePressEvent>(x, y, button);
+    this->scene->event(this->context.get());
   }
 
   void mouseReleased() override
   {
-    this->mouse_pressed = false;
+    this->context->event = std::make_shared<MouseReleaseEvent>();
+    this->scene->event(this->context.get());
   }
 
   void mouseMoved(int x, int y)
   {
-    if (this->mouse_pressed) {
-      const glm::dvec2 pos = { static_cast<double>(x), static_cast<double>(y) };
-      glm::dvec2 dx = (this->mouse_pos - pos) * .01;
-      dx[1] = -dx[1];
-      switch (this->button) {
-      case 0: this->viewmatrix->orbit(dx); break;
-      case 1: this->viewmatrix->pan(dx); break;
-      case 2: this->viewmatrix->zoom(dx[1]); break;
-      default: break;
-      }
-      this->mouse_pos = pos;
+    this->context->event = std::make_shared<MouseMoveEvent>(x, y);
+    this->scene->event(this->context.get());
+    if (this->context->redraw) {
       this->scene->redraw(this->context.get());
     }
   }
 
   std::shared_ptr<Scene> scene;
-  std::shared_ptr<ViewMatrix> viewmatrix;
   std::shared_ptr<Context> context;
-
-  int button;
-  bool mouse_pressed{ false };
-  glm::dvec2 mouse_pos{};
 };

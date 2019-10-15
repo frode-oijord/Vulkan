@@ -66,8 +66,8 @@
             (uint32 0)
             VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)))
 
-   (renderpass-scope
-      (renderpass
+   (renderpass
+      (renderpass-description
          (renderpass-attachment
             VK_FORMAT_B8G8R8A8_UNORM
             VK_SAMPLE_COUNT_1_BIT

@@ -4,6 +4,7 @@
 #include <Innovator/Node.h>
 #include <Innovator/State.h>
 #include <Innovator/VulkanObjects.h>
+#include <Innovator/Events.h>
 
 #include <map>
 #include <memory>
@@ -41,6 +42,7 @@ public:
     vulkan(std::move(vulkan)),
     device(std::move(device)),
     extent(extent),
+    redraw(false),
     fence(std::make_unique<VulkanFence>(this->device)),
     command(std::make_unique<VulkanCommandBuffers>(this->device)),
     pipelinecache(std::make_shared<VulkanPipelineCache>(this->device))
@@ -65,64 +67,60 @@ public:
     this->extent = extent;
   }
 
+  void begin()
+  {
+    this->redraw = false;
+    this->command->begin();
+    this->state = State();
+    this->imageobjects.clear();
+    this->bufferobjects.clear();
+  }
+
+  void end()
+  {
+    this->fence->reset();
+    this->command->end();
+    this->command->submit(
+      this->queue,
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      this->fence->fence);
+
+    for (auto image_object : this->imageobjects) {
+      const auto memory = std::make_shared<VulkanMemory>(
+        this->device,
+        image_object->memory_requirements.size,
+        image_object->memory_type_index);
+
+      const VkDeviceSize offset = 0;
+      image_object->bind(memory, offset);
+    }
+
+    for (auto buffer_object : this->bufferobjects) {
+      const auto memory = std::make_shared<VulkanMemory>(
+        this->device,
+        buffer_object->memory_requirements.size,
+        buffer_object->memory_type_index);
+
+      const VkDeviceSize offset = 0;
+      buffer_object->bind(memory, offset);
+    }
+
+    this->fence->wait();
+  }
+
   std::shared_ptr<VulkanInstance> vulkan;
   std::shared_ptr<VulkanDevice> device;
   VkExtent2D extent;
   VkQueue queue{ nullptr };
 
   State state;
+  std::shared_ptr<Event> event;
+  bool redraw;
 
   std::shared_ptr<VulkanFence> fence;
   std::unique_ptr<VulkanCommandBuffers> command;
   std::shared_ptr<VulkanPipelineCache> pipelinecache;
 
-  std::unique_ptr<VulkanCommandBufferScope> command_scope;
   std::vector<ImageObject*> imageobjects;
   std::vector<BufferObject*> bufferobjects;
-
-  class Scope {
-  public:
-    Scope(Context* self)
-      : self(self)
-    {
-      self->command_scope = std::make_unique<VulkanCommandBufferScope>(self->command->buffer());
-      self->state = State();
-      self->imageobjects.clear();
-      self->bufferobjects.clear();
-    }
-
-    ~Scope()
-    {
-      self->command_scope.reset();
-
-      for (auto image_object : self->imageobjects) {
-        const auto memory = std::make_shared<VulkanMemory>(
-          self->device,
-          image_object->memory_requirements.size,
-          image_object->memory_type_index);
-
-        const VkDeviceSize offset = 0;
-        image_object->bind(memory, offset);
-      }
-
-      for (auto buffer_object : self->bufferobjects) {
-        const auto memory = std::make_shared<VulkanMemory>(
-          self->device,
-          buffer_object->memory_requirements.size,
-          buffer_object->memory_type_index);
-
-        const VkDeviceSize offset = 0;
-        buffer_object->bind(memory, offset);
-      }
-
-      FenceScope fence_scope(self->device->device,
-        self->fence->fence);
-
-      self->command->submit(self->queue,
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        self->fence->fence);
-    }
-
-    Context* self;
-  };
 };

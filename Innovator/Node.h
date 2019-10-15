@@ -36,6 +36,11 @@ public:
     this->doRecord(context);
   }
 
+  void event(class Context* context)
+  {
+    this->doEvent(context);
+  }
+
   void render(class Context* context)
   {
     this->doRender(context);
@@ -52,6 +57,7 @@ private:
   virtual void doStage(class Context*) {}
   virtual void doPipeline(class Context*) {}
   virtual void doRecord(class Context*) {}
+  virtual void doEvent(class Context*) {}
   virtual void doRender(class Context*) {}
   virtual void doPresent(class Context*) {}
 };
@@ -100,6 +106,13 @@ protected:
   {
     for (const auto& node : this->children) {
       node->record(context);
+    }
+  }
+
+  void doEvent(class Context* context) override
+  {
+    for (const auto& node : this->children) {
+      node->event(context);
     }
   }
 

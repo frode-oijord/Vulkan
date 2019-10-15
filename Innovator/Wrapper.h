@@ -686,33 +686,18 @@ public:
     vkDestroyFence(this->device->device, this->fence, nullptr);
   }
 
+  void wait()
+  {
+    THROW_ON_ERROR(vkWaitForFences(this->device->device, 1, &this->fence, VK_TRUE, UINT64_MAX));
+  }
+
+  void reset()
+  {
+    THROW_ON_ERROR(vkResetFences(this->device->device, 1, &this->fence));
+  }
+
   std::shared_ptr<VulkanDevice> device;
   VkFence fence { nullptr };
-};
-
-class FenceScope {
-public:
-  NO_COPY_OR_ASSIGNMENT(FenceScope)
-  FenceScope() = delete;
-
-  explicit FenceScope(VkDevice device, VkFence fence) :
-    device(device),
-    fence(fence)
-  {
-    THROW_ON_ERROR(vkResetFences(this->device, 1, &this->fence));
-  }
-
-  ~FenceScope()
-  {
-    try {
-      THROW_ON_ERROR(vkWaitForFences(this->device, 1, &this->fence, VK_TRUE, UINT64_MAX));
-    } catch(std::exception & e) {
-      std::cerr << e.what() << std::endl;
-    }
-  }
-
-  VkDevice device;
-  VkFence fence;
 };
 
 class VulkanCommandBuffers {
@@ -742,67 +727,11 @@ public:
     vkFreeCommandBuffers(this->device->device, this->device->default_pool, static_cast<uint32_t>(this->buffers.size()), this->buffers.data());
   }
 
-  void submit(VkQueue queue, 
-              VkPipelineStageFlags flags, 
-              size_t buffer_index, 
-              const std::vector<VkSemaphore> & wait_semaphores = std::vector<VkSemaphore>(),
-              const std::vector<VkSemaphore> & signal_semaphores = std::vector<VkSemaphore>(),
-              VkFence fence = VK_NULL_HANDLE)
-  {
-    submit(queue, flags, { this->buffers[buffer_index] }, wait_semaphores, signal_semaphores, fence);
-  }
-
-  void submit(VkQueue queue,
-              VkPipelineStageFlags flags,
-              VkFence fence = VK_NULL_HANDLE,
-              const std::vector<VkSemaphore> & wait_semaphores = std::vector<VkSemaphore>(),
-              const std::vector<VkSemaphore> & signal_semaphores = std::vector<VkSemaphore>())
-  {
-    submit(queue, flags, this->buffers, wait_semaphores, signal_semaphores, fence);
-  }
-
-  static void submit(VkQueue queue,
-                     VkPipelineStageFlags flags,
-                     const std::vector<VkCommandBuffer> & buffers,
-                     const std::vector<VkSemaphore> & wait_semaphores,
-                     const std::vector<VkSemaphore> & signal_semaphores,
-                     VkFence fence)
-  {
-    VkSubmitInfo submit_info{
-      VK_STRUCTURE_TYPE_SUBMIT_INFO,                   // sType 
-      nullptr,                                         // pNext  
-      static_cast<uint32_t>(wait_semaphores.size()),   // waitSemaphoreCount  
-      wait_semaphores.data(),                          // pWaitSemaphores  
-      &flags,                                          // pWaitDstStageMask  
-      static_cast<uint32_t>(buffers.size()),           // commandBufferCount  
-      buffers.data(),                                  // pCommandBuffers 
-      static_cast<uint32_t>(signal_semaphores.size()), // signalSemaphoreCount
-      signal_semaphores.data(),                        // pSignalSemaphores
-    };
-
-    THROW_ON_ERROR(vkQueueSubmit(queue, 1, &submit_info, fence));
-  }
-
-  VkCommandBuffer buffer(size_t buffer_index = 0)
-  {
-    return this->buffers[buffer_index];
-  }
-
-  std::shared_ptr<VulkanDevice> device;
-  std::vector<VkCommandBuffer> buffers;
-};
-
-class VulkanCommandBufferScope {
-public:
-  NO_COPY_OR_ASSIGNMENT(VulkanCommandBufferScope)
-  VulkanCommandBufferScope() = delete;
-
-  VulkanCommandBufferScope(VkCommandBuffer command,
-                           VkRenderPass renderpass = nullptr,
-                           uint32_t subpass = 0,
-                           VkFramebuffer framebuffer = nullptr,
-                           VkCommandBufferUsageFlags flags = 0) :
-    command(command)
+  void begin(size_t buffer_index = 0,
+             VkRenderPass renderpass = nullptr,
+             uint32_t subpass = 0,
+             VkFramebuffer framebuffer = nullptr,
+             VkCommandBufferUsageFlags flags = 0)
   {
     VkCommandBufferInheritanceInfo inheritance_info{
       VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO, // sType
@@ -822,19 +751,62 @@ public:
       &inheritance_info,                           // pInheritanceInfo 
     };
 
-    THROW_ON_ERROR(vkBeginCommandBuffer(this->command, &begin_info));
+    THROW_ON_ERROR(vkBeginCommandBuffer(this->buffers[buffer_index], &begin_info));
   }
 
-  ~VulkanCommandBufferScope()
+  void end(size_t buffer_index = 0)
   {
-    try {
-      THROW_ON_ERROR(vkEndCommandBuffer(this->command));
-    } catch (std::exception & e) {
-      std::cerr << e.what() << std::endl;
-    }
+    THROW_ON_ERROR(vkEndCommandBuffer(this->buffers[buffer_index]));
   }
 
-  VkCommandBuffer command;
+  void submit(VkQueue queue,
+              VkPipelineStageFlags flags,
+              VkFence fence = VK_NULL_HANDLE,
+              const std::vector<VkSemaphore>& wait_semaphores = std::vector<VkSemaphore>(),
+              const std::vector<VkSemaphore>& signal_semaphores = std::vector<VkSemaphore>())
+  {
+    this->submit(queue, flags, this->buffers, fence, wait_semaphores, signal_semaphores);
+  }
+
+  void submit(VkQueue queue,
+              VkPipelineStageFlags flags,
+              size_t buffer_index,
+              VkFence fence = VK_NULL_HANDLE,
+              const std::vector<VkSemaphore>& wait_semaphores = std::vector<VkSemaphore>(),
+              const std::vector<VkSemaphore>& signal_semaphores = std::vector<VkSemaphore>())
+  {
+    this->submit(queue, flags, { this->buffers[buffer_index] }, fence, wait_semaphores, signal_semaphores);
+  }
+
+  void submit(VkQueue queue,
+              VkPipelineStageFlags flags,
+              const std::vector<VkCommandBuffer> & buffers,
+              VkFence fence = VK_NULL_HANDLE,
+              const std::vector<VkSemaphore>& wait_semaphores = std::vector<VkSemaphore>(),
+              const std::vector<VkSemaphore>& signal_semaphores = std::vector<VkSemaphore>())
+  {
+    VkSubmitInfo submit_info{
+      VK_STRUCTURE_TYPE_SUBMIT_INFO,                   // sType 
+      nullptr,                                         // pNext  
+      static_cast<uint32_t>(wait_semaphores.size()),   // waitSemaphoreCount  
+      wait_semaphores.data(),                          // pWaitSemaphores  
+      & flags,                                          // pWaitDstStageMask  
+      static_cast<uint32_t>(buffers.size()),           // commandBufferCount  
+      buffers.data(),                                  // pCommandBuffers 
+      static_cast<uint32_t>(signal_semaphores.size()), // signalSemaphoreCount
+      signal_semaphores.data(),                        // pSignalSemaphores
+    };
+
+    THROW_ON_ERROR(vkQueueSubmit(queue, 1, &submit_info, fence));
+  }
+
+  VkCommandBuffer buffer(size_t buffer_index = 0)
+  {
+    return this->buffers[buffer_index];
+  }
+
+  std::shared_ptr<VulkanDevice> device;
+  std::vector<VkCommandBuffer> buffers;
 };
 
 class VulkanImage {

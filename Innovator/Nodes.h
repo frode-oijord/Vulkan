@@ -152,32 +152,37 @@ public:
 protected:
   void doAlloc(Context* context) override
   {
-    Context::Scope scope(context);
+    context->begin();
     Group::doAlloc(context);
+    context->end();
   }
 
   void doResize(Context* context) override
   {
-    Context::Scope scope(context);
+    context->begin();
     Group::doResize(context);
+    context->end();
   }
 
   void doStage(Context* context) override
   {
-    Context::Scope scope(context);
+    context->begin();
     Group::doStage(context);
+    context->end();
   }
 
   void doPipeline(Context* context) override
   {
-    Context::Scope scope(context);
+    context->begin();
     Group::doPipeline(context);
+    context->end();
   }
 
   void doRecord(Context* context) override
   {
-    Context::Scope scope(context);
+    context->begin();
     Group::doRecord(context);
+    context->end();
   }
 };
 
@@ -188,18 +193,19 @@ public:
   ViewMatrix() = delete;
   virtual ~ViewMatrix() = default;
 
-  ViewMatrix(double m0, double m1, double m2, 
-             double m3, double m4, double m5, 
-             double m6, double m7, double m8) :
-    ViewMatrix(glm::dvec3(m0, m1, m2), 
-               glm::dvec3(m3, m4, m5), 
-               glm::dvec3(m6, m7, m8))
-  {}
-
   ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
     : mat(glm::lookAt(eye, target, up))
   {}
 
+  ViewMatrix(double m0, double m1, double m2, 
+             double m3, double m4, double m5, 
+             double m6, double m7, double m8)
+    : ViewMatrix(glm::dvec3(m0, m1, m2), 
+                 glm::dvec3(m3, m4, m5), 
+                 glm::dvec3(m6, m7, m8))
+  {}
+
+private:
   void zoom(double dy)
   {
     this->mat = glm::translate(this->mat, glm::dvec3(0.0, 0.0, dy));
@@ -210,18 +216,40 @@ public:
     this->mat = glm::translate(this->mat, glm::dvec3(dx, 0.0));
   }
 
-  void orbit(const glm::dvec2& dx)
+  void doEvent(Context* context)
   {
+    auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
+    if (press) {
+      this->press = std::move(press);
+    }
+
+    if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
+      this->press.reset();
+      context->event.reset();
+    }
+
+    auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
+    if (move && this->press) {
+      glm::dvec2 dx = (this->press->pos - move->pos) * .01;
+      dx[1] = -dx[1];
+      switch (this->press->button) {
+      case 1: this->pan(dx); break;
+      case 2: this->zoom(dx[1]); break;
+      default: break;
+      }
+      this->press->pos = move->pos;
+      context->event.reset();
+    }
   }
 
-
-private:
   void doRender(Context* context) override
   {
     context->state.ViewMatrix = this->mat;
   }
 
   glm::dmat4 mat{ 1.0 };
+
+  std::shared_ptr<MousePressEvent> press{ nullptr };
 };
 
 
@@ -1203,19 +1231,12 @@ private:
 
   void doRecord(Context* context) override
   {
-    VulkanCommandBufferScope command_scope(this->command->buffer(),
-                                           context->state.renderpass->renderpass,
-                                           0,
-                                           VK_NULL_HANDLE,
-                                           VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
-
-    //glm::mat4 mv(1.0);
-    //vkCmdPushConstants(this->command->buffer(),
-    //                   this->pipeline_layout->layout,
-    //                   VK_SHADER_STAGE_VERTEX_BIT,
-    //                   0,
-    //                   static_cast<uint32_t>(sizeof(glm::mat4)),
-    //                   glm::value_ptr(mv));
+    this->command->begin(
+      0,
+      context->state.renderpass->renderpass,
+      0,
+      VK_NULL_HANDLE,
+      VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
 
     vkCmdBindDescriptorSets(this->command->buffer(), 
                             VK_PIPELINE_BIND_POINT_GRAPHICS, 
@@ -1261,6 +1282,7 @@ private:
                            context->state.vertex_attribute_buffer_offsets.data());
     
     this->execute(this->command->buffer(), context);
+    this->command->end();
   }
 
   void doRender(Context* context) override
@@ -1622,11 +1644,11 @@ private:
   VkAttachmentDescription description;
 };
 
-class RenderpassScope : public Group {
+class Renderpass : public Group {
 public:
-  NO_COPY_OR_ASSIGNMENT(RenderpassScope)
-  virtual ~RenderpassScope() = default;
-  RenderpassScope(std::vector<std::shared_ptr<Node>> children) :
+  NO_COPY_OR_ASSIGNMENT(Renderpass)
+  virtual ~Renderpass() = default;
+  Renderpass(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {}
 
@@ -1662,28 +1684,28 @@ private:
       { { { 1.0f, 0 } } }
     };
 
+    this->render_command->begin();
     {
-
-      VulkanCommandBufferScope commandbuffer(this->render_command->buffer());
-
-      VulkanRenderPassScope renderpass_scope(this->renderpass->renderpass,
-                                             this->framebuffer->framebuffer,
-                                             renderarea,
-                                             clearvalues,
-                                             this->render_command->buffer());
+      VulkanRenderPassScope renderpass_scope(
+        this->renderpass->renderpass,
+        this->framebuffer->framebuffer,
+        renderarea,
+        clearvalues,
+        this->render_command->buffer());
 
       context->state.command = this->render_command.get();
       Group::doRender(context);
     }
-
-    FenceScope fence(context->device->device, this->render_fence->fence);
+    this->render_command->end();
 
     std::vector<VkSemaphore> wait_semaphores{};
     std::vector<VkSemaphore> signal_semaphores = { this->rendering_finished->semaphore };
 
+    this->render_fence->reset();
     this->render_command->submit(this->render_queue,
                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                                  this->render_fence->fence);
+    this->render_fence->wait();
   }
 
 
@@ -1695,11 +1717,11 @@ private:
   std::shared_ptr<VulkanFramebuffer> framebuffer;
 };
 
-class Renderpass : public Group {
+class RenderpassDescription : public Group {
 public:
-  NO_COPY_OR_ASSIGNMENT(Renderpass)
-  virtual ~Renderpass() = default;
-  Renderpass(std::vector<std::shared_ptr<Node>> children) :
+  NO_COPY_OR_ASSIGNMENT(RenderpassDescription)
+  virtual ~RenderpassDescription() = default;
+  RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {}
 
@@ -1851,7 +1873,7 @@ private:
         this->subresource_range,                                       // subresourceRange
       } };
 
-      VulkanCommandBufferScope command_scope(this->swap_buffers_command->buffer(i));
+      this->swap_buffers_command->begin(i);
 
       vkCmdPipelineBarrier(this->swap_buffers_command->buffer(i),
                            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 
@@ -1917,12 +1939,15 @@ private:
                            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                            0, 0, nullptr, 0, nullptr,
                            2, dst_image_barriers);
+
+      this->swap_buffers_command->end(i);
     }
   }
 
   void doPresent(Context* context) override
   {
-    THROW_ON_ERROR(context->vulkan->vkAcquireNextImage(context->device->device,
+    THROW_ON_ERROR(context->vulkan->vkAcquireNextImage(
+      context->device->device,
       this->swapchain->swapchain,
       UINT64_MAX,
       this->swapchain_image_ready->semaphore,
@@ -1932,9 +1957,11 @@ private:
     std::vector<VkSemaphore> wait_semaphores = { this->swapchain_image_ready->semaphore };
     std::vector<VkSemaphore> signal_semaphores = { this->swap_buffers_finished->semaphore };
 
-    this->swap_buffers_command->submit(this->present_queue,
+    this->swap_buffers_command->submit(
+      this->present_queue,
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
       this->image_index,
+      VK_NULL_HANDLE,
       wait_semaphores,
       signal_semaphores);
 
@@ -2012,7 +2039,7 @@ private:
 	void doRecord(Context* context) override
 	{
 		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
-		VulkanCommandBufferScope command_scope(this->get_image_command->buffer());
+    this->get_image_command->begin();
 
     VkImageMemoryBarrier src_image_barriers[2] = { 
     {
@@ -2106,17 +2133,17 @@ private:
                          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          0, 0, nullptr, 0, nullptr,
                          2, dst_image_barriers);
+
+    this->get_image_command->end();
 	}
 
   void doPresent(Context* context) override
   {
-    {
-      FenceScope fence_scope(context->device->device, this->offscreen_fence->fence);
-
-      this->get_image_command->submit(context->queue,
-                                      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                      this->offscreen_fence->fence);
-    }
+    this->offscreen_fence->reset();
+    this->get_image_command->submit(context->queue,
+                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                    this->offscreen_fence->fence);
+    this->offscreen_fence->wait();
 
     VkImageSubresource image_subresource{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
     VkSubresourceLayout subresource_layout;
