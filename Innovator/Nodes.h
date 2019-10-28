@@ -928,36 +928,16 @@ public:
 private:
 	void doAlloc(Context* context) override
 	{
-		VkFormatProperties format_properties;
-		vkGetPhysicalDeviceFormatProperties(
-			context->device->physical_device.device,
-			context->state.texture->format(),
-			&format_properties);
+		VkFormatProperties format_properties =
+			context->device->physical_device.getFormatProperties(context->state.texture->format());
 
-
-		uint32_t sparse_properties_count;
-		vkGetPhysicalDeviceSparseImageFormatProperties(
-			context->device->physical_device.device,
-			context->state.texture->format(),
-			context->state.texture->image_type(),
-			this->sample_count,
-			this->usage_flags,
-			this->tiling,
-			&sparse_properties_count,
-			nullptr);
-
-
-		std::vector<VkSparseImageFormatProperties> sparse_properties(sparse_properties_count);
-		vkGetPhysicalDeviceSparseImageFormatProperties(
-			context->device->physical_device.device,
-			context->state.texture->format(),
-			context->state.texture->image_type(),
-			this->sample_count,
-			this->usage_flags,
-			this->tiling,
-			&sparse_properties_count,
-			sparse_properties.data());
-
+		std::vector<VkSparseImageFormatProperties> sparse_properties =
+			context->device->physical_device.getSparseImageFormatProperties(
+				context->state.texture->format(),
+				context->state.texture->image_type(),
+				this->sample_count,
+				this->usage_flags,
+				this->tiling);
 
 		this->image = std::make_shared<VulkanImage>(
 			context->device,
@@ -980,7 +960,6 @@ private:
   {
     context->state.image = this->image->image;
     VulkanTextureImage* texture = context->state.texture;
-
     {
       VkImageMemoryBarrier memory_barrier{
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                // sType

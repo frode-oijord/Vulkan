@@ -15,32 +15,79 @@
 
 class VulkanPhysicalDevice {
 public:
-  VulkanPhysicalDevice(VulkanPhysicalDevice && self) = default;
-  VulkanPhysicalDevice(const VulkanPhysicalDevice & self) = default;
-  VulkanPhysicalDevice & operator=(VulkanPhysicalDevice && self) = delete;
-  VulkanPhysicalDevice & operator=(const VulkanPhysicalDevice & self) = delete;
-  ~VulkanPhysicalDevice() = default;
+	VulkanPhysicalDevice(VulkanPhysicalDevice&& self) = default;
+	VulkanPhysicalDevice(const VulkanPhysicalDevice& self) = default;
+	VulkanPhysicalDevice& operator=(VulkanPhysicalDevice&& self) = delete;
+	VulkanPhysicalDevice& operator=(const VulkanPhysicalDevice& self) = delete;
+	~VulkanPhysicalDevice() = default;
 
-  explicit VulkanPhysicalDevice(VkPhysicalDevice device)
-    : device(device)
-  {
-    vkGetPhysicalDeviceFeatures(this->device, &this->features);
-    vkGetPhysicalDeviceProperties(this->device, &this->properties);
-    vkGetPhysicalDeviceMemoryProperties(this->device, &this->memory_properties);
+	explicit VulkanPhysicalDevice(VkPhysicalDevice device)
+		: device(device)
+	{
+		vkGetPhysicalDeviceFeatures(this->device, &this->features);
+		vkGetPhysicalDeviceProperties(this->device, &this->properties);
+		vkGetPhysicalDeviceMemoryProperties(this->device, &this->memory_properties);
 
-    uint32_t count;
-    vkGetPhysicalDeviceQueueFamilyProperties(this->device, &count, nullptr);
-    this->queue_family_properties.resize(count);
-    vkGetPhysicalDeviceQueueFamilyProperties(this->device, &count, this->queue_family_properties.data());
+		uint32_t count;
+		vkGetPhysicalDeviceQueueFamilyProperties(this->device, &count, nullptr);
+		this->queue_family_properties.resize(count);
+		vkGetPhysicalDeviceQueueFamilyProperties(this->device, &count, this->queue_family_properties.data());
 
-    THROW_ON_ERROR(vkEnumerateDeviceLayerProperties(this->device, &count, nullptr));
-    this->layer_properties.resize(count);
-    THROW_ON_ERROR(vkEnumerateDeviceLayerProperties(this->device, &count, this->layer_properties.data()));
+		THROW_ON_ERROR(vkEnumerateDeviceLayerProperties(this->device, &count, nullptr));
+		this->layer_properties.resize(count);
+		THROW_ON_ERROR(vkEnumerateDeviceLayerProperties(this->device, &count, this->layer_properties.data()));
 
-    THROW_ON_ERROR(vkEnumerateDeviceExtensionProperties(this->device, nullptr, &count, nullptr));
-    this->extension_properties.resize(count);
-    THROW_ON_ERROR(vkEnumerateDeviceExtensionProperties(this->device, nullptr, &count, this->extension_properties.data()));
-  }
+		THROW_ON_ERROR(vkEnumerateDeviceExtensionProperties(this->device, nullptr, &count, nullptr));
+		this->extension_properties.resize(count);
+		THROW_ON_ERROR(vkEnumerateDeviceExtensionProperties(this->device, nullptr, &count, this->extension_properties.data()));
+	}
+
+	VkFormatProperties getFormatProperties(VkFormat format)
+	{
+		VkFormatProperties properties;
+		vkGetPhysicalDeviceFormatProperties(
+			this->device,
+			format,
+			&properties);
+
+		return properties;
+	}
+
+	std::vector<VkSparseImageFormatProperties> getSparseImageFormatProperties(
+		VkFormat format,
+		VkImageType type,
+		VkSampleCountFlagBits samples,
+		VkImageUsageFlags usage,
+		VkImageTiling tiling)
+	{
+		uint32_t count;
+		vkGetPhysicalDeviceSparseImageFormatProperties(
+			this->device,
+			format,
+			type,
+			samples,
+			usage,
+			tiling,
+			&count,
+			nullptr);
+
+		if (count == 0) {
+			throw std::runtime_error("VulkanPhysicalDevice::getSparseImageFormatProperties: image format not supported for sparse binding");
+		}
+
+		std::vector<VkSparseImageFormatProperties> properties(count);
+		vkGetPhysicalDeviceSparseImageFormatProperties(
+			this->device,
+			format,
+			type,
+			samples,
+			usage,
+			tiling,
+			&count,
+			properties.data());
+
+		return properties;
+	}
 
   uint32_t getQueueIndex(VkQueueFlags required_flags, const std::vector<VkBool32> & filter)
   {
