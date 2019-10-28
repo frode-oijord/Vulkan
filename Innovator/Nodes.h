@@ -906,7 +906,6 @@ private:
   std::shared_ptr<VulkanTextureImage> texture;
 };
 
-
 class Image : public Node {
 public:
   NO_COPY_OR_ASSIGNMENT(Image)
@@ -928,32 +927,163 @@ public:
 private:
 	void doAlloc(Context* context) override
 	{
-		VkFormatProperties format_properties =
-			context->device->physical_device.getFormatProperties(context->state.texture->format());
-
-		std::vector<VkSparseImageFormatProperties> sparse_properties =
-			context->device->physical_device.getSparseImageFormatProperties(
-				context->state.texture->format(),
-				context->state.texture->image_type(),
-				this->sample_count,
-				this->usage_flags,
-				this->tiling);
+    VulkanTextureImage* texture = context->state.texture;
 
 		this->image = std::make_shared<VulkanImage>(
 			context->device,
-			context->state.texture->image_type(),
-			context->state.texture->format(),
-			context->state.texture->extent(0),
-			context->state.texture->levels(),
-			context->state.texture->layers(),
+			texture->image_type(),
+			texture->format(),
+			texture->extent(0),
+			texture->levels(),
+			texture->layers(),
 			this->sample_count,
 			this->tiling,
 			this->usage_flags,
 			this->sharing_mode,
 			this->create_flags);
 
-		this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		context->imageobjects.push_back(this->image_object.get());
+    VkMemoryRequirements memory_requirements;
+    vkGetImageMemoryRequirements(
+      context->device->device,
+      this->image->image,
+      &memory_requirements);
+
+    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+      memory_requirements.memoryTypeBits,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    uint32_t sparse_memory_requirements_count;
+    vkGetImageSparseMemoryRequirements(context->device->device, this->image->image, &sparse_memory_requirements_count, nullptr);
+
+    std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
+    vkGetImageSparseMemoryRequirements(context->device->device, this->image->image, &sparse_memory_requirements_count, sparse_memory_requirements.data());
+
+    VkSparseImageMemoryRequirements sparse_memory_requirement = [&]() {
+      for (auto requirements : sparse_memory_requirements) {
+        if (requirements.formatProperties.aspectMask & texture->subresource_range().aspectMask) {
+          return requirements;
+        }
+      }
+      throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
+    }();
+
+    assert(memory_requirements.size % memory_requirements.alignment == 0);
+    uint32_t sparse_bind_count = static_cast<uint32_t>(memory_requirements.size / memory_requirements.alignment);
+    std::vector<VkSparseMemoryBind>	sparse_memory_binds(sparse_bind_count);
+
+    bool single_miptail = sparse_memory_requirement.formatProperties.flags & VK_SPARSE_IMAGE_FORMAT_SINGLE_MIPTAIL_BIT;
+    VkExtent3D imageGranularity = sparse_memory_requirement.formatProperties.imageGranularity;
+
+    for (uint32_t layer = 0; layer < texture->layers(); layer++) {
+      for (uint32_t mip_level = 0; mip_level < sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+
+        VkExtent3D extent = texture->extent(mip_level);
+
+        assert(extent.width % imageGranularity.width == 0);
+        assert(extent.height % imageGranularity.height == 0);
+        assert(extent.depth % imageGranularity.depth == 0);
+
+        for (uint32_t i = 0; i < extent.width / imageGranularity.width; i++) {
+          for (uint32_t j = 0; j < extent.height / imageGranularity.height; j++) {
+            for (uint32_t k = 0; k < extent.depth / imageGranularity.depth; k++) {
+
+              VkOffset3D offset {
+                static_cast<int32_t>(i * imageGranularity.width),
+                static_cast<int32_t>(j * imageGranularity.height),
+                static_cast<int32_t>(k * imageGranularity.depth),
+              };
+
+              VkExtent3D extent {
+                imageGranularity.width,
+                imageGranularity.height,
+                imageGranularity.depth,
+              };
+
+              auto image_memory_page = std::make_shared<VulkanMemory>(
+                context->device,
+                memory_requirements.alignment, // alignment is equal to size for each page when sparse residency
+                memory_type_index);
+
+              image_memory_pages.push_back(image_memory_page);
+
+              VkImageSubresource subresource = {
+                texture->subresource_range().aspectMask,
+                mip_level,
+                layer
+              };
+
+              image_memory_binds.push_back({
+                subresource,
+                offset,
+                extent,
+                image_memory_page->memory,
+                0,
+                0,
+              });
+            }
+          }
+        }
+      } // end mips
+
+      // Check if format has one mip tail per layer
+      if (!single_miptail && sparse_memory_requirement.imageMipTailFirstLod < texture->levels()) {
+
+        auto image_opaque_memory_page = std::make_shared<VulkanMemory>(
+          context->device,
+          sparse_memory_requirement.imageMipTailSize,
+          memory_type_index);
+
+        image_opaque_memory_pages.push_back(image_opaque_memory_page);
+
+        VkDeviceSize resourceOffset = 
+          sparse_memory_requirement.imageMipTailOffset + 
+          layer * sparse_memory_requirement.imageMipTailStride;
+
+        image_opaque_memory_binds.push_back({
+          resourceOffset,                             // resourceOffset
+          sparse_memory_requirement.imageMipTailSize, // size
+          image_opaque_memory_page->memory,           // memory
+          0,                                          // memoryOffset
+          0                                           // flags
+        });
+      } 
+    } // end layers
+
+    std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info;
+    image_memory_bind_info.push_back({
+      this->image->image,
+      static_cast<uint32_t>(image_memory_binds.size()),
+      image_memory_binds.data(),
+    });
+
+    std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
+    image_opaque_memory_bind_infos.push_back({
+      this->image->image,
+      static_cast<uint32_t>(image_opaque_memory_binds.size()),
+      image_opaque_memory_binds.data(),
+    });
+
+    std::vector<VkSemaphore> wait_semaphores;
+    std::vector<VkSemaphore> signal_semaphores;
+    std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
+
+    VkBindSparseInfo bind_sparse_info = {
+      VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                           // sType
+      nullptr,                                                      // pNext
+      static_cast<uint32_t>(wait_semaphores.size()),                // waitSemaphoreCount
+      wait_semaphores.data(),                                       // pWaitSemaphores
+      static_cast<uint32_t>(buffer_memory_bind_infos.size()),       // bufferBindCount
+      buffer_memory_bind_infos.data(),                              // pBufferBinds;
+      static_cast<uint32_t>(image_opaque_memory_bind_infos.size()), // imageOpaqueBindCount
+      image_opaque_memory_bind_infos.data(),                        // pImageOpaqueBinds
+      static_cast<uint32_t>(image_memory_bind_info.size()),         // imageBindCount
+      image_memory_bind_info.data(),                                // pImageBinds
+      static_cast<uint32_t>(signal_semaphores.size()),              // signalSemaphoreCount
+      signal_semaphores.data(),                                     // pSignalSemaphores
+    };
+
+    vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(context->queue);
 	}
 
   void doStage(Context* context) override
@@ -1039,7 +1169,6 @@ private:
   }
 
   std::shared_ptr<VulkanImage> image;
-  std::shared_ptr<ImageObject> image_object;
 
   VkSampleCountFlagBits sample_count;
   VkImageTiling tiling;
@@ -1047,6 +1176,11 @@ private:
   VkSharingMode sharing_mode;
   VkImageCreateFlags create_flags;
   VkImageLayout layout;
+
+  std::vector<std::shared_ptr<VulkanMemory>> image_memory_pages;
+  std::vector<std::shared_ptr<VulkanMemory>> image_opaque_memory_pages;
+  std::vector<VkSparseImageMemoryBind> image_memory_binds;
+  std::vector<VkSparseMemoryBind> image_opaque_memory_binds;
 };
 
 
