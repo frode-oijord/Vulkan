@@ -47,7 +47,7 @@ public:
     command(std::make_unique<VulkanCommandBuffers>(this->device)),
     pipelinecache(std::make_shared<VulkanPipelineCache>(this->device))
   {
-    this->queue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT);
+    this->queue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT);
   }
 
   virtual ~Context()

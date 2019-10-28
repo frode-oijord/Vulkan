@@ -926,23 +926,55 @@ public:
   {}
 
 private:
-  void doAlloc(Context* context) override
-  {
-    this->image = std::make_shared<VulkanImage>(context->device,
-                                                context->state.texture->image_type(),
-                                                context->state.texture->format(),
-                                                context->state.texture->extent(0),
-                                                context->state.texture->levels(),
-                                                context->state.texture->layers(),
-                                                this->sample_count,
-                                                this->tiling,
-                                                this->usage_flags,
-                                                this->sharing_mode,
-                                                this->create_flags);
+	void doAlloc(Context* context) override
+	{
+		VkFormatProperties format_properties;
+		vkGetPhysicalDeviceFormatProperties(
+			context->device->physical_device.device,
+			context->state.texture->format(),
+			&format_properties);
 
-    this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    context->imageobjects.push_back(this->image_object.get());
-  }
+
+		uint32_t sparse_properties_count;
+		vkGetPhysicalDeviceSparseImageFormatProperties(
+			context->device->physical_device.device,
+			context->state.texture->format(),
+			context->state.texture->image_type(),
+			this->sample_count,
+			this->usage_flags,
+			this->tiling,
+			&sparse_properties_count,
+			nullptr);
+
+
+		std::vector<VkSparseImageFormatProperties> sparse_properties(sparse_properties_count);
+		vkGetPhysicalDeviceSparseImageFormatProperties(
+			context->device->physical_device.device,
+			context->state.texture->format(),
+			context->state.texture->image_type(),
+			this->sample_count,
+			this->usage_flags,
+			this->tiling,
+			&sparse_properties_count,
+			sparse_properties.data());
+
+
+		this->image = std::make_shared<VulkanImage>(
+			context->device,
+			context->state.texture->image_type(),
+			context->state.texture->format(),
+			context->state.texture->extent(0),
+			context->state.texture->levels(),
+			context->state.texture->layers(),
+			this->sample_count,
+			this->tiling,
+			this->usage_flags,
+			this->sharing_mode,
+			this->create_flags);
+
+		this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		context->imageobjects.push_back(this->image_object.get());
+	}
 
   void doStage(Context* context) override
   {

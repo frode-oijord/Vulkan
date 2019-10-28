@@ -119,6 +119,9 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "vertexinputbindingdescription", fun_ptr(node<VertexInputBindingDescription, uint32_t, uint32_t, VkVertexInputRate>) },
     { "vertexinputattributedescription", fun_ptr(node<VertexInputAttributeDescription, uint32_t, uint32_t, VkFormat, uint32_t>) },
 
+	{ "VK_IMAGE_CREATE_SPARSE_BINDING_BIT", VK_IMAGE_CREATE_SPARSE_BINDING_BIT },
+	{ "VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT", VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT },
+
     { "VK_FILTER_NEAREST", VK_FILTER_NEAREST },
     { "VK_FILTER_LINEAR", VK_FILTER_LINEAR },
     { "VK_FILTER_CUBIC_IMG", VK_FILTER_CUBIC_IMG },
