@@ -802,40 +802,57 @@ public:
   NO_COPY_OR_ASSIGNMENT(Sampler)
   virtual ~Sampler() = default;
   
-  Sampler(VkFilter mag_filter,
-          VkFilter min_filter,
-          VkSamplerMipmapMode mipmap_mode,
-          VkSamplerAddressMode address_mode_u,
-          VkSamplerAddressMode address_mode_v,
-          VkSamplerAddressMode address_mode_w) :
-    mag_filter(mag_filter),
-    min_filter(min_filter),
-    mipmap_mode(mipmap_mode),
-    address_mode_u(address_mode_u),
-    address_mode_v(address_mode_v),
-    address_mode_w(address_mode_w),
-    mip_lod_bias(0.0f)
+  Sampler(VkFilter magFilter,
+          VkFilter minFilter,
+          VkSamplerMipmapMode mipmapMode,
+          VkSamplerAddressMode addressModeU,
+          VkSamplerAddressMode addressModeV,
+          VkSamplerAddressMode addressModeW,
+          float mipLodBias,
+          VkBool32 anisotropyEnable,
+          float maxAnisotropy,
+          VkBool32 compareEnable,
+          VkCompareOp compareOp,
+          float minLod,
+          float maxLod,
+          VkBorderColor borderColor,
+          VkBool32 unnormalizedCoordinates) :
+    magFilter(magFilter),
+    minFilter(minFilter),
+    mipmapMode(mipmapMode),
+    addressModeU(addressModeU),
+    addressModeV(addressModeV),
+    addressModeW(addressModeW),
+    mipLodBias(mipLodBias),
+    anisotropyEnable(anisotropyEnable),
+    maxAnisotropy(maxAnisotropy),
+    compareEnable(compareEnable),
+    compareOp(compareOp),
+    minLod(minLod),
+    maxLod(maxLod),
+    borderColor(borderColor),
+    unnormalizedCoordinates(unnormalizedCoordinates)
   {}
 
 private:
   void doAlloc(Context* context) override
   {
     this->sampler = std::make_unique<VulkanSampler>(context->device,
-                                                    this->mag_filter,
-                                                    this->min_filter,
-                                                    this->mipmap_mode,
-                                                    this->address_mode_u,
-                                                    this->address_mode_v,
-                                                    this->address_mode_w,
-                                                    this->mip_lod_bias,
-                                                    VK_FALSE,
-                                                    1.f,
-                                                    VK_FALSE,
-                                                    VK_COMPARE_OP_NEVER,
-                                                    0.f,
-                                                    0.f,
-                                                    VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-                                                    VK_FALSE);
+                                                    this->magFilter,
+                                                    this->minFilter,
+                                                    this->mipmapMode,
+                                                    this->addressModeU,
+                                                    this->addressModeV,
+                                                    this->addressModeW,
+                                                    this->mipLodBias,
+                                                    this->anisotropyEnable,
+                                                    this->maxAnisotropy,
+                                                    this->compareEnable,
+                                                    this->compareOp,
+                                                    this->minLod,
+                                                    this->maxLod,
+                                                    this->borderColor,
+                                                    this->unnormalizedCoordinates);
   }
 
   void doPipeline(Context* context) override
@@ -844,13 +861,21 @@ private:
   }
 
   std::unique_ptr<VulkanSampler> sampler;
-  VkFilter mag_filter;
-  VkFilter min_filter;
-  VkSamplerMipmapMode mipmap_mode;
-  VkSamplerAddressMode address_mode_u;
-  VkSamplerAddressMode address_mode_v;
-  VkSamplerAddressMode address_mode_w;
-  float mip_lod_bias;
+  VkFilter magFilter;
+  VkFilter minFilter;
+  VkSamplerMipmapMode mipmapMode;
+  VkSamplerAddressMode addressModeU;
+  VkSamplerAddressMode addressModeV;
+  VkSamplerAddressMode addressModeW;
+  float mipLodBias;
+  VkBool32 anisotropyEnable;
+  float maxAnisotropy;
+  VkBool32 compareEnable;
+  VkCompareOp compareOp;
+  float minLod;
+  float maxLod;
+  VkBorderColor borderColor;
+  VkBool32 unnormalizedCoordinates;
 };
 
 class TextureImage : public BufferData {
@@ -967,12 +992,15 @@ private:
       throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
     }();
 
-    assert(memory_requirements.size % memory_requirements.alignment == 0);
-    uint32_t sparse_bind_count = static_cast<uint32_t>(memory_requirements.size / memory_requirements.alignment);
-    std::vector<VkSparseMemoryBind>	sparse_memory_binds(sparse_bind_count);
-
     bool single_miptail = sparse_memory_requirement.formatProperties.flags & VK_SPARSE_IMAGE_FORMAT_SINGLE_MIPTAIL_BIT;
     VkExtent3D imageGranularity = sparse_memory_requirement.formatProperties.imageGranularity;
+
+    this->image_memory = std::make_shared<VulkanMemory>(
+      context->device,
+      memory_requirements.size,
+      memory_type_index);
+
+    VkDeviceSize memoryOffset = 0;
 
     for (uint32_t layer = 0; layer < texture->layers(); layer++) {
       for (uint32_t mip_level = 0; mip_level < sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
@@ -983,28 +1011,17 @@ private:
         assert(extent.height % imageGranularity.height == 0);
         assert(extent.depth % imageGranularity.depth == 0);
 
-        for (uint32_t i = 0; i < extent.width / imageGranularity.width; i++) {
-          for (uint32_t j = 0; j < extent.height / imageGranularity.height; j++) {
-            for (uint32_t k = 0; k < extent.depth / imageGranularity.depth; k++) {
+        for (int32_t i = 0; i < extent.width; i += imageGranularity.width) {
+          for (int32_t j = 0; j < extent.height; j += imageGranularity.height) {
+            for (int32_t k = 0; k < extent.depth; k += imageGranularity.depth) {
 
-              VkOffset3D offset {
-                static_cast<int32_t>(i * imageGranularity.width),
-                static_cast<int32_t>(j * imageGranularity.height),
-                static_cast<int32_t>(k * imageGranularity.depth),
-              };
+              VkOffset3D offset{ i, j, k };
 
               VkExtent3D extent {
                 imageGranularity.width,
                 imageGranularity.height,
                 imageGranularity.depth,
               };
-
-              auto image_memory_page = std::make_shared<VulkanMemory>(
-                context->device,
-                memory_requirements.alignment, // alignment is equal to size for each page when sparse residency
-                memory_type_index);
-
-              image_memory_pages.push_back(image_memory_page);
 
               VkImageSubresource subresource = {
                 texture->subresource_range().aspectMask,
@@ -1016,10 +1033,11 @@ private:
                 subresource,
                 offset,
                 extent,
-                image_memory_page->memory,
-                0,
-                0,
+                this->image_memory->memory,
+                memoryOffset,
+                0,  // flags
               });
+              memoryOffset += memory_requirements.alignment;
             }
           }
         }
@@ -1028,12 +1046,10 @@ private:
       // Check if format has one mip tail per layer
       if (!single_miptail && sparse_memory_requirement.imageMipTailFirstLod < texture->levels()) {
 
-        auto image_opaque_memory_page = std::make_shared<VulkanMemory>(
+        this->image_opaque_memory = std::make_shared<VulkanMemory>(
           context->device,
           sparse_memory_requirement.imageMipTailSize,
           memory_type_index);
-
-        image_opaque_memory_pages.push_back(image_opaque_memory_page);
 
         VkDeviceSize resourceOffset = 
           sparse_memory_requirement.imageMipTailOffset + 
@@ -1042,26 +1058,24 @@ private:
         image_opaque_memory_binds.push_back({
           resourceOffset,                             // resourceOffset
           sparse_memory_requirement.imageMipTailSize, // size
-          image_opaque_memory_page->memory,           // memory
+          this->image_opaque_memory->memory,          // memory
           0,                                          // memoryOffset
           0                                           // flags
         });
       } 
     } // end layers
 
-    std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info;
-    image_memory_bind_info.push_back({
+    std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info{ {
       this->image->image,
       static_cast<uint32_t>(image_memory_binds.size()),
       image_memory_binds.data(),
-    });
+    } };
 
-    std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
-    image_opaque_memory_bind_infos.push_back({
+    std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos{ {
       this->image->image,
       static_cast<uint32_t>(image_opaque_memory_binds.size()),
       image_opaque_memory_binds.data(),
-    });
+    } };
 
     std::vector<VkSemaphore> wait_semaphores;
     std::vector<VkSemaphore> signal_semaphores;
@@ -1177,8 +1191,8 @@ private:
   VkImageCreateFlags create_flags;
   VkImageLayout layout;
 
-  std::vector<std::shared_ptr<VulkanMemory>> image_memory_pages;
-  std::vector<std::shared_ptr<VulkanMemory>> image_opaque_memory_pages;
+  std::shared_ptr<VulkanMemory> image_memory;
+  std::shared_ptr<VulkanMemory> image_opaque_memory;
   std::vector<VkSparseImageMemoryBind> image_memory_binds;
   std::vector<VkSparseMemoryBind> image_opaque_memory_binds;
 };

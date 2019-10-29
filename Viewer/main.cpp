@@ -10,7 +10,7 @@
 int main(int argc, char *argv[])
 {
   try {
-    VulkanImageFactory::Register<GliTextureImage>();
+    VulkanImageFactory::Register<DebugTextureImage>();
 
     auto scene = std::make_shared<Group>();
     scene->children = {

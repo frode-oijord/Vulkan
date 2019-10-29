@@ -7,7 +7,16 @@
             VK_SAMPLER_MIPMAP_MODE_LINEAR
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
+            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
+            (float 0)
+            (uint32 0)
+            (float 1)
+            (uint32 0)
+            VK_COMPARE_OP_NEVER
+            (float 0)
+            (float 10)
+            VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
+            (uint32 0))
 
          (textureimage filename)
          (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))

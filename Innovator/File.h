@@ -85,6 +85,7 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     std::unordered_map<std::string, std::any>{
     { "int32", fun_ptr(make_object<int32_t, Number>) },
     { "uint32", fun_ptr(make_object<uint32_t, Number>) },
+    { "float", fun_ptr(make_object<float, Number>) },
     { "count", fun_ptr(count) },
     { "pipeline-bindpoint", fun_ptr(node<PipelineBindpoint, VkPipelineBindPoint> ) },
     { "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) },
@@ -98,7 +99,7 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) },
     { "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) },
     { "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) },
-    { "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode>) },
+    { "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode, float, uint32_t, float, uint32_t, VkCompareOp, float, float, VkBorderColor, uint32_t>) },
     { "textureimage", fun_ptr(node<TextureImage, std::string>) },
     { "image", fun_ptr(node<Image, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) },
     { "imageview", fun_ptr(node<ImageView, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle>) },
@@ -119,12 +120,29 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "vertexinputbindingdescription", fun_ptr(node<VertexInputBindingDescription, uint32_t, uint32_t, VkVertexInputRate>) },
     { "vertexinputattributedescription", fun_ptr(node<VertexInputAttributeDescription, uint32_t, uint32_t, VkFormat, uint32_t>) },
 
-	{ "VK_IMAGE_CREATE_SPARSE_BINDING_BIT", VK_IMAGE_CREATE_SPARSE_BINDING_BIT },
-	{ "VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT", VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT },
+	  { "VK_IMAGE_CREATE_SPARSE_BINDING_BIT", VK_IMAGE_CREATE_SPARSE_BINDING_BIT },
+	  { "VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT", VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT },
+    { "VK_IMAGE_CREATE_SPARSE_ALIASED_BIT", VK_IMAGE_CREATE_SPARSE_ALIASED_BIT },
 
     { "VK_FILTER_NEAREST", VK_FILTER_NEAREST },
     { "VK_FILTER_LINEAR", VK_FILTER_LINEAR },
     { "VK_FILTER_CUBIC_IMG", VK_FILTER_CUBIC_IMG },
+
+    { "VK_COMPARE_OP_NEVER", VK_COMPARE_OP_NEVER },
+    { "VK_COMPARE_OP_LESS", VK_COMPARE_OP_LESS },
+    { "VK_COMPARE_OP_EQUAL", VK_COMPARE_OP_EQUAL },
+    { "VK_COMPARE_OP_LESS_OR_EQUAL", VK_COMPARE_OP_LESS_OR_EQUAL },
+    { "VK_COMPARE_OP_GREATER", VK_COMPARE_OP_GREATER },
+    { "VK_COMPARE_OP_NOT_EQUAL", VK_COMPARE_OP_NOT_EQUAL },
+    { "VK_COMPARE_OP_GREATER_OR_EQUAL", VK_COMPARE_OP_GREATER_OR_EQUAL },
+    { "VK_COMPARE_OP_ALWAYS", VK_COMPARE_OP_ALWAYS },
+
+    { "VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK", VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK },
+    { "VK_BORDER_COLOR_INT_TRANSPARENT_BLACK", VK_BORDER_COLOR_INT_TRANSPARENT_BLACK },
+    { "VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK", VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK },
+    { "VK_BORDER_COLOR_INT_OPAQUE_BLACK", VK_BORDER_COLOR_INT_OPAQUE_BLACK },
+    { "VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE", VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE },
+    { "VK_BORDER_COLOR_INT_OPAQUE_WHITE", VK_BORDER_COLOR_INT_OPAQUE_WHITE },
 
     { "VK_ATTACHMENT_LOAD_OP_LOAD", VK_ATTACHMENT_LOAD_OP_LOAD },
     { "VK_ATTACHMENT_LOAD_OP_CLEAR", VK_ATTACHMENT_LOAD_OP_CLEAR },
