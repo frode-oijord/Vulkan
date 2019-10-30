@@ -63,7 +63,7 @@ public:
     return {
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().x)),
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().y)),
-      1
+      static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().z)),
     };
   }
 
@@ -160,7 +160,7 @@ public:
     return {
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().x)),
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().y)),
-      1
+      static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().z)),
     };
   }
 

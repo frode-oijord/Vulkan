@@ -983,7 +983,7 @@ private:
     std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
     vkGetImageSparseMemoryRequirements(context->device->device, this->image->image, &sparse_memory_requirements_count, sparse_memory_requirements.data());
 
-    VkSparseImageMemoryRequirements sparse_memory_requirement = [&]() {
+    this->sparse_memory_requirement = [&]() {
       for (auto requirements : sparse_memory_requirements) {
         if (requirements.formatProperties.aspectMask & texture->subresource_range().aspectMask) {
           return requirements;
@@ -992,8 +992,8 @@ private:
       throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
     }();
 
-    bool single_miptail = sparse_memory_requirement.formatProperties.flags & VK_SPARSE_IMAGE_FORMAT_SINGLE_MIPTAIL_BIT;
-    VkExtent3D imageGranularity = sparse_memory_requirement.formatProperties.imageGranularity;
+    bool single_miptail = this->sparse_memory_requirement.formatProperties.flags & VK_SPARSE_IMAGE_FORMAT_SINGLE_MIPTAIL_BIT;
+    VkExtent3D imageGranularity = this->sparse_memory_requirement.formatProperties.imageGranularity;
 
     this->image_memory = std::make_shared<VulkanMemory>(
       context->device,
@@ -1003,7 +1003,7 @@ private:
     VkDeviceSize memoryOffset = 0;
 
     for (uint32_t layer = 0; layer < texture->layers(); layer++) {
-      for (uint32_t mip_level = 0; mip_level < sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+      for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
 
         VkExtent3D extent = texture->extent(mip_level);
 
@@ -1043,24 +1043,19 @@ private:
         }
       } // end mips
 
-      // Check if format has one mip tail per layer
-      if (!single_miptail && sparse_memory_requirement.imageMipTailFirstLod < texture->levels()) {
-
-        this->image_opaque_memory = std::make_shared<VulkanMemory>(
-          context->device,
-          sparse_memory_requirement.imageMipTailSize,
-          memory_type_index);
+      if (!single_miptail && this->sparse_memory_requirement.imageMipTailFirstLod < texture->levels()) {
 
         VkDeviceSize resourceOffset = 
-          sparse_memory_requirement.imageMipTailOffset + 
-          layer * sparse_memory_requirement.imageMipTailStride;
+          this->sparse_memory_requirement.imageMipTailOffset +
+          layer * this->sparse_memory_requirement.imageMipTailStride;
 
+        this->mip_tail_offset = memoryOffset;
         image_opaque_memory_binds.push_back({
-          resourceOffset,                             // resourceOffset
-          sparse_memory_requirement.imageMipTailSize, // size
-          this->image_opaque_memory->memory,          // memory
-          0,                                          // memoryOffset
-          0                                           // flags
+          resourceOffset,                                   // resourceOffset
+          this->sparse_memory_requirement.imageMipTailSize, // size
+          this->image_memory->memory,                       // memory
+          this->mip_tail_offset,                            // memoryOffset
+          0                                                 // flags
         });
       } 
     } // end layers
@@ -1127,8 +1122,25 @@ private:
 
     std::vector<VkBufferImageCopy> regions;
 
-    VkDeviceSize buffer_offset = 0;
-    for (uint32_t mip_level = 0; mip_level < texture->levels(); mip_level++) {
+    for (VkSparseImageMemoryBind memory_bind : this->image_memory_binds) {
+      const VkImageSubresourceLayers subresource_layers{
+        texture->subresource_range().aspectMask,               // aspectMask
+        memory_bind.subresource.mipLevel,                      // mipLevel
+        texture->subresource_range().baseArrayLayer,           // baseArrayLayer
+        texture->subresource_range().layerCount,               // layerCount
+      };
+
+      regions.push_back({
+        memory_bind.memoryOffset,                  // bufferOffset 
+        0,                                         // bufferRowLength
+        0,                                         // bufferImageHeight
+        subresource_layers,                        // imageSubresource
+        memory_bind.offset,                        // imageOffset
+        memory_bind.extent,                        // imageExtent
+      });
+    }
+
+    for (uint32_t mip_level = this->sparse_memory_requirement.imageMipTailFirstLod; mip_level < texture->levels(); mip_level++) {
 
       const VkImageSubresourceLayers subresource_layers{
         texture->subresource_range().aspectMask,               // aspectMask
@@ -1138,7 +1150,7 @@ private:
       };
 
       regions.push_back({
-        buffer_offset,                             // bufferOffset 
+        this->mip_tail_offset,                     // bufferOffset 
         0,                                         // bufferRowLength
         0,                                         // bufferImageHeight
         subresource_layers,                        // imageSubresource
@@ -1146,7 +1158,7 @@ private:
         texture->extent(mip_level),                // imageExtent
         });
 
-      buffer_offset += texture->size(mip_level);
+      this->mip_tail_offset += texture->size(mip_level);
     }
 
     vkCmdCopyBufferToImage(context->command->buffer(),
@@ -1191,8 +1203,10 @@ private:
   VkImageCreateFlags create_flags;
   VkImageLayout layout;
 
+  VkDeviceSize mip_tail_offset;
+  VkSparseImageMemoryRequirements sparse_memory_requirement;
   std::shared_ptr<VulkanMemory> image_memory;
-  std::shared_ptr<VulkanMemory> image_opaque_memory;
+  std::shared_ptr<VulkanMemory> opaque_image_memory;
   std::vector<VkSparseImageMemoryBind> image_memory_binds;
   std::vector<VkSparseMemoryBind> image_opaque_memory_binds;
 };
