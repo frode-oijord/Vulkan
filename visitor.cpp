@@ -8,8 +8,8 @@
 #include <map>
 #include <any>
 
-
 struct Visitor {
+
 	template <typename NodeType>
 	void apply(NodeType* node)
 	{
@@ -27,7 +27,6 @@ struct Visitor {
 		this->operations[typeid(NodeType)] = operation;
 	}
 
-private:
 	std::map<std::type_index, std::any> operations;
 };
 
@@ -41,10 +40,6 @@ struct Group : public Node {
 	void visit(Visitor* visitor) override
 	{
 		visitor->apply(this);
-	}
-
-	void visitChildren(Visitor* visitor)
-	{
 		for (auto child : this->children) {
 			child->visit(visitor);
 		}
@@ -54,90 +49,111 @@ struct Group : public Node {
 };
 
 
-struct Text : public Node {
+struct BuiltinNode : public Node {
 	void visit(Visitor* visitor) override
 	{
 		visitor->apply(this);
 	}
-
-	std::string data;
 };
 
 
-struct TextVisitor {
-
-	TextVisitor()
+struct BuiltinVisitor 
+{
+	BuiltinVisitor()
 	{
-		//this->visitor.register_operation<Group>([this](Group* group) {
-		//	this->apply_group(group);
-		//	});
-		this->visitor.register_operation<Group>(std::bind(&TextVisitor::apply_group, this, std::placeholders::_1));
-
-		this->visitor.register_operation<Text>(apply_text);
+		this->visitor.register_operation<Group>([this](Group* node) {
+			this->visit(node);
+		});
+		this->visitor.register_operation<BuiltinNode>([this](BuiltinNode* node) {
+			this->visit(node);
+		});
 	}
 
-	void apply(Node* node)
+	void apply(Node* root)
 	{
-		node->visit(&this->visitor);
+		this->state.clear();
+		root->visit(&this->visitor);
+		std::cout << this->state << std::endl;
 	}
 
-	void apply_group(Group* group) 
+	void visit(Group* group)
 	{
-		std::cout << "Group node visited" << std::endl;
-		group->visitChildren(&this->visitor);
+		this->state += "Group node visited by builtin visitor\n";
 	}
 
-	static void apply_text(Text* node)
+	void visit(BuiltinNode* node)
 	{
-		std::cout << "Text node visited" << std::endl;
+		this->state += "BuiltinNode node visited by builtin visitor\n";
 	}
 
 	Visitor visitor;
+	std::string state;
 };
 
+static BuiltinVisitor builtin_visitor;
 
 struct CustomNode : public Node {
-	void visit(Visitor* visitor) override 
+	void visit(Visitor* visitor) override
 	{
 		visitor->apply(this);
 	}
 };
 
+struct CustomVisitor {
 
-void apply_text(Text* node)
-{
-	std::cout << "Text node visited by custom visitor" << std::endl;
-}
+	CustomVisitor()
+	{
+		this->visitor.register_operation<Group>([this](Group* node) {
+			this->visit(node);
+		});
+		this->visitor.register_operation<BuiltinNode>([this](BuiltinNode* node) {
+			this->visit(node);
+		});
+		this->visitor.register_operation<CustomNode>([this](CustomNode* node) {
+			this->visit(node);
+  	});
+	}
 
+	void apply(Node* root)
+	{
+		this->state.clear();
+		root->visit(&this->visitor);
+		std::cout << this->state << std::endl;
+	}
 
-void apply_custom(CustomNode* node)
-{
-	std::cout << "Custom node visited by custom visitor" << std::endl;
-}
+	void visit(Group* node)
+	{
+		this->state += "Group node visited by custom visitor\n";
+	}
 
+	void visit(BuiltinNode* node)
+	{
+		this->state += "BuiltinNode node visited by custom visitor\n";
+	}
+
+	void visit(CustomNode* node)
+	{
+		this->state += "CustomNode node visited by custom visitor\n";
+	}
+
+	Visitor visitor;
+	std::string state;
+};
+	
+static CustomVisitor custom_visitor;
 
 int main()
 {
+	builtin_visitor.visitor.register_operation<CustomNode>([](CustomNode* node) {
+		builtin_visitor.state += "Custom node visited by builtin visitor\n";
+	});
+
 	auto root = std::make_shared<Group>();
 	root->children = {
-		std::make_shared<Text>(),
+		std::make_shared<BuiltinNode>(),
 		std::make_shared<CustomNode>(),
 	};
 
-	TextVisitor text_visitor;
-	text_visitor.visitor.register_operation<CustomNode>([](CustomNode* node) {
-		std::cout << "Custom node visited" << std::endl;
-	});
-	text_visitor.apply(root.get());
-
-	Visitor custom_visitor;
-	custom_visitor.register_operation<Text>(apply_text);
-	custom_visitor.register_operation<Group>([&](Group* group) {
-		std::cout << "Group node visited by custom visitor" << std::endl;
-		group->visitChildren(&custom_visitor);
-	});
-	custom_visitor.register_operation<CustomNode>(apply_custom);
-
-	root->visit(&custom_visitor);
+	builtin_visitor.apply(root.get());
+	custom_visitor.apply(root.get());
 }
-
