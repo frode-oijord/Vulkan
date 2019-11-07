@@ -1,45 +1,96 @@
+
+#include <any>
+#include <string>
+#include <vector>
 #include <memory>
 #include <iostream>
 #include <typeinfo>
 #include <typeindex>
-#include <string>
-#include <vector>
 #include <functional>
-#include <map>
-#include <any>
+#include <unordered_map>
 
-struct Visitor {
+// Nodes can modify the state when they're visited, e.g. change the current transform,
+// or set the current index buffer, texture image etc...
+struct State 
+{
+	std::string indent;
+};
 
+
+// The context we're visiting the nodes in, e.g. Vulkan instance, Vulkan device. 
+struct Context 
+{
+	State state;
+};
+
+
+// The visitor base. Contains a map that map node types to callbacks. 
+struct Visitor 
+{
+	Visitor(std::shared_ptr<Context> context)
+		: context(std::move(context))
+	{}
+
+	// a node calls this method when visited. If there's a matching callback for the given node 
+	// type, it is called.
 	template <typename NodeType>
 	void apply(NodeType* node)
 	{
 		std::type_index type = typeid(NodeType);
-		auto it = operations.find(type);
-		if (it != this->operations.end()) {
-			auto operation = std::any_cast<std::function<void(NodeType*)>>(it->second);
-			operation(node);
+		auto it = callbacks.find(type);
+		if (it != this->callbacks.end()) {
+			auto callback = std::any_cast<std::function<void(NodeType*)>>(it->second);
+			callback(node);
 		}
 	}
 
+	// register a callback for a node type
 	template <typename NodeType>
-	void register_operation(std::function<void(NodeType*)> operation)
+	void register_callback(std::function<void(NodeType*)> operation)
 	{
-		this->operations[typeid(NodeType)] = operation;
+		this->callbacks[typeid(NodeType)] = operation;
 	}
 
-	std::map<std::type_index, std::any> operations;
+	std::shared_ptr<Context> context;
+	std::unordered_map<std::type_index, std::any> callbacks;
 };
 
 
-struct Node {
+struct Node 
+{
+	Node(std::string name) : 
+		name(name)	
+	{}
+
 	virtual void visit(Visitor* visitor) = 0;
+
+	std::string name;
 };
 
+#define VISITABLE											\
+void visit(Visitor* visitor) override \
+{																			\
+	visitor->apply(this);								\
+}																			\
 
-struct Group : public Node {
-	void visit(Visitor* visitor) override
+
+struct Label : Node 
+{
+	VISITABLE
+	Label() :
+		Node("Label") 
+	{}
+};
+
+struct Group : public Node 
+{
+	VISITABLE
+	Group(std::string name) :
+		Node(name)
+	{}
+
+	void visitChildren(Visitor* visitor)
 	{
-		visitor->apply(this);
 		for (auto child : this->children) {
 			child->visit(visitor);
 		}
@@ -49,111 +100,158 @@ struct Group : public Node {
 };
 
 
-struct BuiltinNode : public Node {
-	void visit(Visitor* visitor) override
-	{
-		visitor->apply(this);
-	}
-};
-
-
-struct BuiltinVisitor 
+struct Separator : public Group 
 {
-	BuiltinVisitor()
-	{
-		this->visitor.register_operation<Group>([this](Group* node) {
-			this->visit(node);
-		});
-		this->visitor.register_operation<BuiltinNode>([this](BuiltinNode* node) {
-			this->visit(node);
-		});
-	}
-
-	void apply(Node* root)
-	{
-		this->state.clear();
-		root->visit(&this->visitor);
-		std::cout << this->state << std::endl;
-	}
-
-	void visit(Group* group)
-	{
-		this->state += "Group node visited by builtin visitor\n";
-	}
-
-	void visit(BuiltinNode* node)
-	{
-		this->state += "BuiltinNode node visited by builtin visitor\n";
-	}
-
-	Visitor visitor;
-	std::string state;
+	VISITABLE
+	Separator(std::string name) :
+		Group(name)
+	{}
 };
 
-static BuiltinVisitor builtin_visitor;
 
-struct CustomNode : public Node {
-	void visit(Visitor* visitor) override
+// print the scene graph, indent child nodes
+struct SceneGraphPrinter : public Visitor
+{
+	SceneGraphPrinter(std::shared_ptr<Context> context)
+		:	Visitor(context)
 	{
-		visitor->apply(this);
-	}
-};
-
-struct CustomVisitor {
-
-	CustomVisitor()
-	{
-		this->visitor.register_operation<Group>([this](Group* node) {
+		this->register_callback<Label>([this](Label* node) {
 			this->visit(node);
 		});
-		this->visitor.register_operation<BuiltinNode>([this](BuiltinNode* node) {
+		this->register_callback<Group>([this](Group* node) {
 			this->visit(node);
 		});
-		this->visitor.register_operation<CustomNode>([this](CustomNode* node) {
+		this->register_callback<Separator>([this](Separator* node) {
 			this->visit(node);
-  	});
+		});
 	}
 
-	void apply(Node* root)
+	void visit(Label* node)
 	{
-		this->state.clear();
-		root->visit(&this->visitor);
-		std::cout << this->state << std::endl;
+		std::cout << this->context->state.indent << node->name << std::endl;
 	}
 
 	void visit(Group* node)
 	{
-		this->state += "Group node visited by custom visitor\n";
+		std::cout << this->context->state.indent << node->name << std::endl;
+		this->context->state.indent += "  ";
+		node->visitChildren(this);
 	}
 
-	void visit(BuiltinNode* node)
+	void visit(Separator* node)
 	{
-		this->state += "BuiltinNode node visited by custom visitor\n";
-	}
+		std::cout << this->context->state.indent << node->name << std::endl;
 
-	void visit(CustomNode* node)
-	{
-		this->state += "CustomNode node visited by custom visitor\n";
+		State state = this->context->state;
+		this->context->state.indent += "  ";
+		node->visitChildren(this);
+		this->context->state = state;
 	}
-
-	Visitor visitor;
-	std::string state;
 };
-	
-static CustomVisitor custom_visitor;
+
+
+// node created by client code
+struct Custom : public Node 
+{
+	Custom() :
+		Node("Custom")
+	{}
+
+	void visit(Visitor* visitor) override
+	{
+		visitor->apply(this);
+	}
+};
+
+// visitor, created by client code
+struct CustomPrinter : public Visitor
+{
+	CustomPrinter(std::shared_ptr<Context> context)
+		:	Visitor(context)
+	{
+		this->register_callback<Custom>([this](Custom* node) {
+			this->print(node);
+		});
+		this->register_callback<Label>([this](Label* node) {
+			this->print(node);
+		});
+		this->register_callback<Group>([this](Group* node) {
+			this->print(node);
+		});
+		this->register_callback<Separator>([this](Separator* node) {
+			this->print(node);
+		});
+	}
+
+	// the custom visitor simply adds a "custom: " to each line of output
+	void print(Custom* node)
+	{
+		std::cout << this->context->state.indent << "custom: " << node->name << std::endl;
+	}
+
+	void print(Label* node)
+	{
+		std::cout << this->context->state.indent << "custom: " << node->name << std::endl;
+	}
+
+	void print(Group* node)
+	{
+		std::cout << this->context->state.indent << "custom: " << node->name << std::endl;
+		this->context->state.indent += "  ";
+	}
+
+	void print(Separator* node)
+	{
+		std::cout << this->context->state.indent << "custom: " << node->name << std::endl;
+
+		State state = this->context->state;
+		this->context->state.indent += "  ";
+		node->visitChildren(this);
+		this->context->state = state;
+	}
+};
+
+
+// create a scene graph with a separator inside a separator to show two
+// indentation levels
+std::shared_ptr<Node> get_scenegraph() 
+{
+	auto root = std::make_shared<Separator>("Separator");
+
+	auto sep = std::make_shared<Separator>("Separator");
+	sep->children = {
+		std::make_shared<Label>(),
+		std::make_shared<Label>(),
+	};
+
+	root->children = {
+		std::make_shared<Custom>(),
+		std::make_shared<Label>(),
+		sep,
+		std::make_shared<Label>(),
+	};
+
+	return root;
+}
+
 
 int main()
 {
-	builtin_visitor.visitor.register_operation<CustomNode>([](CustomNode* node) {
-		builtin_visitor.state += "Custom node visited by builtin visitor\n";
+	// the context is shared between predefined and custom visitors in this case
+	auto context = std::make_shared<Context>();
+	SceneGraphPrinter printer(context);
+	CustomPrinter custom(context);
+
+	// client code can register callback for custom node
+	printer.register_callback<Custom>([&printer](Custom* node) {
+		std::cout << printer.context->state.indent << node->name << std::endl;
 	});
 
-	auto root = std::make_shared<Group>();
-	root->children = {
-		std::make_shared<BuiltinNode>(),
-		std::make_shared<CustomNode>(),
-	};
+	auto root = get_scenegraph();
 
-	builtin_visitor.apply(root.get());
-	custom_visitor.apply(root.get());
+	// visit nodes with predefined printer
+	root->visit(&printer);
+
+	// visit nodes with client-code defined printer
+	root->visit(&custom);
 }
