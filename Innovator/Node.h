@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Innovator/Defines.h>
+#include <Innovator/State.h>
+#include <Innovator/Visitor.h>
+
 #include <vector>
 #include <memory>
 
@@ -10,6 +13,8 @@ public:
 
   Node() = default;
   virtual ~Node() = default;
+
+	virtual void visit(Visitor* visitor) = 0;
 
   void alloc(class Context* context)
   {
@@ -36,11 +41,6 @@ public:
     this->doRecord(context);
   }
 
-  void event(class Context* context)
-  {
-    this->doEvent(context);
-  }
-
   void render(class Context* context)
   {
     this->doRender(context);
@@ -57,13 +57,13 @@ private:
   virtual void doStage(class Context*) {}
   virtual void doPipeline(class Context*) {}
   virtual void doRecord(class Context*) {}
-  virtual void doEvent(class Context*) {}
   virtual void doRender(class Context*) {}
   virtual void doPresent(class Context*) {}
 };
 
 class Group : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Group)
   Group() = default;
   virtual ~Group() = default;
@@ -109,13 +109,6 @@ protected:
     }
   }
 
-  void doEvent(class Context* context) override
-  {
-    for (const auto& node : this->children) {
-      node->event(context);
-    }
-  }
-
   void doRender(class Context* context) override
   {
     for (const auto& node : this->children) {
@@ -129,4 +122,23 @@ protected:
       node->present(context);
     }
   }
+};
+
+
+class Separator : public Group {
+public:
+	DECLARE_VISITABLE
+	NO_COPY_OR_ASSIGNMENT(Separator)
+	Separator() = default;
+	virtual ~Separator() = default;
+
+	explicit Separator(std::vector<std::shared_ptr<Node>> children);
+
+protected:
+	void doAlloc(Context* context) override;
+	void doResize(Context* context) override;
+	void doStage(Context* context) override;
+	void doPipeline(Context* context) override;
+	void doRecord(Context* context) override;
+	void doRender(Context* context) override;
 };

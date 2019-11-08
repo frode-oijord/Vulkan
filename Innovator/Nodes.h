@@ -4,8 +4,10 @@
 #include <Innovator/VulkanSurface.h>
 #include <Innovator/Wrapper.h>
 #include <Innovator/Node.h>
+#include <Innovator/Visitor.h>
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
+#include <Innovator/EventVisitor.h>
 
 #include <vulkan/vulkan.h>
 #include <shaderc/shaderc.hpp>
@@ -19,102 +21,9 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
-class StateScope {
-public:
-  NO_COPY_OR_ASSIGNMENT(StateScope)
-  StateScope() = delete;
-
-  explicit StateScope(State * state) : 
-    stateptr(state),
-    statecpy(*state)
-  {}
-
-  ~StateScope()
-  {
-    *stateptr = this->statecpy;
-  }
-  
-  State* stateptr;
-  State statecpy;
-};
-
-class RenderStateScope {
-public:
-  NO_COPY_OR_ASSIGNMENT(RenderStateScope)
-  RenderStateScope() = delete;
-
-  explicit RenderStateScope(State* state) :
-    state(state),
-    ModelMatrix(state->ModelMatrix),
-    ViewMatrix(state->ViewMatrix),
-    ProjMatrix(state->ProjMatrix)
-  {}
-
-  ~RenderStateScope()
-  {
-    state->ModelMatrix = this->ModelMatrix;
-    state->ViewMatrix = this->ViewMatrix;
-    state->ProjMatrix = this->ProjMatrix;
-  }
-
-  State* state;
-
-  glm::dmat4 ModelMatrix{ 1.0 };
-  glm::dmat4 ViewMatrix{ 1.0 };
-  glm::dmat4 ProjMatrix{ 1.0 };
-};
-
-
-class Separator : public Group {
-public:
-  NO_COPY_OR_ASSIGNMENT(Separator)
-  Separator() = default;
-  virtual ~Separator() = default;
-
-  explicit Separator(std::vector<std::shared_ptr<Node>> children) : 
-    Group(std::move(children)) 
-  {}
-
-protected:
-  void doAlloc(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doAlloc(context);
-  }
-
-  void doResize(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doResize(context);
-  }
-
-  void doStage(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doStage(context);
-  }
-
-  void doPipeline(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doPipeline(context);
-  }
-
-  void doRecord(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doRecord(context);
-  }
-
-  void doRender(Context* context) override
-  {
-    RenderStateScope scope(&context->state);
-    Group::doRender(context);
-  }
-};
-
 class Scene : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Scene)
   Scene() = default;
   virtual ~Scene() = default;
@@ -123,12 +32,14 @@ public:
     Group(std::move(children))
   {}
 
-  void init(Context* context)
+  void init(std::shared_ptr<Context> context)
   {
-    this->doAlloc(context);
-    this->doStage(context);
-    this->doPipeline(context);
-    this->doRecord(context);
+		this->eventvisitor = std::make_shared<EventVisitor>(context);
+
+    this->doAlloc(context.get());
+    this->doStage(context.get());
+    this->doPipeline(context.get());
+    this->doRecord(context.get());
   }
 
   void redraw(Context* context)
@@ -149,6 +60,11 @@ public:
     this->redraw(context);
   }
 
+	void event()
+	{
+		this->visit(this->eventvisitor.get());
+	}
+
 protected:
   void doAlloc(Context* context) override
   {
@@ -184,11 +100,14 @@ protected:
     Group::doRecord(context);
     context->end();
   }
+
+	std::shared_ptr<EventVisitor> eventvisitor;
 };
 
 
 class ViewMatrix : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ViewMatrix)
   ViewMatrix() = delete;
   virtual ~ViewMatrix() = default;
@@ -205,7 +124,6 @@ public:
                  glm::dvec3(m6, m7, m8))
   {}
 
-private:
   void zoom(double dy)
   {
     this->mat = glm::translate(this->mat, glm::dvec3(0.0, 0.0, dy));
@@ -216,45 +134,19 @@ private:
     this->mat = glm::translate(this->mat, glm::dvec3(dx, 0.0));
   }
 
-  void doEvent(Context* context)
-  {
-    auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-    if (press) {
-      this->press = std::move(press);
-    }
-
-    if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-      this->press.reset();
-      context->event.reset();
-    }
-
-    auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-    if (move && this->press) {
-      glm::dvec2 dx = (this->press->pos - move->pos) * .01;
-      dx[1] = -dx[1];
-      switch (this->press->button) {
-      case 1: this->pan(dx); break;
-      case 2: this->zoom(dx[1]); break;
-      default: break;
-      }
-      this->press->pos = move->pos;
-      context->event.reset();
-    }
-  }
-
+private:
   void doRender(Context* context) override
   {
     context->state.ViewMatrix = this->mat;
   }
 
   glm::dmat4 mat{ 1.0 };
-
-  std::shared_ptr<MousePressEvent> press{ nullptr };
 };
 
 
 class ProjMatrix : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ProjMatrix)
   ProjMatrix() = delete;
   virtual ~ProjMatrix() = default;
@@ -299,6 +191,7 @@ private:
 
 class Transform : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Transform)
   Transform() = default;
   virtual ~Transform() = default;
@@ -321,6 +214,7 @@ private:
 
 class BufferData : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(BufferData)
   BufferData() = default;
   virtual ~BufferData() = default;
@@ -358,6 +252,7 @@ private:
 template <typename T>
 class InlineBufferData : public BufferData {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(InlineBufferData)
   InlineBufferData() = default;
   virtual ~InlineBufferData() = default;
@@ -388,6 +283,7 @@ public:
 
 class STLBufferData : public BufferData {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(STLBufferData)
   STLBufferData() = delete;
   virtual ~STLBufferData() = default;
@@ -442,6 +338,7 @@ public:
 
 class CpuMemoryBuffer : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(CpuMemoryBuffer)
   CpuMemoryBuffer() = delete;
   virtual ~CpuMemoryBuffer() = default;
@@ -490,6 +387,7 @@ private:
 
 class GpuMemoryBuffer : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(GpuMemoryBuffer)
   GpuMemoryBuffer() = delete;
   virtual ~GpuMemoryBuffer() = default;
@@ -545,6 +443,7 @@ private:
 
 class TransformBuffer : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(TransformBuffer)
   virtual ~TransformBuffer() = default;
 
@@ -588,6 +487,7 @@ private:
 
 class IndexBufferDescription : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(IndexBufferDescription)
   IndexBufferDescription() = delete;
   virtual ~IndexBufferDescription() = default;
@@ -610,6 +510,7 @@ private:
 
 class VertexInputAttributeDescription : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(VertexInputAttributeDescription)
   VertexInputAttributeDescription() = delete;
   virtual ~VertexInputAttributeDescription() = default;
@@ -640,6 +541,7 @@ private:
 
 class VertexInputBindingDescription : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(VertexInputBindingDescription)
   VertexInputBindingDescription() = delete;
   virtual ~VertexInputBindingDescription() = default;
@@ -669,6 +571,7 @@ private:
 
 class DescriptorSetLayoutBinding : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DescriptorSetLayoutBinding)
   DescriptorSetLayoutBinding() = delete;
   virtual ~DescriptorSetLayoutBinding() = default;
@@ -732,6 +635,7 @@ private:
 
 class Shader : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Shader)
   Shader() = delete;
   virtual ~Shader() = default;
@@ -799,6 +703,7 @@ protected:
 
 class Sampler : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Sampler)
   virtual ~Sampler() = default;
   
@@ -855,6 +760,7 @@ private:
 
 class TextureImage : public BufferData {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(TextureImage)
   TextureImage() = delete;
   virtual ~TextureImage() = default;
@@ -909,6 +815,7 @@ private:
 
 class Image : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Image)
   virtual ~Image() = default;
   Image(VkSampleCountFlagBits sample_count,
@@ -1041,6 +948,7 @@ private:
 
 class ImageView : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ImageView)
   virtual ~ImageView() = default;
   ImageView(VkComponentSwizzle r,
@@ -1072,6 +980,7 @@ private:
 
 class CullMode : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(CullMode)
     CullMode() = delete;
   virtual ~CullMode() = default;
@@ -1091,6 +1000,7 @@ private:
 
 class ComputeCommand : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ComputeCommand)
   ComputeCommand() = delete;
   virtual ~ComputeCommand() = default;
@@ -1168,6 +1078,7 @@ private:
 
 class DrawCommandBase : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DrawCommandBase)
   DrawCommandBase() = delete;
   virtual ~DrawCommandBase() = default;
@@ -1306,6 +1217,7 @@ private:
 
 class DrawCommand : public DrawCommandBase {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DrawCommand)
   virtual ~DrawCommand() = default;
 
@@ -1335,6 +1247,7 @@ private:
 
 class IndexedDrawCommand : public DrawCommandBase {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(IndexedDrawCommand)
   virtual ~IndexedDrawCommand() = default;
 
@@ -1379,6 +1292,7 @@ private:
 
 class FramebufferAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(FramebufferAttachment)
   virtual ~FramebufferAttachment() = default;
 
@@ -1445,6 +1359,7 @@ public:
 
 class Framebuffer : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Framebuffer)
   virtual ~Framebuffer() = default;
 
@@ -1475,6 +1390,7 @@ public:
 
 class InputAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(InputAttachment)
   virtual ~InputAttachment() = default;
   explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
@@ -1493,6 +1409,7 @@ private:
 
 class ColorAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ColorAttachment)
   virtual ~ColorAttachment() = default;
   explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
@@ -1511,6 +1428,7 @@ private:
 
 class ResolveAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ResolveAttachment)
   virtual ~ResolveAttachment() = default;
   explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
@@ -1528,6 +1446,7 @@ private:
 
 class DepthStencilAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DepthStencilAttachment)
   virtual ~DepthStencilAttachment() = default;
   explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
@@ -1545,6 +1464,7 @@ private:
 
 class PreserveAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(PreserveAttachment)
   virtual ~PreserveAttachment() = default;
   explicit PreserveAttachment(uint32_t attachment) :
@@ -1562,6 +1482,7 @@ private:
 
 class PipelineBindpoint : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(PipelineBindpoint)
   virtual ~PipelineBindpoint() = default;
   explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
@@ -1580,6 +1501,7 @@ private:
 
 class SubpassDescription : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(SubpassDescription)
   SubpassDescription() = delete;
   virtual ~SubpassDescription() = default;
@@ -1610,6 +1532,7 @@ private:
 
 class RenderpassAttachment: public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(RenderpassAttachment)
   virtual ~RenderpassAttachment() = default;
 
@@ -1646,8 +1569,10 @@ private:
 
 class Renderpass : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Renderpass)
   virtual ~Renderpass() = default;
+
   Renderpass(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {}
@@ -1719,6 +1644,7 @@ private:
 
 class RenderpassDescription : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(RenderpassDescription)
   virtual ~RenderpassDescription() = default;
   RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
@@ -1758,6 +1684,7 @@ private:
 
 class SwapchainObject : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(SwapchainObject)
   virtual ~SwapchainObject() = default;
 
@@ -2001,6 +1928,7 @@ private:
 
 class OffscreenImage : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
 	NO_COPY_OR_ASSIGNMENT(OffscreenImage)
 	virtual ~OffscreenImage() = default;
 
