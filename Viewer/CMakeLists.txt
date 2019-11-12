@@ -4,9 +4,7 @@ project (Viewer LANGUAGES CXX)
 find_package(Vulkan REQUIRED)
 
 add_executable(Viewer main.cpp 
-	${PROJECT_SOURCE_DIR}/../Innovator/Nodes.cpp
-	${PROJECT_SOURCE_DIR}/../Innovator/Visitor.cpp
-	${PROJECT_SOURCE_DIR}/../Innovator/EventVisitor.cpp)	
+	${PROJECT_SOURCE_DIR}/../Innovator/Visitor.cpp)
 
 set_property(TARGET Viewer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
