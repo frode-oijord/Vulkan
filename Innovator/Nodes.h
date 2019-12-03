@@ -386,7 +386,21 @@ public:
     usage_flags(usage_flags), 
     create_flags(create_flags)
   {
-
+    static bool register_callbacks = []() {
+      allocvisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
+        self->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
+      });
+      stagevisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
+        self->stage(stagevisitor.context.get());
+      });
+      pipelinevisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
+        self->updateState(pipelinevisitor.context.get());
+      });
+      recordvisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
+        self->updateState(recordvisitor.context.get());
+      });
+      return true;
+    }();
   }
 
 	void alloc(Context* context, std::vector<BufferObject*> & bufferobjects)
@@ -415,25 +429,6 @@ public:
   }
 
 private:
-  struct CallbackRegistry {
-    CallbackRegistry()
-    {
-      allocvisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
-      });
-      stagevisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->stage(stagevisitor.context.get());
-      });
-      pipelinevisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->updateState(pipelinevisitor.context.get());
-      });
-      recordvisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->updateState(recordvisitor.context.get());
-      });
-    }
-  };
-
-  inline static CallbackRegistry registry;
   VkBufferUsageFlags usage_flags;
   VkBufferCreateFlags create_flags;
   std::shared_ptr<BufferObject> buffer{ nullptr };
@@ -449,7 +444,20 @@ public:
   explicit GpuMemoryBuffer(VkBufferUsageFlags usage_flags, VkBufferCreateFlags create_flags = 0) : 
     usage_flags(usage_flags), 
     create_flags(create_flags)
-  {}
+  {
+    allocvisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer * node) {
+      node->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
+    });
+    stagevisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* node) {
+      node->stage(stagevisitor.context.get());
+    });
+    pipelinevisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* node) {
+      node->pipeline(pipelinevisitor.context.get());
+    });
+    recordvisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* node) {
+      node->record(recordvisitor.context.get());
+    });
+  }
 
 	void alloc(Context* context, std::vector<BufferObject*>& bufferobjects)
   {
@@ -490,16 +498,6 @@ public:
   }
 
 private:
-  struct CallbackRegistry {
-    CallbackRegistry()
-    {
-      allocvisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* node) {
-        node->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
-      });
-    }
-  };
-
-  inline static CallbackRegistry callbacks;
   VkBufferUsageFlags usage_flags;
   VkBufferCreateFlags create_flags;
   std::shared_ptr<BufferObject> buffer{ nullptr };
@@ -544,6 +542,20 @@ private:
     MemoryMap map(this->buffer->memory.get(), this->size, this->buffer->offset);
     std::copy(data.begin(), data.end(), reinterpret_cast<glm::mat4*>(map.mem));
   }
+
+  struct CallbackRegistry {
+    CallbackRegistry()
+    {
+      allocvisitor.register_callback<TransformBuffer>([this](TransformBuffer* node) {
+        node->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
+      });
+      pipelinevisitor.register_callback<TransformBuffer>([](TransformBuffer* node) {
+        node->pipeline(pipelinevisitor.context.get());
+      });
+    }
+  };
+
+  inline static CallbackRegistry callbacks;
 
   size_t size;
   std::shared_ptr<BufferObject> buffer{ nullptr };

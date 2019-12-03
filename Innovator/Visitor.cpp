@@ -74,9 +74,6 @@ EventVisitor::visit(ViewMatrix* node)
 
 AllocVisitor::AllocVisitor()
 {
-	this->register_callback<TransformBuffer>([this](TransformBuffer* node) {
-		node->alloc(this->context.get(), this->bufferobjects);
-	});
 	this->register_callback<Shader>([this](Shader* node) {
 		node->alloc(this->context.get());
 	});
@@ -186,9 +183,6 @@ StageVisitor::StageVisitor()
 	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
 		node->stage(this->context.get());
 	});
-	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
-		node->stage(this->context.get());
-	});
 	this->register_callback<TextureImage>([this](TextureImage* node) {
 		node->stage(this->context.get());
 	});
@@ -281,12 +275,6 @@ PipelineVisitor::PipelineVisitor()
 	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
 		node->pipeline(this->context.get());
 		});
-	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<TransformBuffer>([this](TransformBuffer* node) {
-		node->pipeline(this->context.get());
-		});
 	this->register_callback<VertexInputAttributeDescription>([this](VertexInputAttributeDescription* node) {
 		node->pipeline(this->context.get());
 		});
@@ -348,9 +336,6 @@ RecordVisitor::RecordVisitor()
 		node->record(this->context.get());
 		});
 	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
 		node->record(this->context.get());
 		});
 	this->register_callback<IndexBufferDescription>([this](IndexBufferDescription* node) {
