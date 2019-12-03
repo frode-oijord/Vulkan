@@ -60,6 +60,12 @@ public:
 		this->callbacks[typeid(NodeType)] = callback;
 	}
 
+  template <typename NodeType>
+  void remove_callback()
+  {
+    this->callbacks.erase(typeid(NodeType));
+  }
+
 	template <typename NodeType>
 	void apply(NodeType* node)
 	{

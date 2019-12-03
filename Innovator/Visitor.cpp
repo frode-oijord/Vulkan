@@ -74,9 +74,6 @@ EventVisitor::visit(ViewMatrix* node)
 
 AllocVisitor::AllocVisitor()
 {
-	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
-		node->alloc(this->context.get(), this->bufferobjects);
-	});
 	this->register_callback<TransformBuffer>([this](TransformBuffer* node) {
 		node->alloc(this->context.get(), this->bufferobjects);
 	});
