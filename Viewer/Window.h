@@ -237,6 +237,8 @@ public:
       swapchain
     };
 
+		CpuMemoryBuffer::init();
+
     this->scene->init(this->context);
   }
 

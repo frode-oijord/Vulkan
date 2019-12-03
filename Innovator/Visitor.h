@@ -52,7 +52,7 @@ public:
 
 class Visitor {
 public:
-	Visitor(std::shared_ptr<class Context> context);
+	Visitor();
 
 	template <typename NodeType>
 	void register_callback(std::function<void(NodeType*)> callback)
@@ -80,7 +80,7 @@ public:
 
 class EventVisitor : public Visitor {
 public:
-	EventVisitor(std::shared_ptr<Context> context);
+	EventVisitor();
 	void visit(class ViewMatrix* node);
 
 private:
@@ -90,9 +90,9 @@ private:
 
 class AllocVisitor : public Visitor {
 public:
-	AllocVisitor(std::shared_ptr<Context> context);
+	AllocVisitor();
 
-	void apply(class Node* node);
+	void visit(class Node* node);
 
 	std::vector<class ImageObject*> imageobjects;
 	std::vector<class BufferObject*> bufferobjects;
@@ -101,29 +101,36 @@ public:
 
 class StageVisitor : public Visitor {
 public:
-	StageVisitor(std::shared_ptr<Context> context);
+	StageVisitor();
 
-	void apply(class Node* node);
+	void visit(class Node* node);
 };
 
 
 class ResizeVisitor : public Visitor {
 public:
-	ResizeVisitor(std::shared_ptr<Context> context);
+	ResizeVisitor();
 
-	void apply(class Node* node);
+	void visit(class Node* node);
 };
 
 class PipelineVisitor : public Visitor {
 public:
-	PipelineVisitor(std::shared_ptr<Context> context);
+	PipelineVisitor();
 
-	void apply(class Node* node);
+	void visit(class Node* node);
 };
 
 class RecordVisitor : public Visitor {
 public:
-	RecordVisitor(std::shared_ptr<Context> context);
+	RecordVisitor();
 
-	void apply(class Node* node);
+	void visit(class Node* node);
 };
+
+inline static EventVisitor eventvisitor;
+inline static AllocVisitor allocvisitor;
+inline static StageVisitor stagevisitor;
+inline static ResizeVisitor resizevisitor;
+inline static PipelineVisitor pipelinevisitor;
+inline static RecordVisitor recordvisitor;

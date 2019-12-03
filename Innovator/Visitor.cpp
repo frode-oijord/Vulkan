@@ -2,8 +2,7 @@
 #include <Innovator/Visitor.h>
 #include <Innovator/Nodes.h>
 
-Visitor::Visitor(std::shared_ptr<Context> context)
-	: context(std::move(context))
+Visitor::Visitor()
 {
 	auto visit_group = [this](Group* node) {
 		this->visit_group(node);
@@ -38,8 +37,7 @@ Visitor::visit_separator(Separator* node)
 }
 
 
-EventVisitor::EventVisitor(std::shared_ptr<Context> context)
-	: Visitor(context)
+EventVisitor::EventVisitor()
 {
 	this->register_callback<ViewMatrix>([this](ViewMatrix* node) {
 		this->visit(node);
@@ -74,15 +72,8 @@ EventVisitor::visit(ViewMatrix* node)
 }
 
 
-AllocVisitor::AllocVisitor(std::shared_ptr<Context> context)
-	: Visitor(context)
+AllocVisitor::AllocVisitor()
 {
-	this->register_callback<BufferData>([this](BufferData* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<CpuMemoryBuffer>([this](CpuMemoryBuffer* node) {
-		node->alloc(this->context.get(), this->bufferobjects);
-	});
 	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
 		node->alloc(this->context.get(), this->bufferobjects);
 	});
@@ -156,15 +147,13 @@ AllocVisitor::AllocVisitor(std::shared_ptr<Context> context)
 }
 
 void
-AllocVisitor::apply(Node* node)
+AllocVisitor::visit(Node* node)
 {
 	this->imageobjects.clear();
 	this->bufferobjects.clear();
 
 	this->context->begin();
-
 	node->visit(this);
-
 	this->context->end();
 
 	for (auto image_object : this->imageobjects) {
@@ -189,8 +178,7 @@ AllocVisitor::apply(Node* node)
 }
 
 
-StageVisitor::StageVisitor(std::shared_ptr<Context> context)
-	: Visitor(context)
+StageVisitor::StageVisitor()
 {
 	this->register_callback<BufferData>([this](BufferData* node) {
 		node->stage(this->context.get());
@@ -199,9 +187,6 @@ StageVisitor::StageVisitor(std::shared_ptr<Context> context)
 		node->stage(this->context.get());
 	});
 	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<CpuMemoryBuffer>([this](CpuMemoryBuffer* node) {
 		node->stage(this->context.get());
 	});
 	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
@@ -223,11 +208,13 @@ StageVisitor::StageVisitor(std::shared_ptr<Context> context)
 
 
 void
-StageVisitor::apply(Node* node)
+StageVisitor::visit(Node* node)
 {
 	this->context->command->begin();
 
+	this->context->begin();
 	node->visit(this);
+	this->context->end();
 
 	this->context->fence->reset();
 	this->context->command->end();
@@ -241,8 +228,7 @@ StageVisitor::apply(Node* node)
 
 
 
-ResizeVisitor::ResizeVisitor(std::shared_ptr<Context> context)
-	: Visitor(context)
+ResizeVisitor::ResizeVisitor()
 {
 	this->register_callback<ProjMatrix>([this](ProjMatrix* node) {
 		node->resize(this->context.get());
@@ -271,12 +257,13 @@ ResizeVisitor::ResizeVisitor(std::shared_ptr<Context> context)
 }
 
 void
-ResizeVisitor::apply(Node* node)
+ResizeVisitor::visit(Node* node)
 {
-	this->context->begin();
 	this->context->command->begin();
 
+	this->context->begin();
 	node->visit(this);
+	this->context->end();
 
 	this->context->fence->reset();
 	this->context->command->end();
@@ -286,20 +273,15 @@ ResizeVisitor::apply(Node* node)
 		this->context->fence->fence);
 
 	this->context->fence->wait();
-	this->context->end();
 }
 
 
-PipelineVisitor::PipelineVisitor(std::shared_ptr<Context> context)
-	: Visitor(context)
+PipelineVisitor::PipelineVisitor()
 {
 	this->register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
 		node->pipeline(this->context.get());
 		});
 	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<CpuMemoryBuffer>([this](CpuMemoryBuffer* node) {
 		node->pipeline(this->context.get());
 		});
 	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
@@ -355,7 +337,7 @@ PipelineVisitor::PipelineVisitor(std::shared_ptr<Context> context)
 }
 
 void
-PipelineVisitor::apply(Node* node)
+PipelineVisitor::visit(Node* node)
 {
 	this->context->begin();
 	node->visit(this);
@@ -363,16 +345,12 @@ PipelineVisitor::apply(Node* node)
 }
 
 
-RecordVisitor::RecordVisitor(std::shared_ptr<Context> context)
-	: Visitor(context)
+RecordVisitor::RecordVisitor()
 {
 	this->register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
 		node->record(this->context.get());
 		});
 	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<CpuMemoryBuffer>([this](CpuMemoryBuffer* node) {
 		node->record(this->context.get());
 		});
 	this->register_callback<GpuMemoryBuffer>([this](GpuMemoryBuffer* node) {
@@ -406,7 +384,7 @@ RecordVisitor::RecordVisitor(std::shared_ptr<Context> context)
 }
 
 void
-RecordVisitor::apply(Node* node)
+RecordVisitor::visit(Node* node)
 {
 	this->context->begin();
 	node->visit(this);
