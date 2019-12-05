@@ -72,74 +72,6 @@ EventVisitor::visit(ViewMatrix* node)
 }
 
 
-AllocVisitor::AllocVisitor()
-{
-	this->register_callback<Shader>([this](Shader* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<Sampler>([this](Sampler* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<TextureImage>([this](TextureImage* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<Image>([this](Image* node) {
-		node->alloc(this->context.get(), this->imageobjects);
-	});
-	this->register_callback<DrawCommand>([this](DrawCommand* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<IndexedDrawCommand>([this](IndexedDrawCommand* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<FramebufferAttachment>([this](FramebufferAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<Framebuffer>([this](Framebuffer* node) {
-		this->visit_group(node);
-		node->alloc(this->context.get());
-	});
-	this->register_callback<InputAttachment>([this](InputAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<ColorAttachment>([this](ColorAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<ResolveAttachment>([this](ResolveAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<DepthStencilAttachment>([this](DepthStencilAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<PreserveAttachment>([this](PreserveAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<PipelineBindpoint>([this](PipelineBindpoint* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<SubpassDescription>([this](SubpassDescription* node) {
-		this->visit_group(node);
-		node->alloc(this->context.get());
-	});
-	this->register_callback<RenderpassAttachment>([this](RenderpassAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<Renderpass>([this](Renderpass* node) {
-		this->visit_group(node);
-		node->alloc(this->context.get());
-	});
-	this->register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-		this->visit_group(node);
-		node->alloc(this->context.get());
-	});
-	this->register_callback<SwapchainObject>([this](SwapchainObject* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<OffscreenImage>([this](OffscreenImage* node) {
-		node->alloc(this->context.get());
-	});
-}
-
 void
 AllocVisitor::visit(Node* node)
 {
@@ -172,32 +104,6 @@ AllocVisitor::visit(Node* node)
 }
 
 
-StageVisitor::StageVisitor()
-{
-	this->register_callback<BufferData>([this](BufferData* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<TextureImage>([this](TextureImage* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<Image>([this](Image* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<ImageView>([this](ImageView* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<SwapchainObject>([this](SwapchainObject* node) {
-		node->stage(this->context.get());
-	});
-}
-
-
 void
 StageVisitor::visit(Node* node)
 {
@@ -217,35 +123,6 @@ StageVisitor::visit(Node* node)
 	this->context->fence->wait();
 }
 
-
-
-ResizeVisitor::ResizeVisitor()
-{
-	this->register_callback<ProjMatrix>([this](ProjMatrix* node) {
-		node->resize(this->context.get());
-	});
-	this->register_callback<FramebufferAttachment>([this](FramebufferAttachment* node) {
-		node->alloc(this->context.get());
-	});
-	this->register_callback<Framebuffer>([this](Framebuffer* node) {
-		this->visit_group(node);
-		node->alloc(this->context.get());
-	});
-	this->register_callback<Renderpass>([this](Renderpass* node) {
-		this->visit_group(node);
-		node->resize(this->context.get());
-	});
-	this->register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-		node->resize(this->context.get());
-		this->visit_group(node);
-	});
-	this->register_callback<SwapchainObject>([this](SwapchainObject* node) {
-		node->stage(this->context.get());
-	});
-	this->register_callback<OffscreenImage>([this](OffscreenImage* node) {
-		node->alloc(this->context.get());
-	});
-}
 
 void
 ResizeVisitor::visit(Node* node)
@@ -267,60 +144,6 @@ ResizeVisitor::visit(Node* node)
 }
 
 
-PipelineVisitor::PipelineVisitor()
-{
-	this->register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<VertexInputAttributeDescription>([this](VertexInputAttributeDescription* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<VertexInputBindingDescription>([this](VertexInputBindingDescription* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<DescriptorSetLayoutBinding>([this](DescriptorSetLayoutBinding* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<Shader>([this](Shader* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<Sampler>([this](Sampler* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<TextureImage>([this](TextureImage* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<Image>([this](Image* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<ImageView>([this](ImageView* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<CullMode>([this](CullMode* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<ComputeCommand>([this](ComputeCommand* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<DrawCommandBase>([this](DrawCommandBase* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<DrawCommand>([this](DrawCommand* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<IndexedDrawCommand>([this](IndexedDrawCommand* node) {
-		node->pipeline(this->context.get());
-		});
-	this->register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-		node->pipeline(this->context.get());
-		this->visit_group(node);
-		});
-
-}
-
 void
 PipelineVisitor::visit(Node* node)
 {
@@ -329,41 +152,6 @@ PipelineVisitor::visit(Node* node)
 	this->context->end();
 }
 
-
-RecordVisitor::RecordVisitor()
-{
-	this->register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<IndexBufferDescription>([this](IndexBufferDescription* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<VertexInputAttributeDescription>([this](VertexInputAttributeDescription* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<TextureImage>([this](TextureImage* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<DrawCommand>([this](DrawCommand* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<IndexedDrawCommand>([this](IndexedDrawCommand* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-		node->record(this->context.get());
-		this->visit_group(node);
-		});
-	this->register_callback<SwapchainObject>([this](SwapchainObject* node) {
-		node->record(this->context.get());
-		});
-	this->register_callback<OffscreenImage>([this](OffscreenImage* node) {
-		node->record(this->context.get());
-		});
-}
 
 void
 RecordVisitor::visit(Node* node)

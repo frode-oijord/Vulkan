@@ -90,8 +90,6 @@ private:
 
 class AllocVisitor : public Visitor {
 public:
-	AllocVisitor();
-
 	void visit(class Node* node);
 
 	std::vector<class ImageObject*> imageobjects;
@@ -101,32 +99,27 @@ public:
 
 class StageVisitor : public Visitor {
 public:
-	StageVisitor();
-
 	void visit(class Node* node);
 };
 
 
 class ResizeVisitor : public Visitor {
 public:
-	ResizeVisitor();
-
 	void visit(class Node* node);
 };
+
 
 class PipelineVisitor : public Visitor {
 public:
-	PipelineVisitor();
-
 	void visit(class Node* node);
 };
+
 
 class RecordVisitor : public Visitor {
 public:
-	RecordVisitor();
-
 	void visit(class Node* node);
 };
+
 
 inline static EventVisitor eventvisitor;
 inline static AllocVisitor allocvisitor;
