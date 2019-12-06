@@ -91,9 +91,6 @@ private:
 class AllocVisitor : public Visitor {
 public:
 	void visit(class Node* node);
-
-	std::vector<class ImageObject*> imageobjects;
-	std::vector<class BufferObject*> bufferobjects;
 };
 
 

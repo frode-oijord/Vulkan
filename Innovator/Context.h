@@ -64,4 +64,7 @@ public:
   std::shared_ptr<VulkanFence> fence;
   std::unique_ptr<VulkanCommandBuffers> command;
   std::shared_ptr<VulkanPipelineCache> pipelinecache;
+
+	std::vector<class ImageObject*> imageobjects;
+	std::vector<class BufferObject*> bufferobjects;
 };

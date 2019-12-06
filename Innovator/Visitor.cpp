@@ -75,14 +75,14 @@ EventVisitor::visit(ViewMatrix* node)
 void
 AllocVisitor::visit(Node* node)
 {
-	this->imageobjects.clear();
-	this->bufferobjects.clear();
+	this->context->imageobjects.clear();
+	this->context->bufferobjects.clear();
 
 	this->context->begin();
 	node->visit(this);
 	this->context->end();
 
-	for (auto image_object : this->imageobjects) {
+	for (auto image_object : this->context->imageobjects) {
 		const auto memory = std::make_shared<VulkanMemory>(
 			this->context->device,
 			image_object->memory_requirements.size,
@@ -92,7 +92,7 @@ AllocVisitor::visit(Node* node)
 		image_object->bind(memory, offset);
 	}
 
-	for (auto buffer_object : this->bufferobjects) {
+	for (auto buffer_object : this->context->bufferobjects) {
 		const auto memory = std::make_shared<VulkanMemory>(
 			this->context->device,
 			buffer_object->memory_requirements.size,

@@ -25,7 +25,7 @@ class Node {
 public:
 	NO_COPY_OR_ASSIGNMENT(Node)
 
-		Node() = default;
+	Node() = default;
 	virtual ~Node() = default;
 
 	virtual void visit(Visitor* visitor) = 0;
@@ -201,9 +201,7 @@ public:
       aspectratio(aspectratio),
       fieldofview(fieldofview)
   {
-		resizevisitor.register_callback<ProjMatrix>([](ProjMatrix* node) {
-			node->resize(resizevisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(resizevisitor, ProjMatrix, resize);
 	}
 
   void resize(Context* context) 
@@ -302,25 +300,14 @@ public:
   explicit InlineBufferData(std::vector<T> values) :
     values(std::move(values))
   {
-		stagevisitor.register_callback<InlineBufferData<float>>([](InlineBufferData<float>* node) {
-			node->stage(stagevisitor.context.get());
-			});
-		stagevisitor.register_callback<InlineBufferData<uint32_t>>([](InlineBufferData<uint32_t>* node) {
-			node->stage(stagevisitor.context.get());
-			});
-		pipelinevisitor.register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		pipelinevisitor.register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		recordvisitor.register_callback<InlineBufferData<float>>([this](InlineBufferData<float>* node) {
-			node->record(recordvisitor.context.get());
-			});
-		recordvisitor.register_callback<InlineBufferData<uint32_t>>([this](InlineBufferData<uint32_t>* node) {
-			node->record(recordvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<float>, stage);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<uint32_t>, stage);
 
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<float>, pipeline);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<uint32_t>, pipeline);
+
+		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<float>, record);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<uint32_t>, record);
 	}
 
   void copy(char * dst) const override
@@ -404,30 +391,19 @@ public:
   NO_COPY_OR_ASSIGNMENT(CpuMemoryBuffer)
   CpuMemoryBuffer() = delete;
   virtual ~CpuMemoryBuffer() = default;
+	
+	explicit CpuMemoryBuffer(VkBufferUsageFlags usage_flags,
+		VkBufferCreateFlags create_flags = 0) :
+		usage_flags(usage_flags),
+		create_flags(create_flags)
+	{
+		REGISTER_VISITOR_CALLBACK(allocvisitor, CpuMemoryBuffer, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, CpuMemoryBuffer, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CpuMemoryBuffer, updateState);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, CpuMemoryBuffer, updateState);
+	}
 
-  explicit CpuMemoryBuffer(VkBufferUsageFlags usage_flags, 
-                           VkBufferCreateFlags create_flags = 0) :
-    usage_flags(usage_flags), 
-    create_flags(create_flags)
-  {
-    static bool register_callbacks = []() {
-      allocvisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
-      });
-      stagevisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->stage(stagevisitor.context.get());
-      });
-      pipelinevisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->updateState(pipelinevisitor.context.get());
-      });
-      recordvisitor.register_callback<CpuMemoryBuffer>([](CpuMemoryBuffer* self) {
-        self->updateState(recordvisitor.context.get());
-      });
-      return true;
-    }();
-  }
-
-	void alloc(Context* context, std::vector<BufferObject*> & bufferobjects)
+	void alloc(Context* context)
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -437,7 +413,7 @@ public:
                                      VK_SHARING_MODE_EXCLUSIVE),
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    bufferobjects.push_back(this->buffer.get());
+    context->bufferobjects.push_back(this->buffer.get());
   }
 
   void stage(Context* context) 
@@ -469,21 +445,13 @@ public:
     usage_flags(usage_flags), 
     create_flags(create_flags)
   {
-    allocvisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* self) {
-			self->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
-		});
-    stagevisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* self) {
-			self->stage(stagevisitor.context.get());
-    });
-    pipelinevisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* self) {
-			self->pipeline(pipelinevisitor.context.get());
-    });
-    recordvisitor.register_callback<GpuMemoryBuffer>([](GpuMemoryBuffer* self) {
-			self->record(recordvisitor.context.get());
-    });
+		REGISTER_VISITOR_CALLBACK(allocvisitor, GpuMemoryBuffer, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, GpuMemoryBuffer, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, GpuMemoryBuffer, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, GpuMemoryBuffer, record);
   }
 
-	void alloc(Context* context, std::vector<BufferObject*>& bufferobjects)
+	void alloc(Context* context)
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -493,7 +461,7 @@ public:
                                      VK_SHARING_MODE_EXCLUSIVE),
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    bufferobjects.push_back(this->buffer.get());
+    context->bufferobjects.push_back(this->buffer.get());
   }
 
   void stage(Context* context) 
@@ -535,9 +503,12 @@ public:
 
   TransformBuffer()
     : size(sizeof(glm::mat4) * 2)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, TransformBuffer, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TransformBuffer, pipeline);
+	}
 
-	void alloc(Context* context, std::vector<BufferObject*>& bufferobjects)
+	void alloc(Context* context)
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -547,7 +518,7 @@ public:
                                      VK_SHARING_MODE_EXCLUSIVE),
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    bufferobjects.push_back(this->buffer.get());
+    context->bufferobjects.push_back(this->buffer.get());
   }
 
   void pipeline(Context* creator) 
@@ -567,20 +538,6 @@ private:
     std::copy(data.begin(), data.end(), reinterpret_cast<glm::mat4*>(map.mem));
   }
 
-  struct CallbackRegistry {
-    CallbackRegistry()
-    {
-      allocvisitor.register_callback<TransformBuffer>([this](TransformBuffer* node) {
-        node->alloc(allocvisitor.context.get(), allocvisitor.bufferobjects);
-      });
-      pipelinevisitor.register_callback<TransformBuffer>([](TransformBuffer* node) {
-        node->pipeline(pipelinevisitor.context.get());
-      });
-    }
-  };
-
-  inline static CallbackRegistry callbacks;
-
   size_t size;
   std::shared_ptr<BufferObject> buffer{ nullptr };
 };
@@ -595,9 +552,7 @@ public:
   explicit IndexBufferDescription(VkIndexType type) : 
     type(type)
   {
-		recordvisitor.register_callback<IndexBufferDescription>([this](IndexBufferDescription* node) {
-			node->record(recordvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(recordvisitor, IndexBufferDescription, record);
 	}
 
   void record(Context* context) 
@@ -627,13 +582,8 @@ public:
       location, binding, format, offset 
     })
   {
-		pipelinevisitor.register_callback<VertexInputAttributeDescription>([this](VertexInputAttributeDescription* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		recordvisitor.register_callback<VertexInputAttributeDescription>([this](VertexInputAttributeDescription* node) {
-			node->record(recordvisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, VertexInputAttributeDescription, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, VertexInputAttributeDescription, record);
 	}
 
   void pipeline(Context* creator) 
@@ -665,9 +615,7 @@ public:
     stride(stride),
     inputRate(inputRate)
   {
-		pipelinevisitor.register_callback<VertexInputBindingDescription>([this](VertexInputBindingDescription* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, VertexInputBindingDescription, pipeline);
 	}
 
   void pipeline(Context* creator) 
@@ -699,9 +647,7 @@ public:
     descriptorType(descriptorType),
     stageFlags(stageFlags)
   {
-		pipelinevisitor.register_callback<DescriptorSetLayoutBinding>([this](DescriptorSetLayoutBinding* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
 	}
 
   void pipeline(Context* creator) 
@@ -763,12 +709,8 @@ public:
   explicit Shader(const VkShaderStageFlagBits stage, std::string glsl):
     stage(stage)
   {
-		allocvisitor.register_callback<Shader>([](Shader* node) {
-			node->alloc(allocvisitor.context.get());
-		});
-		pipelinevisitor.register_callback<Shader>([this](Shader* node) {
-			node->pipeline(pipelinevisitor.context.get());
-		});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Shader, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Shader, pipeline);
 
     //std::ifstream input(filename, std::ios::in);
     //std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
@@ -847,12 +789,8 @@ public:
     address_mode_w(address_mode_w),
     mip_lod_bias(0.0f)
   {
-		allocvisitor.register_callback<Sampler>([this](Sampler* node) {
-			node->alloc(allocvisitor.context.get());
-		});
-		pipelinevisitor.register_callback<Sampler>([this](Sampler* node) {
-			node->pipeline(pipelinevisitor.context.get());
-		});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Sampler, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Sampler, pipeline);
 	}
 
 	void alloc(Context* context)
@@ -902,18 +840,10 @@ public:
   explicit TextureImage(const std::string& filename) :
     texture(VulkanImageFactory::Create(filename))
   {
-		allocvisitor.register_callback<TextureImage>([this](TextureImage* node) {
-			node->alloc(allocvisitor.context.get());
-		});
-		stagevisitor.register_callback<TextureImage>([this](TextureImage* node) {
-			node->stage(stagevisitor.context.get());
-			});
-		pipelinevisitor.register_callback<TextureImage>([this](TextureImage* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		recordvisitor.register_callback<TextureImage>([this](TextureImage* node) {
-			node->record(recordvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, TextureImage, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, record);
 	}
 
   void copy(char* dst) const override
@@ -978,19 +908,12 @@ public:
     create_flags(create_flags),
     layout(layout)
   {
-		allocvisitor.register_callback<Image>([this](Image* node) {
-			node->alloc(allocvisitor.context.get(), allocvisitor.imageobjects);
-			});
-		stagevisitor.register_callback<Image>([this](Image* node) {
-			node->stage(stagevisitor.context.get());
-			});
-		pipelinevisitor.register_callback<Image>([this](Image* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Image, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, Image, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Image, pipeline);
 	}
 
-	void alloc(Context* context, std::vector<ImageObject*>& imageobjects)
+	void alloc(Context* context)
   {
     this->image = std::make_shared<VulkanImage>(context->device,
                                                 context->state.texture->image_type(),
@@ -1005,7 +928,7 @@ public:
                                                 this->create_flags);
 
     this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    imageobjects.push_back(this->image_object.get());
+    context->imageobjects.push_back(this->image_object.get());
   }
 
   void stage(Context* context) 
@@ -1115,13 +1038,8 @@ public:
             VkComponentSwizzle a) :
     component_mapping({ r, g, b, a })
   {
-		stagevisitor.register_callback<ImageView>([](ImageView* node) {
-			node->stage(stagevisitor.context.get());
-			});
-		pipelinevisitor.register_callback<ImageView>([this](ImageView* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(stagevisitor, ImageView, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, ImageView, pipeline);
 	}
 
   void stage(Context* context) 
@@ -1154,9 +1072,7 @@ public:
   explicit CullMode(VkCullModeFlags cullmode) :
     cullmode(cullmode)
   {
-		pipelinevisitor.register_callback<CullMode>([this](CullMode* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CullMode, pipeline);
 	}
   
   void pipeline(Context* context) 
@@ -1182,9 +1098,7 @@ public:
     group_count_y(group_count_y), 
     group_count_z(group_count_z) 
   {
-		pipelinevisitor.register_callback<ComputeCommand>([this](ComputeCommand* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, ComputeCommand, pipeline);
 	}
 
   void pipeline(Context* context) 
@@ -1450,16 +1364,9 @@ public:
     firstinstance(firstinstance),
     offset(0)
   {
-		allocvisitor.register_callback<IndexedDrawCommand>([this](IndexedDrawCommand* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-		pipelinevisitor.register_callback<IndexedDrawCommand>([this](IndexedDrawCommand* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		recordvisitor.register_callback<IndexedDrawCommand>([this](IndexedDrawCommand* node) {
-			node->record(recordvisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(allocvisitor, IndexedDrawCommand, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, IndexedDrawCommand, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, IndexedDrawCommand, record);
 	}
 
 private:
@@ -1502,14 +1409,8 @@ public:
       aspectMask, 0, 1, 0, 1
     };
 
-
-		allocvisitor.register_callback<FramebufferAttachment>([this](FramebufferAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-		resizevisitor.register_callback<FramebufferAttachment>([this](FramebufferAttachment* node) {
-			node->alloc(resizevisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(allocvisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, FramebufferAttachment, alloc);
   }
 
 	void alloc(Context* context) 
@@ -1570,14 +1471,8 @@ public:
   explicit Framebuffer(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {
-		allocvisitor.register_callback<Framebuffer>([](Framebuffer* node) {
-			allocvisitor.visit_group(node);
-			node->alloc(allocvisitor.context.get());
-			});
-		resizevisitor.register_callback<Framebuffer>([this](Framebuffer* node) {
-			resizevisitor.visit_group(node);
-			node->alloc(resizevisitor.context.get());
-			});
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, Framebuffer, alloc);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(resizevisitor, Framebuffer, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1603,9 +1498,7 @@ public:
   explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
   {
-		allocvisitor.register_callback<InputAttachment>([this](InputAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, InputAttachment, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1625,9 +1518,7 @@ public:
   explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
   {
-		allocvisitor.register_callback<ColorAttachment>([this](ColorAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, ColorAttachment, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1648,9 +1539,7 @@ public:
   explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
   {
-		allocvisitor.register_callback<ResolveAttachment>([this](ResolveAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, ResolveAttachment, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1670,9 +1559,7 @@ public:
   explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
   {
-		allocvisitor.register_callback<DepthStencilAttachment>([this](DepthStencilAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, DepthStencilAttachment, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1692,9 +1579,7 @@ public:
   explicit PreserveAttachment(uint32_t attachment) :
     attachment(attachment)
   {
-		allocvisitor.register_callback<PreserveAttachment>([this](PreserveAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, PreserveAttachment, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1714,9 +1599,7 @@ public:
   explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
     bind_point(bind_point)
   {
-		allocvisitor.register_callback<PipelineBindpoint>([this](PipelineBindpoint* node) {
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, PipelineBindpoint, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1739,10 +1622,7 @@ public:
   SubpassDescription(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {
-		allocvisitor.register_callback<SubpassDescription>([this](SubpassDescription* node) {
-			allocvisitor.visit_group(node);
-			node->alloc(allocvisitor.context.get());
-			});
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, SubpassDescription, alloc);
 	}
 
 	void alloc(Context* context) 
@@ -1789,10 +1669,8 @@ public:
       finalLayout
     };
 
-		allocvisitor.register_callback<RenderpassAttachment>([this](RenderpassAttachment* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-  }
+		REGISTER_VISITOR_CALLBACK(allocvisitor, RenderpassAttachment, alloc);
+	}
 
 	void alloc(Context* context) 
   {
@@ -1812,15 +1690,8 @@ public:
   Renderpass(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {
-		allocvisitor.register_callback<Renderpass>([this](Renderpass* node) {
-			allocvisitor.visit_group(node);
-			node->alloc(allocvisitor.context.get());
-			});
-		resizevisitor.register_callback<Renderpass>([this](Renderpass* node) {
-			resizevisitor.visit_group(node);
-			node->resize(resizevisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, Renderpass, alloc);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(resizevisitor, Renderpass, resize);
 	}
 
   void alloc(Context* context) 
@@ -1893,23 +1764,10 @@ public:
   RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
   {
-		allocvisitor.register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-			allocvisitor.visit_group(node);
-			node->alloc(allocvisitor.context.get());
-			});
-		resizevisitor.register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-			node->resize(resizevisitor.context.get());
-			resizevisitor.visit_group(node);
-			});
-		pipelinevisitor.register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			pipelinevisitor.visit_group(node);
-			});
-		recordvisitor.register_callback<RenderpassDescription>([this](RenderpassDescription* node) {
-			node->record(recordvisitor.context.get());
-			recordvisitor.visit_group(node);
-			});
-
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, RenderpassDescription, alloc);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(resizevisitor, RenderpassDescription, resize);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(pipelinevisitor, RenderpassDescription, pipeline);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(recordvisitor, RenderpassDescription, record);
 	}
 
 	void alloc(Context* context) 
@@ -1955,18 +1813,10 @@ public:
       present_mode(present_mode),
       present_queue(nullptr)
   {
-		allocvisitor.register_callback<SwapchainObject>([](SwapchainObject* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-		stagevisitor.register_callback<SwapchainObject>([](SwapchainObject* node) {
-			node->stage(stagevisitor.context.get());
-			});
-		resizevisitor.register_callback<SwapchainObject>([this](SwapchainObject* node) {
-			node->stage(resizevisitor.context.get());
-			});
-		recordvisitor.register_callback<SwapchainObject>([this](SwapchainObject* node) {
-			node->record(recordvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, SwapchainObject, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, SwapchainObject, stage);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, SwapchainObject, stage);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, SwapchainObject, record);
 	}
 
 	void alloc(Context* context) 
@@ -2200,15 +2050,9 @@ public:
 	OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment)
 		: color_attachment(color_attachment)
 	{
-		allocvisitor.register_callback<OffscreenImage>([this](OffscreenImage* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-		resizevisitor.register_callback<OffscreenImage>([this](OffscreenImage* node) {
-			node->alloc(resizevisitor.context.get());
-			});
-		recordvisitor.register_callback<OffscreenImage>([this](OffscreenImage* node) {
-			node->record(recordvisitor.context.get());
-			});
+		REGISTER_VISITOR_CALLBACK(allocvisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, OffscreenImage, record);
 	}
 
 	void alloc(Context* context)
