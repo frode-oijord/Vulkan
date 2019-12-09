@@ -137,6 +137,27 @@ protected:
 };
 
 
+template <typename T>
+std::shared_ptr<T> find_first(std::shared_ptr<Node> root)
+{
+	auto node = std::dynamic_pointer_cast<T>(root);
+	if (node) {
+		return node;
+	}
+
+	auto group = std::dynamic_pointer_cast<Group>(root);
+	if (group) {
+		for (auto node : group->children) {
+			auto first = find_first<T>(node);
+			if (first) {
+				return first;
+			}
+		}
+	}
+	return node;
+}
+
+
 class VulkanWindow : public Window {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanWindow)
@@ -218,7 +239,7 @@ public:
       swapchain
     };
 
-    this->scene->init(this->context.get());
+    this->scene->init(this->context);
   }
 
   void redraw() override
@@ -239,19 +260,20 @@ public:
   void mousePressed(int x, int y, int button)
   {
     this->context->event = std::make_shared<MousePressEvent>(x, y, button);
-    this->scene->event(this->context.get());
+		this->scene->event();
   }
 
   void mouseReleased() override
   {
     this->context->event = std::make_shared<MouseReleaseEvent>();
-    this->scene->event(this->context.get());
+		this->scene->event();
   }
 
   void mouseMoved(int x, int y)
   {
     this->context->event = std::make_shared<MouseMoveEvent>(x, y);
-    this->scene->event(this->context.get());
+		this->scene->event();
+
     if (this->context->redraw) {
       this->scene->redraw(this->context.get());
     }

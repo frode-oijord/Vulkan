@@ -2,11 +2,59 @@
 
 #include <stdexcept>
 
-#define NO_COPY_OR_ASSIGNMENT(Class)                    \
-  Class(Class&&) = delete;                              \
-  Class(const Class&) = delete;                         \
-  Class & operator=(Class&&) = delete;                  \
-  Class & operator=(const Class&) = delete;             \
+#define NO_COPY_OR_ASSIGNMENT(Class)              \
+  Class(Class&&) = delete;                        \
+  Class(const Class&) = delete;                   \
+  Class & operator=(Class&&) = delete;            \
+  Class & operator=(const Class&) = delete;       \
+
+#define DECLARE_VISITABLE													\
+	void visit(Visitor* visitor) override;					\
+
+#define IMPLEMENT_VISITABLE(Class)								\
+	void Class::visit(Visitor* visitor)							\
+	{																								\
+		visitor->apply(this);													\
+	}																								\
+
+#define IMPLEMENT_VISITABLE_INLINE								\
+	void visit(Visitor* visitor) override						\
+	{																								\
+		visitor->apply(this);													\
+	}																								\
+
+#define REGISTER_VISITOR_CALLBACK(__visitor__, __nodetype__, __method__)	\
+{																																					\
+	static bool dummy	= []() {																							\
+		__visitor__.register_callback<__nodetype__>([](__nodetype__* self) {	\
+			self->__method__(allocvisitor.context.get());												\
+			});																																	\
+		return true;																													\
+	}();																																		\
+}                                                                         \
+
+#define REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(__visitor__, __nodetype__, __method__)	\
+{																																												\
+	static bool dummy	= []() {																														\
+		__visitor__.register_callback<__nodetype__>([](__nodetype__* self) {								\
+			__visitor__.visit_group(self);																										\
+			self->__method__(allocvisitor.context.get());																			\
+			});																																								\
+		return true;																																				\
+	}();																																									\
+}																																												\
+
+#define REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(__visitor__, __nodetype__, __method__)	\
+{																																												\
+	static bool dummy	= []() {																														\
+		__visitor__.register_callback<__nodetype__>([](__nodetype__* self) {								\
+			self->__method__(allocvisitor.context.get());																			\
+			__visitor__.visit_group(self);																										\
+			});																																								\
+		return true;																																				\
+	}();																																									\
+}																																												\
+
 
 class VkException : public std::exception {};
 class VkTimeoutException : public VkException {};

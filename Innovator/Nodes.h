@@ -3,9 +3,10 @@
 #include <Innovator/Context.h>
 #include <Innovator/VulkanSurface.h>
 #include <Innovator/Wrapper.h>
-#include <Innovator/Node.h>
+#include <Innovator/Visitor.h>
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
+#include <Innovator/VulkanObjects.h>
 
 #include <vulkan/vulkan.h>
 #include <shaderc/shaderc.hpp>
@@ -15,120 +16,112 @@
 
 #include <utility>
 #include <vector>
+#include <fstream>
 #include <memory>
 #include <filesystem>
 namespace fs = std::filesystem;
 
-class StateScope {
+class Node {
 public:
-  NO_COPY_OR_ASSIGNMENT(StateScope)
-  StateScope() = delete;
+	NO_COPY_OR_ASSIGNMENT(Node)
 
-  explicit StateScope(State * state) : 
-    stateptr(state),
-    statecpy(*state)
-  {}
+	Node() = default;
+	virtual ~Node() = default;
 
-  ~StateScope()
-  {
-    *stateptr = this->statecpy;
-  }
-  
-  State* stateptr;
-  State statecpy;
+	virtual void visit(Visitor* visitor) = 0;
+
+	void render(class Context* context)
+	{
+		this->doRender(context);
+	}
+
+	void present(class Context* context)
+	{
+		this->doPresent(context);
+	}
+
+private:
+	virtual void doRender(class Context*) {}
+	virtual void doPresent(class Context*) {}
 };
 
-class RenderStateScope {
+class Group : public Node {
 public:
-  NO_COPY_OR_ASSIGNMENT(RenderStateScope)
-  RenderStateScope() = delete;
+	IMPLEMENT_VISITABLE_INLINE
+	NO_COPY_OR_ASSIGNMENT(Group)
+	Group() = default;
+	virtual ~Group() = default;
 
-  explicit RenderStateScope(State* state) :
-    state(state),
-    ModelMatrix(state->ModelMatrix),
-    ViewMatrix(state->ViewMatrix),
-    ProjMatrix(state->ProjMatrix)
-  {}
+	explicit Group(std::vector<std::shared_ptr<Node>> children)
+		: children(std::move(children)) {}
 
-  ~RenderStateScope()
-  {
-    state->ModelMatrix = this->ModelMatrix;
-    state->ViewMatrix = this->ViewMatrix;
-    state->ProjMatrix = this->ProjMatrix;
-  }
+	std::vector<std::shared_ptr<Node>> children;
 
-  State* state;
+protected:
+	void doRender(class Context* context) override
+	{
+		for (const auto& node : this->children) {
+			node->render(context);
+		}
+	}
 
-  glm::dmat4 ModelMatrix{ 1.0 };
-  glm::dmat4 ViewMatrix{ 1.0 };
-  glm::dmat4 ProjMatrix{ 1.0 };
+	void doPresent(class Context* context) override
+	{
+		for (const auto& node : this->children) {
+			node->present(context);
+		}
+	}
 };
-
 
 class Separator : public Group {
 public:
-  NO_COPY_OR_ASSIGNMENT(Separator)
-  Separator() = default;
-  virtual ~Separator() = default;
+	IMPLEMENT_VISITABLE_INLINE
+	NO_COPY_OR_ASSIGNMENT(Separator)
+	Separator() = default;
+	virtual ~Separator() = default;
 
-  explicit Separator(std::vector<std::shared_ptr<Node>> children) : 
-    Group(std::move(children)) 
-  {}
+	explicit Separator(std::vector<std::shared_ptr<Node>> children)
+		: Group(std::move(children))
+	{}
 
 protected:
-  void doAlloc(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doAlloc(context);
-  }
-
-  void doResize(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doResize(context);
-  }
-
-  void doStage(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doStage(context);
-  }
-
-  void doPipeline(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doPipeline(context);
-  }
-
-  void doRecord(Context* context) override
-  {
-    StateScope scope(&context->state);
-    Group::doRecord(context);
-  }
-
-  void doRender(Context* context) override
-  {
-    RenderStateScope scope(&context->state);
-    Group::doRender(context);
-  }
+	void doRender(Context* context) override
+	{
+		RenderStateScope scope(&context->state);
+		Group::doRender(context);
+	}
 };
+
 
 class Scene : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Scene)
-  Scene() = default;
-  virtual ~Scene() = default;
+	Scene() = default;
 
-  explicit Scene(std::vector<std::shared_ptr<Node>> children) :
-    Group(std::move(children))
-  {}
+	virtual ~Scene()
+	{
+		eventvisitor.context.reset();
+		allocvisitor.context.reset();
+		stagevisitor.context.reset();
+		resizevisitor.context.reset();
+		pipelinevisitor.context.reset();
+		recordvisitor.context.reset();
+	}
 
-  void init(Context* context)
+  void init(std::shared_ptr<Context> context)
   {
-    this->doAlloc(context);
-    this->doStage(context);
-    this->doPipeline(context);
-    this->doRecord(context);
+		eventvisitor.context = context;
+		allocvisitor.context = context;
+		stagevisitor.context = context;
+		resizevisitor.context = context;
+		pipelinevisitor.context = context;
+		recordvisitor.context = context;
+
+		allocvisitor.visit(this);
+		stagevisitor.visit(this);
+		pipelinevisitor.visit(this);
+		recordvisitor.visit(this);
   }
 
   void redraw(Context* context)
@@ -144,117 +137,60 @@ public:
 
   void resize(Context* context)
   {
-    this->doResize(context);
-    this->doRecord(context);
+		resizevisitor.visit(this);
+		recordvisitor.visit(this);
     this->redraw(context);
   }
 
-protected:
-  void doAlloc(Context* context) override
-  {
-    context->begin();
-    Group::doAlloc(context);
-    context->end();
-  }
-
-  void doResize(Context* context) override
-  {
-    context->begin();
-    Group::doResize(context);
-    context->end();
-  }
-
-  void doStage(Context* context) override
-  {
-    context->begin();
-    Group::doStage(context);
-    context->end();
-  }
-
-  void doPipeline(Context* context) override
-  {
-    context->begin();
-    Group::doPipeline(context);
-    context->end();
-  }
-
-  void doRecord(Context* context) override
-  {
-    context->begin();
-    Group::doRecord(context);
-    context->end();
-  }
+	void event()
+	{
+		this->visit(&eventvisitor);
+	}
 };
 
 
 class ViewMatrix : public Node {
 public:
-  NO_COPY_OR_ASSIGNMENT(ViewMatrix)
-  ViewMatrix() = delete;
-  virtual ~ViewMatrix() = default;
+	IMPLEMENT_VISITABLE_INLINE
+	NO_COPY_OR_ASSIGNMENT(ViewMatrix)
+	ViewMatrix() = delete;
+	virtual ~ViewMatrix() = default;
 
-  ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
-    : mat(glm::lookAt(eye, target, up))
-  {}
+	ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
+		: mat(glm::lookAt(eye, target, up))
+	{}
 
-  ViewMatrix(double m0, double m1, double m2, 
-             double m3, double m4, double m5, 
-             double m6, double m7, double m8)
-    : ViewMatrix(glm::dvec3(m0, m1, m2), 
-                 glm::dvec3(m3, m4, m5), 
-                 glm::dvec3(m6, m7, m8))
-  {}
+	ViewMatrix(double m0, double m1, double m2,
+		double m3, double m4, double m5,
+		double m6, double m7, double m8)
+		: ViewMatrix(glm::dvec3(m0, m1, m2),
+			glm::dvec3(m3, m4, m5),
+			glm::dvec3(m6, m7, m8))
+	{}
+
+	void zoom(double dy)
+	{
+		this->mat = glm::translate(this->mat, glm::dvec3(0.0, 0.0, dy));
+	}
+
+	void pan(const glm::dvec2& dx)
+	{
+		this->mat = glm::translate(this->mat, glm::dvec3(dx, 0.0));
+	}
 
 private:
-  void zoom(double dy)
-  {
-    this->mat = glm::translate(this->mat, glm::dvec3(0.0, 0.0, dy));
-  }
+	void doRender(Context* context) override
+	{
+		context->state.ViewMatrix = this->mat;
+	}
 
-  void pan(const glm::dvec2& dx)
-  {
-    this->mat = glm::translate(this->mat, glm::dvec3(dx, 0.0));
-  }
-
-  void doEvent(Context* context)
-  {
-    auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-    if (press) {
-      this->press = std::move(press);
-    }
-
-    if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-      this->press.reset();
-      context->event.reset();
-    }
-
-    auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-    if (move && this->press) {
-      glm::dvec2 dx = (this->press->pos - move->pos) * .01;
-      dx[1] = -dx[1];
-      switch (this->press->button) {
-      case 1: this->pan(dx); break;
-      case 2: this->zoom(dx[1]); break;
-      default: break;
-      }
-      this->press->pos = move->pos;
-      context->event.reset();
-    }
-  }
-
-  void doRender(Context* context) override
-  {
-    context->state.ViewMatrix = this->mat;
-  }
-
-  glm::dmat4 mat{ 1.0 };
-
-  std::shared_ptr<MousePressEvent> press{ nullptr };
+	glm::dmat4 mat{ 1.0 };
 };
 
 
 class ProjMatrix : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ProjMatrix)
   ProjMatrix() = delete;
   virtual ~ProjMatrix() = default;
@@ -265,14 +201,10 @@ public:
       aspectratio(aspectratio),
       fieldofview(fieldofview)
   {
-    this->mat = glm::perspective(this->fieldofview,
-                                 this->aspectratio,
-                                 this->nearplane,
-                                 this->farplane);
-  }
+		REGISTER_VISITOR_CALLBACK(resizevisitor, ProjMatrix, resize);
+	}
 
-private:
-  void doResize(Context* context) override
+  void resize(Context* context) 
   {
     this->aspectratio = static_cast<double>(context->extent.width) /
                         static_cast<double>(context->extent.height);
@@ -283,6 +215,7 @@ private:
                                  this->farplane);
   }
 
+private:
   void doRender(Context* context) override
   {
     context->state.ProjMatrix = this->mat;
@@ -299,6 +232,7 @@ private:
 
 class Transform : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Transform)
   Transform() = default;
   virtual ~Transform() = default;
@@ -321,6 +255,7 @@ private:
 
 class BufferData : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(BufferData)
   BufferData() = default;
   virtual ~BufferData() = default;
@@ -333,23 +268,22 @@ public:
     return this->size() / this->stride();
   }
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     context->state.bufferdata = this;
   }
 
-  void doStage(Context* context) override
+  void stage(Context* context) 
   {
     context->state.bufferdata = this;
   }
 
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.bufferdata = this;
   }
 
-  void doRecord(Context* context) override
+  void record(Context* context) 
   {
     context->state.bufferdata = this;
   }
@@ -358,13 +292,23 @@ private:
 template <typename T>
 class InlineBufferData : public BufferData {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(InlineBufferData)
   InlineBufferData() = default;
   virtual ~InlineBufferData() = default;
 
   explicit InlineBufferData(std::vector<T> values) :
     values(std::move(values))
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<float>, stage);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<uint32_t>, stage);
+
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<float>, pipeline);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<uint32_t>, pipeline);
+
+		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<float>, record);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<uint32_t>, record);
+	}
 
   void copy(char * dst) const override
   {
@@ -388,6 +332,7 @@ public:
 
 class STLBufferData : public BufferData {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(STLBufferData)
   STLBufferData() = delete;
   virtual ~STLBufferData() = default;
@@ -442,18 +387,23 @@ public:
 
 class CpuMemoryBuffer : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(CpuMemoryBuffer)
   CpuMemoryBuffer() = delete;
   virtual ~CpuMemoryBuffer() = default;
+	
+	explicit CpuMemoryBuffer(VkBufferUsageFlags usage_flags,
+		VkBufferCreateFlags create_flags = 0) :
+		usage_flags(usage_flags),
+		create_flags(create_flags)
+	{
+		REGISTER_VISITOR_CALLBACK(allocvisitor, CpuMemoryBuffer, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, CpuMemoryBuffer, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CpuMemoryBuffer, updateState);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, CpuMemoryBuffer, updateState);
+	}
 
-  explicit CpuMemoryBuffer(VkBufferUsageFlags usage_flags, 
-                           VkBufferCreateFlags create_flags = 0) :
-    usage_flags(usage_flags), 
-    create_flags(create_flags)
-  {}
-
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context)
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -466,23 +416,19 @@ private:
     context->bufferobjects.push_back(this->buffer.get());
   }
 
-  void doStage(Context* context) override
+  void stage(Context* context) 
   {
     context->state.buffer = this->buffer->buffer->buffer;
     MemoryMap memmap(this->buffer->memory.get(), context->state.bufferdata->size(), this->buffer->offset);
     context->state.bufferdata->copy(memmap.mem);
   }
 
-  void doPipeline(Context* context) override
+  void updateState(Context* context) 
   {
     context->state.buffer = this->buffer->buffer->buffer;
   }
 
-  void doRecord(Context* context) override
-  {
-    context->state.buffer = this->buffer->buffer->buffer;
-  }
-
+private:
   VkBufferUsageFlags usage_flags;
   VkBufferCreateFlags create_flags;
   std::shared_ptr<BufferObject> buffer{ nullptr };
@@ -490,6 +436,7 @@ private:
 
 class GpuMemoryBuffer : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(GpuMemoryBuffer)
   GpuMemoryBuffer() = delete;
   virtual ~GpuMemoryBuffer() = default;
@@ -497,10 +444,14 @@ public:
   explicit GpuMemoryBuffer(VkBufferUsageFlags usage_flags, VkBufferCreateFlags create_flags = 0) : 
     usage_flags(usage_flags), 
     create_flags(create_flags)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, GpuMemoryBuffer, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, GpuMemoryBuffer, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, GpuMemoryBuffer, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, GpuMemoryBuffer, record);
+  }
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context)
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -513,7 +464,7 @@ private:
     context->bufferobjects.push_back(this->buffer.get());
   }
 
-  void doStage(Context* context) override
+  void stage(Context* context) 
   {
     std::vector<VkBufferCopy> regions = { {
         0,                                                   // srcOffset
@@ -528,16 +479,17 @@ private:
                     regions.data());
   }
 
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.buffer = this->buffer->buffer->buffer;
   }
 
-  void doRecord(Context* context) override
+  void record(Context* context) 
   {
     context->state.buffer = this->buffer->buffer->buffer;
   }
 
+private:
   VkBufferUsageFlags usage_flags;
   VkBufferCreateFlags create_flags;
   std::shared_ptr<BufferObject> buffer{ nullptr };
@@ -545,15 +497,18 @@ private:
 
 class TransformBuffer : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(TransformBuffer)
   virtual ~TransformBuffer() = default;
 
   TransformBuffer()
     : size(sizeof(glm::mat4) * 2)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, TransformBuffer, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TransformBuffer, pipeline);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context)
   {
     this->buffer = std::make_shared<BufferObject>(
       std::make_shared<VulkanBuffer>(context->device,
@@ -566,11 +521,12 @@ private:
     context->bufferobjects.push_back(this->buffer.get());
   }
 
-  void doPipeline(Context* creator) override
+  void pipeline(Context* creator) 
   {
     creator->state.buffer = this->buffer->buffer->buffer;
   }
 
+private:
   void doRender(Context* context) override
   {
     std::array<glm::mat4, 2> data = {
@@ -588,16 +544,18 @@ private:
 
 class IndexBufferDescription : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(IndexBufferDescription)
   IndexBufferDescription() = delete;
   virtual ~IndexBufferDescription() = default;
 
   explicit IndexBufferDescription(VkIndexType type) : 
     type(type)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(recordvisitor, IndexBufferDescription, record);
+	}
 
-private:
-  void doRecord(Context* context) override
+  void record(Context* context) 
   {
     context->state.index_buffer_description = {
       this->type,
@@ -605,11 +563,13 @@ private:
     };
   }
 
+private:
   VkIndexType type;
 };
 
 class VertexInputAttributeDescription : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(VertexInputAttributeDescription)
   VertexInputAttributeDescription() = delete;
   virtual ~VertexInputAttributeDescription() = default;
@@ -621,25 +581,29 @@ public:
     vertex_input_attribute_description({ 
       location, binding, format, offset 
     })
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, VertexInputAttributeDescription, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, VertexInputAttributeDescription, record);
+	}
 
-private:
-  void doPipeline(Context* creator) override
+  void pipeline(Context* creator) 
   {
     creator->state.vertex_attributes.push_back(this->vertex_input_attribute_description);
   }
 
-  void doRecord(Context* recorder) override
+  void record(Context* recorder) 
   {
     recorder->state.vertex_attribute_buffers.push_back(recorder->state.buffer);
     recorder->state.vertex_attribute_buffer_offsets.push_back(0);
   }
 
+private:
   VkVertexInputAttributeDescription vertex_input_attribute_description;
 };
 
 class VertexInputBindingDescription : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(VertexInputBindingDescription)
   VertexInputBindingDescription() = delete;
   virtual ~VertexInputBindingDescription() = default;
@@ -650,10 +614,11 @@ public:
     binding(binding),
     stride(stride),
     inputRate(inputRate)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, VertexInputBindingDescription, pipeline);
+	}
 
-private:
-  void doPipeline(Context* creator) override
+  void pipeline(Context* creator) 
   {
     creator->state.vertex_input_bindings.push_back({
       this->binding,
@@ -662,6 +627,7 @@ private:
     });
   }
   
+private:
   uint32_t binding;
   uint32_t stride;
   VkVertexInputRate inputRate;
@@ -669,6 +635,7 @@ private:
 
 class DescriptorSetLayoutBinding : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DescriptorSetLayoutBinding)
   DescriptorSetLayoutBinding() = delete;
   virtual ~DescriptorSetLayoutBinding() = default;
@@ -679,10 +646,11 @@ public:
     binding(binding),
     descriptorType(descriptorType),
     stageFlags(stageFlags)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
+	}
 
-private:
-  void doPipeline(Context* creator) override
+  void pipeline(Context* creator) 
   {
     creator->state.descriptor_pool_sizes.push_back({
       this->descriptorType,                // type 
@@ -723,6 +691,7 @@ private:
     });
   }
 
+private:
   uint32_t binding;
   VkDescriptorType descriptorType;
   VkShaderStageFlags stageFlags;
@@ -732,6 +701,7 @@ private:
 
 class Shader : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Shader)
   Shader() = delete;
   virtual ~Shader() = default;
@@ -739,6 +709,9 @@ public:
   explicit Shader(const VkShaderStageFlagBits stage, std::string glsl):
     stage(stage)
   {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Shader, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Shader, pipeline);
+
     //std::ifstream input(filename, std::ios::in);
     //std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
 
@@ -772,13 +745,12 @@ public:
     this->spv = { module.cbegin(), module.cend() };
   }
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     this->shader = std::make_unique<VulkanShaderModule>(context->device, this->spv);
   }
 
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.shader_stage_infos.push_back({
       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, // sType 
@@ -799,6 +771,7 @@ protected:
 
 class Sampler : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Sampler)
   virtual ~Sampler() = default;
   
@@ -832,34 +805,38 @@ public:
     maxLod(maxLod),
     borderColor(borderColor),
     unnormalizedCoordinates(unnormalizedCoordinates)
-  {}
-
-private:
-  void doAlloc(Context* context) override
   {
-    this->sampler = std::make_unique<VulkanSampler>(context->device,
-                                                    this->magFilter,
-                                                    this->minFilter,
-                                                    this->mipmapMode,
-                                                    this->addressModeU,
-                                                    this->addressModeV,
-                                                    this->addressModeW,
-                                                    this->mipLodBias,
-                                                    this->anisotropyEnable,
-                                                    this->maxAnisotropy,
-                                                    this->compareEnable,
-                                                    this->compareOp,
-                                                    this->minLod,
-                                                    this->maxLod,
-                                                    this->borderColor,
-                                                    this->unnormalizedCoordinates);
-  }
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Sampler, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Sampler, pipeline);
+	}
 
-  void doPipeline(Context* context) override
+	void alloc(Context* context)
+	{
+		this->sampler = std::make_unique<VulkanSampler>(
+			context->device,
+			this->magFilter,
+			this->minFilter,
+			this->mipmapMode,
+			this->addressModeU,
+			this->addressModeV,
+			this->addressModeW,
+			this->mipLodBias,
+			this->anisotropyEnable,
+			this->maxAnisotropy,
+			this->compareEnable,
+			this->compareOp,
+			this->minLod,
+			this->maxLod,
+			this->borderColor,
+			this->unnormalizedCoordinates);
+	}
+
+  void pipeline(Context* context) 
   {
     context->state.sampler = this->sampler->sampler;
   }
 
+private:
   std::unique_ptr<VulkanSampler> sampler;
   VkFilter magFilter;
   VkFilter minFilter;
@@ -880,13 +857,19 @@ private:
 
 class TextureImage : public BufferData {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(TextureImage)
   TextureImage() = delete;
   virtual ~TextureImage() = default;
 
   explicit TextureImage(const std::string& filename) :
     texture(VulkanImageFactory::Create(filename))
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, TextureImage, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, record);
+	}
 
   void copy(char* dst) const override
   {
@@ -903,36 +886,37 @@ public:
     return 0;
   }
 
+	void alloc(Context* context) 
+  {
+    context->state.bufferdata = this;
+    context->state.texture = this->texture.get();
+  }
+
+  void stage(Context* context) 
+  {
+    context->state.bufferdata = this;
+    context->state.texture = this->texture.get();
+  }
+
+  void pipeline(Context* context) 
+  {
+    context->state.bufferdata = this;
+    context->state.texture = this->texture.get();
+  }
+
+  void record(Context* context) 
+  {
+    context->state.bufferdata = this;
+    context->state.texture = this->texture.get();
+  }
+
 private:
-  void doAlloc(Context* context) override
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-  void doStage(Context* context) override
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-  void doPipeline(Context* context) override
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-  void doRecord(Context* context) override
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
   std::shared_ptr<VulkanTextureImage> texture;
 };
 
 class Image : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Image)
   virtual ~Image() = default;
   Image(VkSampleCountFlagBits sample_count,
@@ -947,12 +931,15 @@ public:
     sharing_mode(sharing_mode),
     create_flags(create_flags),
     layout(layout)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Image, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, Image, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Image, pipeline);
+	}
 
-private:
-	void doAlloc(Context* context) override
+	void alloc(Context* context)
 	{
-    VulkanTextureImage* texture = context->state.texture;
+		VulkanTextureImage* texture = context->state.texture;
 
 		this->image = std::make_shared<VulkanImage>(
 			context->device,
@@ -1095,7 +1082,7 @@ private:
     vkQueueWaitIdle(context->queue);
 	}
 
-  void doStage(Context* context) override
+  void stage(Context* context) 
   {
     context->state.image = this->image->image;
     VulkanTextureImage* texture = context->state.texture;
@@ -1189,11 +1176,12 @@ private:
     }
   }
 
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.imageLayout = this->layout;
   }
 
+private:
   std::shared_ptr<VulkanImage> image;
 
   VkSampleCountFlagBits sample_count;
@@ -1214,6 +1202,7 @@ private:
 
 class ImageView : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ImageView)
   virtual ~ImageView() = default;
   ImageView(VkComponentSwizzle r,
@@ -1221,10 +1210,12 @@ public:
             VkComponentSwizzle b,
             VkComponentSwizzle a) :
     component_mapping({ r, g, b, a })
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(stagevisitor, ImageView, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, ImageView, pipeline);
+	}
 
-private:
-  void doStage(Context* context) override
+  void stage(Context* context) 
   {
     this->view = std::make_unique<VulkanImageView>(context->device,
                                                    context->state.image,
@@ -1234,36 +1225,41 @@ private:
                                                    context->state.texture->subresource_range());
   }
 
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.imageView = this->view->view;
   }
 
+private:
   std::unique_ptr<VulkanImageView> view;
   VkComponentMapping component_mapping;
 };
 
 class CullMode : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(CullMode)
     CullMode() = delete;
   virtual ~CullMode() = default;
 
   explicit CullMode(VkCullModeFlags cullmode) :
     cullmode(cullmode)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CullMode, pipeline);
+	}
   
-private:
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.rasterization_state.cullMode = this->cullmode;
   }
 
+private:
   VkCullModeFlags cullmode;
 };
 
 class ComputeCommand : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ComputeCommand)
   ComputeCommand() = delete;
   virtual ~ComputeCommand() = default;
@@ -1274,10 +1270,11 @@ public:
     group_count_x(group_count_x), 
     group_count_y(group_count_y), 
     group_count_z(group_count_z) 
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, ComputeCommand, pipeline);
+	}
 
-private:
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
       context->device,
@@ -1298,14 +1295,14 @@ private:
     }
     this->descriptor_set->update(context->state.write_descriptor_sets);
 
-    this->pipeline = std::make_unique<VulkanComputePipeline>(
+    this->compute_pipeline = std::make_unique<VulkanComputePipeline>(
       context->device,
       context->pipelinecache->cache,
       context->state.shader_stage_infos[0],
       this->pipeline_layout->layout);
   }
 
-  void doRecord(Context* context) override
+  void record(Context* context) 
   {
     vkCmdBindDescriptorSets(this->command->buffer(),
                             VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -1318,7 +1315,7 @@ private:
 
     vkCmdBindPipeline(this->command->buffer(),
                       VK_PIPELINE_BIND_POINT_COMPUTE,
-                      this->pipeline->pipeline);
+                      this->compute_pipeline->pipeline);
 
     vkCmdDispatch(this->command->buffer(),
                   this->group_count_x,
@@ -1326,11 +1323,12 @@ private:
                   this->group_count_z);
   }
 
+private:
   uint32_t group_count_x;
   uint32_t group_count_y;
   uint32_t group_count_z;
 
-  std::unique_ptr<VulkanComputePipeline> pipeline;
+  std::unique_ptr<VulkanComputePipeline> compute_pipeline;
   std::unique_ptr<VulkanCommandBuffers> command;
 
   std::shared_ptr<VulkanDescriptorSetLayout> descriptor_set_layout;
@@ -1341,6 +1339,7 @@ private:
 
 class DrawCommandBase : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DrawCommandBase)
   DrawCommandBase() = delete;
   virtual ~DrawCommandBase() = default;
@@ -1349,10 +1348,7 @@ public:
     topology(topology)
   {}
 
-private:
-  virtual void execute(VkCommandBuffer command, Context* context) = 0;
-
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     this->command = std::make_unique<VulkanCommandBuffers>(
       context->device,
@@ -1360,7 +1356,9 @@ private:
       VK_COMMAND_BUFFER_LEVEL_SECONDARY);
   }
 
-  void doPipeline(Context* context) override
+  virtual void execute(VkCommandBuffer command, Context* context) = 0;
+
+  void pipeline(Context* context) 
   {
     auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
       context->device,
@@ -1389,7 +1387,7 @@ private:
     }
     this->descriptor_sets->update(context->state.write_descriptor_sets);
 
-    this->pipeline = std::make_unique<VulkanGraphicsPipeline>(
+    this->graphics_pipeline = std::make_unique<VulkanGraphicsPipeline>(
       context->device,
       context->state.renderpass->renderpass,
       context->pipelinecache->cache,
@@ -1402,7 +1400,7 @@ private:
       context->state.vertex_attributes);
   }
 
-  void doRecord(Context* context) override
+  void record(Context* context) 
   {
     this->command->begin(
       0,
@@ -1422,7 +1420,7 @@ private:
 
     vkCmdBindPipeline(this->command->buffer(), 
                       VK_PIPELINE_BIND_POINT_GRAPHICS, 
-                      this->pipeline->pipeline);
+                      this->graphics_pipeline->pipeline);
 
     std::vector<VkRect2D> scissors{ {
       { 0, 0 },
@@ -1458,6 +1456,7 @@ private:
     this->command->end();
   }
 
+private:
   void doRender(Context* context) override
   {
     vkCmdExecuteCommands(context->state.command->buffer(),
@@ -1467,7 +1466,7 @@ private:
 
   VkPrimitiveTopology topology;
   std::unique_ptr<VulkanCommandBuffers> command;
-  std::unique_ptr<VulkanGraphicsPipeline> pipeline;
+  std::unique_ptr<VulkanGraphicsPipeline> graphics_pipeline;
   std::vector<VkDynamicState> dynamic_states{
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR
@@ -1479,6 +1478,7 @@ private:
 
 class DrawCommand : public DrawCommandBase {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DrawCommand)
   virtual ~DrawCommand() = default;
 
@@ -1492,7 +1492,18 @@ public:
     instancecount(instancecount),
     firstvertex(firstvertex),
     firstinstance(firstinstance)
-  {}
+  {
+		allocvisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
+			node->alloc(allocvisitor.context.get());
+			});
+		pipelinevisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
+			node->pipeline(pipelinevisitor.context.get());
+			});
+		recordvisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
+			node->record(recordvisitor.context.get());
+			});
+
+	}
 
 private:
   void execute(VkCommandBuffer command, Context*) override
@@ -1508,6 +1519,7 @@ private:
 
 class IndexedDrawCommand : public DrawCommandBase {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(IndexedDrawCommand)
   virtual ~IndexedDrawCommand() = default;
 
@@ -1524,7 +1536,11 @@ public:
     vertexoffset(vertexoffset),
     firstinstance(firstinstance),
     offset(0)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, IndexedDrawCommand, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, IndexedDrawCommand, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, IndexedDrawCommand, record);
+	}
 
 private:
   void execute(VkCommandBuffer command, Context* context) override
@@ -1552,6 +1568,7 @@ private:
 
 class FramebufferAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(FramebufferAttachment)
   virtual ~FramebufferAttachment() = default;
 
@@ -1564,10 +1581,12 @@ public:
     this->subresource_range = {
       aspectMask, 0, 1, 0, 1
     };
+
+		REGISTER_VISITOR_CALLBACK(allocvisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, FramebufferAttachment, alloc);
   }
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
     this->image = std::make_shared<VulkanImage>(context->device,
@@ -1618,29 +1637,27 @@ public:
 
 class Framebuffer : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Framebuffer)
   virtual ~Framebuffer() = default;
 
   explicit Framebuffer(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
-  {}
-
-private:
-  void doAlloc(Context* context) override
   {
-    Group::doAlloc(context);
-    this->framebuffer = std::make_unique<VulkanFramebuffer>(context->device,
-                                                            context->state.renderpass,
-                                                            context->state.framebuffer_attachments,
-                                                            context->extent,
-                                                            1);
-    context->state.framebuffer = this->framebuffer;
-  }
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, Framebuffer, alloc);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(resizevisitor, Framebuffer, alloc);
+	}
 
-  void doResize(Context* context) override
-  {
-    this->doAlloc(context);
-  }
+	void alloc(Context* context) 
+	{
+		this->framebuffer = std::make_unique<VulkanFramebuffer>(
+			context->device,
+			context->state.renderpass,
+			context->state.framebuffer_attachments,
+			context->extent,
+			1);
+		context->state.framebuffer = this->framebuffer;
+	}
 
 public:
   std::shared_ptr<VulkanFramebuffer> framebuffer;
@@ -1648,15 +1665,17 @@ public:
 
 class InputAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(InputAttachment)
   virtual ~InputAttachment() = default;
   explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
-  {}
-
-private:
-  void doAlloc(Context* context) override
   {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, InputAttachment, alloc);
+	}
+
+	void alloc(Context* context) 
+	{
     context->state.input_attachments.push_back(this->attachment);
   }
 
@@ -1666,123 +1685,139 @@ private:
 
 class ColorAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ColorAttachment)
   virtual ~ColorAttachment() = default;
   explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, ColorAttachment, alloc);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     context->state.color_attachments.push_back(this->attachment);
   }
 
+private:
   VkAttachmentReference attachment;
 };
 
 
 class ResolveAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(ResolveAttachment)
   virtual ~ResolveAttachment() = default;
   explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, ResolveAttachment, alloc);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     context->state.resolve_attachments.push_back(this->attachment);
   }
 
+private:
   VkAttachmentReference attachment;
 };
 
 class DepthStencilAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(DepthStencilAttachment)
   virtual ~DepthStencilAttachment() = default;
   explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
     attachment({ attachment, layout })
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, DepthStencilAttachment, alloc);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     context->state.depth_stencil_attachment = this->attachment;
   }
 
+private:
   VkAttachmentReference attachment;
 };
 
 class PreserveAttachment : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(PreserveAttachment)
   virtual ~PreserveAttachment() = default;
   explicit PreserveAttachment(uint32_t attachment) :
     attachment(attachment)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, PreserveAttachment, alloc);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     context->state.preserve_attachments.push_back(this->attachment);
   }
 
+private:
   uint32_t attachment;
 };
 
 class PipelineBindpoint : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(PipelineBindpoint)
   virtual ~PipelineBindpoint() = default;
   explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
     bind_point(bind_point)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, PipelineBindpoint, alloc);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     context->state.bind_point = this->bind_point;
   }
 
+private:
   VkPipelineBindPoint bind_point;
 };
 
 
 class SubpassDescription : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(SubpassDescription)
   SubpassDescription() = delete;
   virtual ~SubpassDescription() = default;
 
   SubpassDescription(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
-  {}
-
-private:
-  void doAlloc(Context* context) override
   {
-    Group::doAlloc(context);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, SubpassDescription, alloc);
+	}
 
+	void alloc(Context* context) 
+  {
     context->state.subpass_descriptions.push_back({
-        0,                                                                 // flags
-        context->state.bind_point,                                         // pipelineBindPoint
-        static_cast<uint32_t>(context->state.input_attachments.size()),    // inputAttachmentCount
-        context->state.input_attachments.data(),                           // pInputAttachments
-        static_cast<uint32_t>(context->state.color_attachments.size()),    // colorAttachmentCount
-        context->state.color_attachments.data(),                           // pColorAttachments
-        context->state.resolve_attachments.data(),                         // pResolveAttachments
-        &context->state.depth_stencil_attachment,                          // pDepthStencilAttachment
-        static_cast<uint32_t>(context->state.preserve_attachments.size()), // preserveAttachmentCount
-        context->state.preserve_attachments.data()                         // pPreserveAttachments
+      0,                                                                 // flags
+      context->state.bind_point,                                         // pipelineBindPoint
+      static_cast<uint32_t>(context->state.input_attachments.size()),    // inputAttachmentCount
+      context->state.input_attachments.data(),                           // pInputAttachments
+      static_cast<uint32_t>(context->state.color_attachments.size()),    // colorAttachmentCount
+      context->state.color_attachments.data(),                           // pColorAttachments
+      context->state.resolve_attachments.data(),                         // pResolveAttachments
+      &context->state.depth_stencil_attachment,                          // pDepthStencilAttachment
+      static_cast<uint32_t>(context->state.preserve_attachments.size()), // preserveAttachmentCount
+      context->state.preserve_attachments.data()                         // pPreserveAttachments
     });
   }
 };
 
 class RenderpassAttachment: public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(RenderpassAttachment)
   virtual ~RenderpassAttachment() = default;
 
@@ -1806,30 +1841,34 @@ public:
       initialLayout, 
       finalLayout
     };
-  }
 
-private:
-  void doAlloc(Context* context) override
+		REGISTER_VISITOR_CALLBACK(allocvisitor, RenderpassAttachment, alloc);
+	}
+
+	void alloc(Context* context) 
   {
     context->state.attachment_descriptions.push_back(this->description);
   }
 
+private:
   VkAttachmentDescription description;
 };
 
 class Renderpass : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(Renderpass)
   virtual ~Renderpass() = default;
+
   Renderpass(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
-  {}
-
-private:
-  void doAlloc(Context* context) override
   {
-    Group::doAlloc(context);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, Renderpass, alloc);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(resizevisitor, Renderpass, resize);
+	}
 
+  void alloc(Context* context) 
+  {
     this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
     this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
     this->render_fence = std::make_unique<VulkanFence>(context->device);
@@ -1839,12 +1878,12 @@ private:
     this->framebuffer = context->state.framebuffer;
   }
 
-  void doResize(Context* context) override
+  void resize(Context* context)
   {
-    Group::doResize(context);
     this->framebuffer = context->state.framebuffer;
   }
 
+private:
   void doRender(Context* context) override
   {
     const VkRect2D renderarea{
@@ -1881,7 +1920,7 @@ private:
     this->render_fence->wait();
   }
 
-
+public:
   VkQueue render_queue{ nullptr };
   std::unique_ptr<VulkanSemaphore> rendering_finished;
   std::unique_ptr<VulkanCommandBuffers> render_command;
@@ -1892,45 +1931,48 @@ private:
 
 class RenderpassDescription : public Group {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(RenderpassDescription)
   virtual ~RenderpassDescription() = default;
   RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
     Group(std::move(children))
-  {}
-
-private:
-  void doAlloc(Context* context) override
   {
-    Group::doAlloc(context);
+		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, RenderpassDescription, alloc);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(resizevisitor, RenderpassDescription, resize);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(pipelinevisitor, RenderpassDescription, pipeline);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(recordvisitor, RenderpassDescription, record);
+	}
+
+	void alloc(Context* context) 
+	{
     this->renderpass = std::make_shared<VulkanRenderpass>(context->device,
                                                           context->state.attachment_descriptions,
                                                           context->state.subpass_descriptions);
     context->state.renderpass = this->renderpass;
   }
 
-  void doResize(Context* context) override
+  void resize(Context* context)
   {
     context->state.renderpass = this->renderpass;
-    Group::doResize(context);
   }
 
-  void doPipeline(Context* context) override
+  void pipeline(Context* context) 
   {
     context->state.renderpass = this->renderpass;
-    Group::doPipeline(context);
   }
 
-  void doRecord(Context* recorder) override
+  void record(Context* context)
   {
-    recorder->state.renderpass = this->renderpass;
-    Group::doRecord(recorder);
+		context->state.renderpass = this->renderpass;
   }
 
+public:
   std::shared_ptr<VulkanRenderpass> renderpass;
 };
 
 class SwapchainObject : public Node {
 public:
+	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(SwapchainObject)
   virtual ~SwapchainObject() = default;
 
@@ -1943,22 +1985,21 @@ public:
       surface_format(surface_format),
       present_mode(present_mode),
       present_queue(nullptr)
-  {}
+  {
+		REGISTER_VISITOR_CALLBACK(allocvisitor, SwapchainObject, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, SwapchainObject, stage);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, SwapchainObject, stage);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, SwapchainObject, record);
+	}
 
-private:
-  void doAlloc(Context* context) override
+	void alloc(Context* context) 
   {
     this->present_queue = context->device->getQueue(0, this->surface->surface);
     this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->device);
     this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->device);
   }
 
-  void doResize(Context* context) override
-  {
-    this->doStage(context);
-  }
-
-  void doStage(Context* context) override
+  void stage(Context* context) 
   {
     VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : nullptr;
 
@@ -2014,7 +2055,7 @@ private:
                          count, image_barriers.data());
   }
 
-  void doRecord(Context* context) override
+  void record(Context* context) 
   {
     this->swap_buffers_command = std::make_unique<VulkanCommandBuffers>(context->device,
                                                                         this->swapchain_images.size(),
@@ -2117,6 +2158,7 @@ private:
     }
   }
 
+private:
   void doPresent(Context* context) override
   {
     THROW_ON_ERROR(context->vulkan->vkAcquireNextImage(
@@ -2174,199 +2216,205 @@ private:
 
 class OffscreenImage : public Node {
 public:
-	NO_COPY_OR_ASSIGNMENT(OffscreenImage)
-	virtual ~OffscreenImage() = default;
+	IMPLEMENT_VISITABLE_INLINE
+		NO_COPY_OR_ASSIGNMENT(OffscreenImage)
+		virtual ~OffscreenImage() = default;
 
-  OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment)
+	OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment)
 		: color_attachment(color_attachment)
-	{}
-
-private:
-	void doAlloc(Context* context) override
 	{
-    this->offscreen_fence = std::make_unique<VulkanFence>(context->device);
-
-    VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
-
-    this->image = std::make_shared<VulkanImage>(context->device,
-                                                VK_IMAGE_TYPE_2D,
-                                                VK_FORMAT_R8G8B8A8_UNORM,
-                                                extent,
-                                                this->subresource_range.levelCount,
-                                                this->subresource_range.layerCount,
-                                                VK_SAMPLE_COUNT_1_BIT,
-                                                VK_IMAGE_TILING_LINEAR,
-                                                VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                                VK_SHARING_MODE_EXCLUSIVE);
-
-    this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-    context->imageobjects.push_back(this->image_object.get());
+		REGISTER_VISITOR_CALLBACK(allocvisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, OffscreenImage, record);
 	}
 
-  void doResize(Context* context) override
-  {
-    this->doAlloc(context);
-  }
+	void alloc(Context* context)
+	{
+		this->offscreen_fence = std::make_unique<VulkanFence>(context->device);
 
-	void doRecord(Context* context) override
+		VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
+
+		this->image = std::make_shared<VulkanImage>(context->device,
+			VK_IMAGE_TYPE_2D,
+			VK_FORMAT_R8G8B8A8_UNORM,
+			extent,
+			this->subresource_range.levelCount,
+			this->subresource_range.layerCount,
+			VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TILING_LINEAR,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_SHARING_MODE_EXCLUSIVE);
+
+		this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+		const auto memory = std::make_shared<VulkanMemory>(
+			context->device,
+			this->image_object->memory_requirements.size,
+			this->image_object->memory_type_index);
+
+		const VkDeviceSize offset = 0;
+		this->image_object->bind(memory, offset);
+	}
+
+	void record(Context* context)
 	{
 		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
-    this->get_image_command->begin();
+		this->get_image_command->begin();
 
-    VkImageMemoryBarrier src_image_barriers[2] = { 
-    {
-      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
-      nullptr,                                                       // pNext
-      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,                          // srcAccessMask
-      VK_ACCESS_TRANSFER_READ_BIT,                                   // dstAccessMask
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                      // oldLayout
-      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,                          // newLayout
-      0,                                                             // srcQueueFamilyIndex
-      0,                                                             // dstQueueFamilyIndex
-      this->color_attachment->image->image,                          // image
-      this->subresource_range,                                       // subresourceRange
-    }, {
-      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
-      nullptr,                                                       // pNext
-      0,                                                             // srcAccessMask
-      VK_ACCESS_TRANSFER_WRITE_BIT,                                  // dstAccessMask
-      VK_IMAGE_LAYOUT_UNDEFINED,                                     // oldLayout
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                          // newLayout
-      0,                                                             // srcQueueFamilyIndex
-      0,                                                             // dstQueueFamilyIndex
-      this->image->image,                                            // image
-      this->subresource_range,                                       // subresourceRange
-      }
-    };
+		VkImageMemoryBarrier src_image_barriers[2] = {
+		{
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
+			nullptr,                                                       // pNext
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,                          // srcAccessMask
+			VK_ACCESS_TRANSFER_READ_BIT,                                   // dstAccessMask
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                      // oldLayout
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,                          // newLayout
+			0,                                                             // srcQueueFamilyIndex
+			0,                                                             // dstQueueFamilyIndex
+			this->color_attachment->image->image,                          // image
+			this->subresource_range,                                       // subresourceRange
+		}, {
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
+			nullptr,                                                       // pNext
+			0,                                                             // srcAccessMask
+			VK_ACCESS_TRANSFER_WRITE_BIT,                                  // dstAccessMask
+			VK_IMAGE_LAYOUT_UNDEFINED,                                     // oldLayout
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                          // newLayout
+			0,                                                             // srcQueueFamilyIndex
+			0,                                                             // dstQueueFamilyIndex
+			this->image->image,                                            // image
+			this->subresource_range,                                       // subresourceRange
+			}
+		};
 
 		vkCmdPipelineBarrier(this->get_image_command->buffer(),
- 			                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			                   VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-			                   0, 0, nullptr, 0, nullptr,
-			                   2, src_image_barriers);
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			0, 0, nullptr, 0, nullptr,
+			2, src_image_barriers);
 
-    const VkImageSubresourceLayers subresource_layers{
-      this->subresource_range.aspectMask,     // aspectMask
-      this->subresource_range.baseMipLevel,   // mipLevel
-      this->subresource_range.baseArrayLayer, // baseArrayLayer
-      this->subresource_range.layerCount      // layerCount;
-    };
+		const VkImageSubresourceLayers subresource_layers{
+			this->subresource_range.aspectMask,     // aspectMask
+			this->subresource_range.baseMipLevel,   // mipLevel
+			this->subresource_range.baseArrayLayer, // baseArrayLayer
+			this->subresource_range.layerCount      // layerCount;
+		};
 
-    const VkOffset3D offset = {
-      0, 0, 0
-    };
+		const VkOffset3D offset = {
+			0, 0, 0
+		};
 
-    VkExtent3D extent3d = { context->extent.width, context->extent.height, 1 };
+		VkExtent3D extent3d = { context->extent.width, context->extent.height, 1 };
 
-    VkImageCopy image_copy{
-      subresource_layers,             // srcSubresource
-      offset,                         // srcOffset
-      subresource_layers,             // dstSubresource
-      offset,                         // dstOffset
-      extent3d                        // extent
-    };
+		VkImageCopy image_copy{
+			subresource_layers,             // srcSubresource
+			offset,                         // srcOffset
+			subresource_layers,             // dstSubresource
+			offset,                         // dstOffset
+			extent3d                        // extent
+		};
 
-    vkCmdCopyImage(this->get_image_command->buffer(),
-                   this->color_attachment->image->image,
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   this->image->image,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   1, &image_copy);
+		vkCmdCopyImage(this->get_image_command->buffer(),
+			this->color_attachment->image->image,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			this->image->image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1, &image_copy);
 
 
-    VkImageMemoryBarrier dst_image_barriers[2] = {
-    {
-      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
-      nullptr,                                                       // pNext
-      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,                          // srcAccessMask
-      VK_ACCESS_TRANSFER_READ_BIT,                                   // dstAccessMask
-      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,                          // oldLayout
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                      // newLayout
-      0,                                                             // srcQueueFamilyIndex
-      0,                                                             // dstQueueFamilyIndex
-      this->color_attachment->image->image,                          // image
-      this->subresource_range,                                       // subresourceRange
-    }, {
-      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
-      nullptr,                                                       // pNext
-      0,                                                             // srcAccessMask
-      VK_ACCESS_TRANSFER_WRITE_BIT,                                  // dstAccessMask
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                          // oldLayout
-      VK_IMAGE_LAYOUT_GENERAL,                                       // newLayout
-      0,                                                             // srcQueueFamilyIndex
-      0,                                                             // dstQueueFamilyIndex
-      this->image->image,                                            // image
-      this->subresource_range,                                       // subresourceRange
-      }
-    };
+		VkImageMemoryBarrier dst_image_barriers[2] = {
+		{
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
+			nullptr,                                                       // pNext
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,                          // srcAccessMask
+			VK_ACCESS_TRANSFER_READ_BIT,                                   // dstAccessMask
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,                          // oldLayout
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,                      // newLayout
+			0,                                                             // srcQueueFamilyIndex
+			0,                                                             // dstQueueFamilyIndex
+			this->color_attachment->image->image,                          // image
+			this->subresource_range,                                       // subresourceRange
+		}, {
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // sType
+			nullptr,                                                       // pNext
+			0,                                                             // srcAccessMask
+			VK_ACCESS_TRANSFER_WRITE_BIT,                                  // dstAccessMask
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                          // oldLayout
+			VK_IMAGE_LAYOUT_GENERAL,                                       // newLayout
+			0,                                                             // srcQueueFamilyIndex
+			0,                                                             // dstQueueFamilyIndex
+			this->image->image,                                            // image
+			this->subresource_range,                                       // subresourceRange
+			}
+		};
 
-    vkCmdPipelineBarrier(this->get_image_command->buffer(),
-                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         0, 0, nullptr, 0, nullptr,
-                         2, dst_image_barriers);
+		vkCmdPipelineBarrier(this->get_image_command->buffer(),
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+			0, 0, nullptr, 0, nullptr,
+			2, dst_image_barriers);
 
-    this->get_image_command->end();
+		this->get_image_command->end();
 	}
 
-  void doPresent(Context* context) override
-  {
-    this->offscreen_fence->reset();
-    this->get_image_command->submit(context->queue,
-                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                    this->offscreen_fence->fence);
-    this->offscreen_fence->wait();
+private:
+	void doPresent(Context* context) override
+	{
+		this->offscreen_fence->reset();
+		this->get_image_command->submit(context->queue,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			this->offscreen_fence->fence);
+		this->offscreen_fence->wait();
 
-    VkImageSubresource image_subresource{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
-    VkSubresourceLayout subresource_layout;
-    vkGetImageSubresourceLayout(context->device->device, this->image->image, &image_subresource, &subresource_layout);
+		VkImageSubresource image_subresource{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+		VkSubresourceLayout subresource_layout;
+		vkGetImageSubresourceLayout(context->device->device, this->image->image, &image_subresource, &subresource_layout);
 
-    // Map image memory so we can start copying from it
-    const char* data;
-    vkMapMemory(context->device->device, this->image_object->memory->memory, 0, VK_WHOLE_SIZE, 0, (void**)& data);
-    data += subresource_layout.offset;
+		// Map image memory so we can start copying from it
+		const char* data;
+		vkMapMemory(context->device->device, this->image_object->memory->memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
+		data += subresource_layout.offset;
 
-    std::ofstream file("test.ppm", std::ios::out | std::ios::binary);
+		std::ofstream file("test.ppm", std::ios::out | std::ios::binary);
 
-    // ppm header
-    file << "P6\n" << context->extent.width << "\n" << context->extent.height << "\n" << 255 << "\n";
+		// ppm header
+		file << "P6\n" << context->extent.width << "\n" << context->extent.height << "\n" << 255 << "\n";
 
-    // If source is BGR (destination is always RGB) and we can't use blit (which does automatic conversion), we'll have to manually swizzle color components
-    bool colorSwizzle = false;
-    // Check if source is BGR 
-    // Note: Not complete, only contains most common and basic BGR surface formats for demonstation purposes
-    std::vector<VkFormat> formatsBGR = { VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SNORM };
-    colorSwizzle = (std::find(formatsBGR.begin(), formatsBGR.end(), this->color_attachment->format) != formatsBGR.end());
+		// If source is BGR (destination is always RGB) and we can't use blit (which does automatic conversion), we'll have to manually swizzle color components
+		bool colorSwizzle = false;
+		// Check if source is BGR 
+		// Note: Not complete, only contains most common and basic BGR surface formats for demonstation purposes
+		std::vector<VkFormat> formatsBGR = { VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SNORM };
+		colorSwizzle = (std::find(formatsBGR.begin(), formatsBGR.end(), this->color_attachment->format) != formatsBGR.end());
 
-    // ppm binary pixel data
-    for (uint32_t y = 0; y < context->extent.height; y++) {
-      unsigned int* row = (unsigned int*)data;
-      for (uint32_t x = 0; x < context->extent.width; x++) {
-        if (colorSwizzle) {
-          file.write((char*)row + 2, 1);
-          file.write((char*)row + 1, 1);
-          file.write((char*)row + 0, 1);
-        }
-        else {
-          file.write((char*)row, 3);
-        }
-        row++;
-      }
-      data += subresource_layout.rowPitch;
-    }
-    file.close();
-    vkUnmapMemory(context->device->device, this->image_object->memory->memory);
+		// ppm binary pixel data
+		for (uint32_t y = 0; y < context->extent.height; y++) {
+			unsigned int* row = (unsigned int*)data;
+			for (uint32_t x = 0; x < context->extent.width; x++) {
+				if (colorSwizzle) {
+					file.write((char*)row + 2, 1);
+					file.write((char*)row + 1, 1);
+					file.write((char*)row + 0, 1);
+				}
+				else {
+					file.write((char*)row, 3);
+				}
+				row++;
+			}
+			data += subresource_layout.rowPitch;
+		}
+		file.close();
+		vkUnmapMemory(context->device->device, this->image_object->memory->memory);
 
-    std::cout << "Screenshot saved to disk" << std::endl;
-  }
+		std::cout << "Screenshot saved to disk" << std::endl;
+	}
 
 	std::shared_ptr<FramebufferAttachment> color_attachment;
 	std::unique_ptr<VulkanCommandBuffers> get_image_command;
-  const VkImageSubresourceRange subresource_range{
-      VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
-  };
-  std::shared_ptr<VulkanImage> image;
-  std::shared_ptr<ImageObject> image_object;
-  std::shared_ptr<VulkanFence> offscreen_fence;
+	const VkImageSubresourceRange subresource_range{
+		VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+	};
+	std::shared_ptr<VulkanImage> image;
+	std::shared_ptr<ImageObject> image_object;
+	std::shared_ptr<VulkanFence> offscreen_fence;
 };

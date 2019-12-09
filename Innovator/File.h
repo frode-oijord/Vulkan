@@ -12,27 +12,27 @@
 using namespace scm;
 
 template <typename BaseType, typename SubType, typename... Arg, std::size_t... i>
-std::shared_ptr<BaseType> make_shared_object_impl(const List & lst, std::index_sequence<i...>)
+std::shared_ptr<BaseType> make_shared_object_impl(const List& lst, std::index_sequence<i...>)
 {
-  return std::make_shared<SubType>(std::any_cast<Arg>(lst[i])...);
+	return std::make_shared<SubType>(std::any_cast<Arg>(lst[i])...);
 }
 
 template <typename BaseType, typename SubType, typename... Arg>
-std::shared_ptr<BaseType> make_shared_object(const List & lst)
+std::shared_ptr<BaseType> make_shared_object(const List& lst)
 {
-  return make_shared_object_impl<BaseType, SubType, Arg...>(lst, std::index_sequence_for<Arg...>{});
+	return make_shared_object_impl<BaseType, SubType, Arg...>(lst, std::index_sequence_for<Arg...>{});
 }
 
 template <typename Type, typename... Arg, std::size_t... i>
-Type make_object_impl(const List & lst, std::index_sequence<i...>)
+Type make_object_impl(const List& lst, std::index_sequence<i...>)
 {
-  return Type(std::any_cast<Arg>(lst[i])... );
+	return Type(std::any_cast<Arg>(lst[i])...);
 }
 
 template <typename Type, typename... Arg>
-Type make_object(const List & lst)
+Type make_object(const List& lst)
 {
-  return make_object_impl<Type, Arg...>(lst, std::index_sequence_for<Arg...>{});
+	return make_object_impl<Type, Arg...>(lst, std::index_sequence_for<Arg...>{});
 }
 
 template <typename NodeType, typename... Arg>

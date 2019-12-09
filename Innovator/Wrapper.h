@@ -837,7 +837,7 @@ public:
       nullptr,                                         // pNext  
       static_cast<uint32_t>(wait_semaphores.size()),   // waitSemaphoreCount  
       wait_semaphores.data(),                          // pWaitSemaphores  
-      & flags,                                          // pWaitDstStageMask  
+      &flags,                                          // pWaitDstStageMask  
       static_cast<uint32_t>(buffers.size()),           // commandBufferCount  
       buffers.data(),                                  // pCommandBuffers 
       static_cast<uint32_t>(signal_semaphores.size()), // signalSemaphoreCount
