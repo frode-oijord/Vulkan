@@ -884,6 +884,8 @@ public:
 	void alloc(Context* context)
 	{
 		VulkanTextureImage* texture = context->state.texture;
+		image_memory_binds.clear();
+		image_opaque_memory_binds.clear();
 
 		this->image = std::make_shared<VulkanImage>(
 			context->device,
