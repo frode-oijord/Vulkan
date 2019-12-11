@@ -1016,7 +1016,7 @@ public:
                 layer
               };
 
-              image_memory_binds.push_back({
+              this->image_memory_binds.push_back({
                 subresource,
                 offset,
                 extent,
@@ -1037,7 +1037,7 @@ public:
           layer * this->sparse_memory_requirement.imageMipTailStride;
 
         this->mip_tail_offset = memoryOffset;
-        image_opaque_memory_binds.push_back({
+				this->image_opaque_memory_binds.push_back({
           resourceOffset,                                   // resourceOffset
           this->sparse_memory_requirement.imageMipTailSize, // size
           this->image_memory->memory,                       // memory
@@ -1049,14 +1049,14 @@ public:
 
     std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info{ {
       this->image->image,
-      static_cast<uint32_t>(image_memory_binds.size()),
-      image_memory_binds.data(),
+      static_cast<uint32_t>(this->image_memory_binds.size()),
+			this->image_memory_binds.data(),
     } };
 
     std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos{ {
       this->image->image,
-      static_cast<uint32_t>(image_opaque_memory_binds.size()),
-      image_opaque_memory_binds.data(),
+      static_cast<uint32_t>(this->image_opaque_memory_binds.size()),
+			this->image_opaque_memory_binds.data(),
     } };
 
     std::vector<VkSemaphore> wait_semaphores;
@@ -1079,7 +1079,6 @@ public:
     };
 
     vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(context->queue);
 	}
 
   void stage(Context* context) 
@@ -1182,6 +1181,44 @@ public:
   }
 
 private:
+	void doRender(Context* context) override
+	{
+		std::vector<VkSparseImageMemoryBind> half_binds(this->image_memory_binds.begin(), this->image_memory_binds.begin() + 1);
+
+		std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info{ {
+			this->image->image,
+			static_cast<uint32_t>(half_binds.size()),
+			half_binds.data(),
+		} };
+
+		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos{ {
+			this->image->image,
+			static_cast<uint32_t>(this->image_opaque_memory_binds.size()),
+			this->image_opaque_memory_binds.data(),
+		} };
+
+		std::vector<VkSemaphore> wait_semaphores;
+		std::vector<VkSemaphore> signal_semaphores;
+		std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
+
+		VkBindSparseInfo bind_sparse_info = {
+			VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                           // sType
+			nullptr,                                                      // pNext
+			static_cast<uint32_t>(wait_semaphores.size()),                // waitSemaphoreCount
+			wait_semaphores.data(),                                       // pWaitSemaphores
+			static_cast<uint32_t>(buffer_memory_bind_infos.size()),       // bufferBindCount
+			buffer_memory_bind_infos.data(),                              // pBufferBinds;
+			static_cast<uint32_t>(image_opaque_memory_bind_infos.size()), // imageOpaqueBindCount
+			image_opaque_memory_bind_infos.data(),                        // pImageOpaqueBinds
+			static_cast<uint32_t>(image_memory_bind_info.size()),         // imageBindCount
+			image_memory_bind_info.data(),                                // pImageBinds
+			static_cast<uint32_t>(signal_semaphores.size()),              // signalSemaphoreCount
+			signal_semaphores.data(),                                     // pSignalSemaphores
+		};
+
+		vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
+	}
+
   std::shared_ptr<VulkanImage> image;
 
   VkSampleCountFlagBits sample_count;
