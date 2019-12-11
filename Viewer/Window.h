@@ -34,7 +34,7 @@ public:
     wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wcex)) {
-      throw std::runtime_error("unable to register window class");
+      //throw std::runtime_error("unable to register window class");
     }
 
     this->hWnd = CreateWindow(
@@ -161,10 +161,10 @@ std::shared_ptr<T> find_first(std::shared_ptr<Node> root)
 class VulkanWindow : public Window {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanWindow)
-  ~VulkanWindow() = default;
+	virtual ~VulkanWindow() = default;
 
-  VulkanWindow(std::shared_ptr<Group> root)
-  {
+  VulkanWindow(std::shared_ptr<Node> scene, std::shared_ptr<FramebufferAttachment> color_attachment)
+	{
     std::vector<const char*> instance_layers{
 #ifdef DEBUG
       "VK_LAYER_LUNARG_standard_validation",
@@ -213,8 +213,6 @@ public:
       device_layers,
       device_extensions);
 
-    auto color_attachment = find_first<FramebufferAttachment>(root);
-
     auto surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
     VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -233,19 +231,29 @@ public:
       device, 
       surface_capabilities.currentExtent);
 
-    this->scene = std::make_shared<Scene>();
-    this->scene->children = {
-      root,
+    this->root = std::make_shared<Separator>();
+    this->root->children = {
+      scene,
       swapchain
     };
 
-    this->scene->init(this->context);
-  }
+		allocvisitor.visit(this->root.get(), this->context.get());
+		stagevisitor.visit(this->root.get(), this->context.get());
+		pipelinevisitor.visit(this->root.get(), this->context.get());
+		recordvisitor.visit(this->root.get(), this->context.get());
+	}
+
 
   void redraw() override
   {
-    this->scene->redraw(this->context.get());
-  }
+		try {
+			this->root->render(this->context.get());
+			this->root->present(this->context.get());
+		}
+		catch (VkException&) {
+			// recreate swapchain, try again next frame
+		}
+	}
 
   void resize(int width, int height) override
   {
@@ -254,31 +262,34 @@ public:
       static_cast<uint32_t>(height)
     };
     this->context->resize(extent);
-    this->scene->resize(this->context.get());
-  }
+
+		resizevisitor.visit(this->root.get(), this->context.get());
+		recordvisitor.visit(this->root.get(), this->context.get());
+		this->redraw();
+	}
 
   void mousePressed(int x, int y, int button)
   {
     this->context->event = std::make_shared<MousePressEvent>(x, y, button);
-		this->scene->event();
+		this->root->visit(&eventvisitor, this->context.get());
   }
 
   void mouseReleased() override
   {
     this->context->event = std::make_shared<MouseReleaseEvent>();
-		this->scene->event();
-  }
+		this->root->visit(&eventvisitor, this->context.get());
+	}
 
   void mouseMoved(int x, int y)
   {
     this->context->event = std::make_shared<MouseMoveEvent>(x, y);
-		this->scene->event();
+		this->root->visit(&eventvisitor, this->context.get());
 
     if (this->context->redraw) {
-      this->scene->redraw(this->context.get());
+			this->redraw();
     }
   }
 
-  std::shared_ptr<Scene> scene;
-  std::shared_ptr<Context> context;
+	std::shared_ptr<Group> root;
+	std::shared_ptr<Context> context;
 };

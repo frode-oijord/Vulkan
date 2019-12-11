@@ -28,7 +28,7 @@ public:
 	Node() = default;
 	virtual ~Node() = default;
 
-	virtual void visit(Visitor* visitor) = 0;
+	virtual void visit(Visitor* visitor, Context* context) = 0;
 
 	void render(class Context* context)
 	{
@@ -89,62 +89,6 @@ protected:
 	{
 		RenderStateScope scope(&context->state);
 		Group::doRender(context);
-	}
-};
-
-
-class Scene : public Group {
-public:
-	IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(Scene)
-	Scene() = default;
-
-	virtual ~Scene()
-	{
-		eventvisitor.context.reset();
-		allocvisitor.context.reset();
-		stagevisitor.context.reset();
-		resizevisitor.context.reset();
-		pipelinevisitor.context.reset();
-		recordvisitor.context.reset();
-	}
-
-  void init(std::shared_ptr<Context> context)
-  {
-		eventvisitor.context = context;
-		allocvisitor.context = context;
-		stagevisitor.context = context;
-		resizevisitor.context = context;
-		pipelinevisitor.context = context;
-		recordvisitor.context = context;
-
-		allocvisitor.visit(this);
-		stagevisitor.visit(this);
-		pipelinevisitor.visit(this);
-		recordvisitor.visit(this);
-  }
-
-  void redraw(Context* context)
-  {
-    try {
-      this->render(context);
-      this->present(context);
-    }
-    catch (VkException&) {
-      // recreate swapchain, try again next frame
-    }
-  }
-
-  void resize(Context* context)
-  {
-		resizevisitor.visit(this);
-		recordvisitor.visit(this);
-    this->redraw(context);
-  }
-
-	void event()
-	{
-		this->visit(&eventvisitor);
 	}
 };
 
@@ -1530,16 +1474,9 @@ public:
     firstvertex(firstvertex),
     firstinstance(firstinstance)
   {
-		allocvisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-		pipelinevisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		recordvisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
-			node->record(recordvisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(allocvisitor, DrawCommand, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DrawCommand, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, DrawCommand, record);
 	}
 
 private:

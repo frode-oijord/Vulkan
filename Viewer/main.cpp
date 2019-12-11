@@ -12,13 +12,8 @@ int main(int argc, char *argv[])
   try {
     VulkanImageFactory::Register<DebugTextureImage>();
 
-    auto scene = std::make_shared<Group>();
-    scene->children = {
-      eval_file("crate/crate.scm")
-    };
-
-    VulkanWindow window(scene);
-    return window.show();
+		auto window = std::any_cast<std::shared_ptr<VulkanWindow>>(eval_file("crate/crate.scm"));
+    return window->show();
   }
   catch (std::exception & e) {
     std::cerr << std::string("caught exception in main(): ") + typeid(e).name() << std::endl;

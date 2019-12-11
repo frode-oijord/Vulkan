@@ -75,7 +75,15 @@
             (uint32 0)
             VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)))
 
-   (renderpass
+   (define main-color-attachment (framebuffer-attachment 
+            VK_FORMAT_B8G8R8A8_UNORM
+            (imageusageflags 
+               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
+               VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
+               VK_IMAGE_USAGE_SAMPLED_BIT)
+            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
+
+   (define main-renderpass (renderpass
       (renderpass-description
          (renderpass-attachment
             VK_FORMAT_B8G8R8A8_UNORM
@@ -103,13 +111,7 @@
             (depth-attachment (uint32 1) VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)))
 
       (framebuffer
-         (framebuffer-attachment 
-            VK_FORMAT_B8G8R8A8_UNORM
-            (imageusageflags 
-               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
-               VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
-               VK_IMAGE_USAGE_SAMPLED_BIT)
-            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT))
+         main-color-attachment
          (framebuffer-attachment
             VK_FORMAT_D32_SFLOAT
             (imageusageflags VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
@@ -158,3 +160,5 @@
       (indexed-shape 
          (bufferdata-uint32 0 1 3 3 2 0 4 6 7 7 5 4 0 4 5 5 1 0 6 2 3 3 7 6 0 2 6 6 4 0 1 5 7 7 3 1)
          (bufferdata-float 0 0 0 0 0 1 0 1 0 0 1 1 1 0 0 1 0 1 1 1 0 1 1 1))))
+
+(window main-renderpass main-color-attachment))
