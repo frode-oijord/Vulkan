@@ -93,62 +93,6 @@ protected:
 };
 
 
-class Scene : public Group {
-public:
-	IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(Scene)
-	Scene() = default;
-
-	virtual ~Scene()
-	{
-		eventvisitor.context.reset();
-		allocvisitor.context.reset();
-		stagevisitor.context.reset();
-		resizevisitor.context.reset();
-		pipelinevisitor.context.reset();
-		recordvisitor.context.reset();
-	}
-
-  void init(std::shared_ptr<Context> context)
-  {
-		eventvisitor.context = context;
-		allocvisitor.context = context;
-		stagevisitor.context = context;
-		resizevisitor.context = context;
-		pipelinevisitor.context = context;
-		recordvisitor.context = context;
-
-		allocvisitor.visit(this);
-		stagevisitor.visit(this);
-		pipelinevisitor.visit(this);
-		recordvisitor.visit(this);
-  }
-
-  void redraw(Context* context)
-  {
-    try {
-      this->render(context);
-      this->present(context);
-    }
-    catch (VkException&) {
-      // recreate swapchain, try again next frame
-    }
-  }
-
-  void resize(Context* context)
-  {
-		resizevisitor.visit(this);
-		recordvisitor.visit(this);
-    this->redraw(context);
-  }
-
-	void event()
-	{
-		this->visit(&eventvisitor);
-	}
-};
-
-
 class ViewMatrix : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE

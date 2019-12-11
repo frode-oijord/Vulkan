@@ -161,9 +161,7 @@ std::shared_ptr<T> find_first(std::shared_ptr<Node> root)
 class VulkanWindow : public Window {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanWindow)
-  ~VulkanWindow() = default;
-
-  VulkanWindow(std::shared_ptr<Group> root)
+  VulkanWindow(std::shared_ptr<Group> scene)
   {
     std::vector<const char*> instance_layers{
 #ifdef DEBUG
@@ -211,7 +209,7 @@ public:
       device_layers,
       device_extensions);
 
-    auto color_attachment = find_first<FramebufferAttachment>(root);
+    auto color_attachment = find_first<FramebufferAttachment>(scene);
 
     auto surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
     VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
@@ -231,19 +229,46 @@ public:
       device, 
       surface_capabilities.currentExtent);
 
-    this->scene = std::make_shared<Scene>();
-    this->scene->children = {
-      root,
+    this->root = std::make_shared<Separator>();
+    this->root->children = {
+      scene,
       swapchain
     };
 
-    this->scene->init(this->context);
-  }
+		eventvisitor.context = this->context;
+		allocvisitor.context = this->context;
+		stagevisitor.context = this->context;
+		resizevisitor.context = this->context;
+		pipelinevisitor.context = this->context;
+		recordvisitor.context = this->context;
+
+		allocvisitor.visit(this->root.get());
+		stagevisitor.visit(this->root.get());
+		pipelinevisitor.visit(this->root.get());
+		recordvisitor.visit(this->root.get());
+	}
+
+	~VulkanWindow()
+	{
+		eventvisitor.context.reset();
+		allocvisitor.context.reset();
+		stagevisitor.context.reset();
+		resizevisitor.context.reset();
+		pipelinevisitor.context.reset();
+		recordvisitor.context.reset();
+	}
+
 
   void redraw() override
   {
-    this->scene->redraw(this->context.get());
-  }
+		try {
+			this->root->render(this->context.get());
+			this->root->present(this->context.get());
+		}
+		catch (VkException&) {
+			// recreate swapchain, try again next frame
+		}
+	}
 
   void resize(int width, int height) override
   {
@@ -252,31 +277,34 @@ public:
       static_cast<uint32_t>(height)
     };
     this->context->resize(extent);
-    this->scene->resize(this->context.get());
-  }
+
+		resizevisitor.visit(this->root.get());
+		recordvisitor.visit(this->root.get());
+		this->redraw();
+	}
 
   void mousePressed(int x, int y, int button)
   {
     this->context->event = std::make_shared<MousePressEvent>(x, y, button);
-		this->scene->event();
+		this->root->visit(&eventvisitor);
   }
 
   void mouseReleased() override
   {
     this->context->event = std::make_shared<MouseReleaseEvent>();
-		this->scene->event();
-  }
+		this->root->visit(&eventvisitor);
+	}
 
   void mouseMoved(int x, int y)
   {
     this->context->event = std::make_shared<MouseMoveEvent>(x, y);
-		this->scene->event();
+		this->root->visit(&eventvisitor);
 
     if (this->context->redraw) {
-      this->scene->redraw(this->context.get());
+			this->redraw();
     }
   }
 
-  std::shared_ptr<Scene> scene;
-  std::shared_ptr<Context> context;
+	std::shared_ptr<Group> root;
+	std::shared_ptr<Context> context;
 };
