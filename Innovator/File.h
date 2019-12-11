@@ -76,8 +76,16 @@ Flags flags(const List& lst) {
   return flags;
 }
 
+std::shared_ptr<VulkanWindow> window(const List& lst)
+{
+	auto scene = std::any_cast<std::shared_ptr<Node>>(lst[0]);
+	auto node = std::any_cast<std::shared_ptr<Node>>(lst[1]);
+	auto color_attachment = std::dynamic_pointer_cast<FramebufferAttachment>(node);
+	return std::make_shared<VulkanWindow>(scene, color_attachment);
+}
 
-std::shared_ptr<Node> eval_file(const std::string & filename)
+
+std::any eval_file(const std::string & filename)
 {
   env_ptr env = scm::global_env();
 
@@ -86,6 +94,7 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
     { "int32", fun_ptr(make_object<int32_t, Number>) },
     { "uint32", fun_ptr(make_object<uint32_t, Number>) },
     { "count", fun_ptr(count) },
+		{ "window", fun_ptr(window) },
     { "pipeline-bindpoint", fun_ptr(node<PipelineBindpoint, VkPipelineBindPoint> ) },
     { "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) },
     { "depth-attachment", fun_ptr(node<DepthStencilAttachment, uint32_t, VkImageLayout>) },
@@ -268,5 +277,5 @@ std::shared_ptr<Node> eval_file(const std::string & filename)
 
   std::any exp = scm::read(code.begin(), code.end());
   std::any sep = scm::eval(exp, env);
-  return std::any_cast<std::shared_ptr<Node>>(sep);
+	return sep;
 }

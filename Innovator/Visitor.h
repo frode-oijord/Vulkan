@@ -50,30 +50,31 @@ public:
 };
 
 
+class Context;
+
 class Visitor {
 public:
 	Visitor();
 
 	template <typename NodeType>
-	void register_callback(std::function<void(NodeType*)> callback)
+	void register_callback(std::function<void(NodeType*, Context*)> callback)
 	{
 		this->callbacks[typeid(NodeType)] = callback;
 	}
 
 	template <typename NodeType>
-	void apply(NodeType* node)
+	void apply(NodeType* node, Context* context)
 	{
 		auto it = callbacks.find(typeid(NodeType));
 		if (it != this->callbacks.end()) {
-			auto callback = std::any_cast<std::function<void(NodeType*)>>(it->second);
-			callback(node);
+			auto callback = std::any_cast<std::function<void(NodeType*, Context*)>>(it->second);
+			callback(node, context);
 		}
 	}
 
-	void visit_group(class Group* node);
-	void visit_separator(class Separator* node);
+	void visit_group(class Group* node, class Context* context);
+	void visit_separator(class Separator* node, class Context* context);
 
-	std::shared_ptr<class Context> context;
 	std::unordered_map<std::type_index, std::any> callbacks;
 };
 
@@ -81,7 +82,7 @@ public:
 class EventVisitor : public Visitor {
 public:
 	EventVisitor();
-	void visit(class ViewMatrix* node);
+	void visit(class ViewMatrix* node, class Context* context);
 
 private:
 	std::shared_ptr<class MousePressEvent> press{ nullptr };
@@ -90,31 +91,31 @@ private:
 
 class AllocVisitor : public Visitor {
 public:
-	void visit(class Node* node);
+	void visit(class Node* node, class Context* context);
 };
 
 
 class StageVisitor : public Visitor {
 public:
-	void visit(class Node* node);
+	void visit(class Node* node, class Context* context);
 };
 
 
 class ResizeVisitor : public Visitor {
 public:
-	void visit(class Node* node);
+	void visit(class Node* node, class Context* context);
 };
 
 
 class PipelineVisitor : public Visitor {
 public:
-	void visit(class Node* node);
+	void visit(class Node* node, class Context* context);
 };
 
 
 class RecordVisitor : public Visitor {
 public:
-	void visit(class Node* node);
+	void visit(class Node* node, class Context* context);
 };
 
 

@@ -34,7 +34,7 @@ public:
     wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wcex)) {
-      throw std::runtime_error("unable to register window class");
+      //throw std::runtime_error("unable to register window class");
     }
 
     this->hWnd = CreateWindow(
@@ -161,8 +161,10 @@ std::shared_ptr<T> find_first(std::shared_ptr<Node> root)
 class VulkanWindow : public Window {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanWindow)
-  VulkanWindow(std::shared_ptr<Group> scene)
-  {
+	virtual ~VulkanWindow() = default;
+
+  VulkanWindow(std::shared_ptr<Node> scene, std::shared_ptr<FramebufferAttachment> color_attachment)
+	{
     std::vector<const char*> instance_layers{
 #ifdef DEBUG
       "VK_LAYER_LUNARG_standard_validation",
@@ -209,8 +211,6 @@ public:
       device_layers,
       device_extensions);
 
-    auto color_attachment = find_first<FramebufferAttachment>(scene);
-
     auto surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
     VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
@@ -235,27 +235,10 @@ public:
       swapchain
     };
 
-		eventvisitor.context = this->context;
-		allocvisitor.context = this->context;
-		stagevisitor.context = this->context;
-		resizevisitor.context = this->context;
-		pipelinevisitor.context = this->context;
-		recordvisitor.context = this->context;
-
-		allocvisitor.visit(this->root.get());
-		stagevisitor.visit(this->root.get());
-		pipelinevisitor.visit(this->root.get());
-		recordvisitor.visit(this->root.get());
-	}
-
-	~VulkanWindow()
-	{
-		eventvisitor.context.reset();
-		allocvisitor.context.reset();
-		stagevisitor.context.reset();
-		resizevisitor.context.reset();
-		pipelinevisitor.context.reset();
-		recordvisitor.context.reset();
+		allocvisitor.visit(this->root.get(), this->context.get());
+		stagevisitor.visit(this->root.get(), this->context.get());
+		pipelinevisitor.visit(this->root.get(), this->context.get());
+		recordvisitor.visit(this->root.get(), this->context.get());
 	}
 
 
@@ -278,27 +261,27 @@ public:
     };
     this->context->resize(extent);
 
-		resizevisitor.visit(this->root.get());
-		recordvisitor.visit(this->root.get());
+		resizevisitor.visit(this->root.get(), this->context.get());
+		recordvisitor.visit(this->root.get(), this->context.get());
 		this->redraw();
 	}
 
   void mousePressed(int x, int y, int button)
   {
     this->context->event = std::make_shared<MousePressEvent>(x, y, button);
-		this->root->visit(&eventvisitor);
+		this->root->visit(&eventvisitor, this->context.get());
   }
 
   void mouseReleased() override
   {
     this->context->event = std::make_shared<MouseReleaseEvent>();
-		this->root->visit(&eventvisitor);
+		this->root->visit(&eventvisitor, this->context.get());
 	}
 
   void mouseMoved(int x, int y)
   {
     this->context->event = std::make_shared<MouseMoveEvent>(x, y);
-		this->root->visit(&eventvisitor);
+		this->root->visit(&eventvisitor, this->context.get());
 
     if (this->context->redraw) {
 			this->redraw();

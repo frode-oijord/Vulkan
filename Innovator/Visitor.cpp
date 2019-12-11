@@ -4,11 +4,11 @@
 
 Visitor::Visitor()
 {
-	auto visit_group = [this](Group* node) {
-		this->visit_group(node);
+	auto visit_group = [this](Group* node, Context* context) {
+		this->visit_group(node, context);
 	};
-	auto visit_separator = [this](Separator* node) {
-		this->visit_separator(node);
+	auto visit_separator = [this](Separator* node, Context* context) {
+		this->visit_separator(node, context);
 	};
 
 	this->register_callback<Group>(visit_group);
@@ -21,30 +21,30 @@ Visitor::Visitor()
 
 
 void 
-Visitor::visit_group(Group* node)
+Visitor::visit_group(Group* node, Context* context)
 {
 	for (auto child : node->children) {
-		child->visit(this);
+		child->visit(this, context);
 	}
 }
 
 void
-Visitor::visit_separator(Separator* node)
+Visitor::visit_separator(Separator* node, Context* context)
 {
 	StateScope scope(&context->state);
-	this->visit_group(node);
+	this->visit_group(node, context);
 }
 
 
 EventVisitor::EventVisitor()
 {
-	this->register_callback<ViewMatrix>([this](ViewMatrix* node) {
-		this->visit(node);
-		});
+	this->register_callback<ViewMatrix>([this](ViewMatrix* node, Context* context) {
+		this->visit(node, context);
+	});
 }
 
 void
-EventVisitor::visit(ViewMatrix* node)
+EventVisitor::visit(ViewMatrix* node, Context* context)
 {
 	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
 	if (press) {
@@ -72,18 +72,18 @@ EventVisitor::visit(ViewMatrix* node)
 
 
 void
-AllocVisitor::visit(Node* node)
+AllocVisitor::visit(Node* node, Context* context)
 {
-	this->context->imageobjects.clear();
-	this->context->bufferobjects.clear();
+	context->imageobjects.clear();
+	context->bufferobjects.clear();
 
-	this->context->begin();
-	node->visit(this);
-	this->context->end();
+	context->begin();
+	node->visit(this, context);
+	context->end();
 
-	for (auto image_object : this->context->imageobjects) {
+	for (auto image_object : context->imageobjects) {
 		const auto memory = std::make_shared<VulkanMemory>(
-			this->context->device,
+			context->device,
 			image_object->memory_requirements.size,
 			image_object->memory_type_index);
 
@@ -91,9 +91,9 @@ AllocVisitor::visit(Node* node)
 		image_object->bind(memory, offset);
 	}
 
-	for (auto buffer_object : this->context->bufferobjects) {
+	for (auto buffer_object : context->bufferobjects) {
 		const auto memory = std::make_shared<VulkanMemory>(
-			this->context->device,
+			context->device,
 			buffer_object->memory_requirements.size,
 			buffer_object->memory_type_index);
 
@@ -104,58 +104,58 @@ AllocVisitor::visit(Node* node)
 
 
 void
-StageVisitor::visit(Node* node)
+StageVisitor::visit(Node* node, Context* context)
 {
-	this->context->command->begin();
+	context->command->begin();
 
-	this->context->begin();
-	node->visit(this);
-	this->context->end();
+	context->begin();
+	node->visit(this, context);
+	context->end();
 
-	this->context->fence->reset();
-	this->context->command->end();
-	this->context->command->submit(
-		this->context->queue,
+	context->fence->reset();
+	context->command->end();
+	context->command->submit(
+		context->queue,
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		this->context->fence->fence);
+		context->fence->fence);
 
-	this->context->fence->wait();
+	context->fence->wait();
 }
 
 
 void
-ResizeVisitor::visit(Node* node)
+ResizeVisitor::visit(Node* node, Context* context)
 {
-	this->context->command->begin();
+	context->command->begin();
 
-	this->context->begin();
-	node->visit(this);
-	this->context->end();
+	context->begin();
+	node->visit(this, context);
+	context->end();
 
-	this->context->fence->reset();
-	this->context->command->end();
-	this->context->command->submit(
-		this->context->queue,
+	context->fence->reset();
+	context->command->end();
+	context->command->submit(
+		context->queue,
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		this->context->fence->fence);
+		context->fence->fence);
 
-	this->context->fence->wait();
+	context->fence->wait();
 }
 
 
 void
-PipelineVisitor::visit(Node* node)
+PipelineVisitor::visit(Node* node, Context* context)
 {
-	this->context->begin();
-	node->visit(this);
-	this->context->end();
+	context->begin();
+	node->visit(this, context);
+	context->end();
 }
 
 
 void
-RecordVisitor::visit(Node* node)
+RecordVisitor::visit(Node* node, Context* context)
 {
-	this->context->begin();
-	node->visit(this);
-	this->context->end();
+	context->begin();
+	node->visit(this, context);
+	context->end();
 }

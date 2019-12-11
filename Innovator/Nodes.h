@@ -28,7 +28,7 @@ public:
 	Node() = default;
 	virtual ~Node() = default;
 
-	virtual void visit(Visitor* visitor) = 0;
+	virtual void visit(Visitor* visitor, Context* context) = 0;
 
 	void render(class Context* context)
 	{
@@ -1264,16 +1264,9 @@ public:
     firstvertex(firstvertex),
     firstinstance(firstinstance)
   {
-		allocvisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
-			node->alloc(allocvisitor.context.get());
-			});
-		pipelinevisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
-			node->pipeline(pipelinevisitor.context.get());
-			});
-		recordvisitor.register_callback<DrawCommand>([this](DrawCommand* node) {
-			node->record(recordvisitor.context.get());
-			});
-
+		REGISTER_VISITOR_CALLBACK(allocvisitor, DrawCommand, alloc);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DrawCommand, pipeline);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, DrawCommand, record);
 	}
 
 private:
