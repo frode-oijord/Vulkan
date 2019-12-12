@@ -48,12 +48,11 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 {
 	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
 	if (press) {
-		this->press = std::move(press);
+		this->press = press;
 	}
 
 	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
 		this->press.reset();
-		context->event.reset();
 	}
 
 	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
@@ -66,7 +65,6 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 		default: break;
 		}
 		this->press->pos = move->pos;
-		context->event.reset();
 	}
 }
 

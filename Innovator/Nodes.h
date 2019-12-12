@@ -14,10 +14,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <map>
+#include <memory>
 #include <utility>
 #include <vector>
 #include <fstream>
-#include <memory>
 #include <filesystem>
 namespace fs = std::filesystem;
 
@@ -105,11 +106,11 @@ public:
 	{}
 
 	ViewMatrix(double m0, double m1, double m2,
-		double m3, double m4, double m5,
-		double m6, double m7, double m8)
+						 double m3, double m4, double m5,
+						 double m6, double m7, double m8)
 		: ViewMatrix(glm::dvec3(m0, m1, m2),
-			glm::dvec3(m3, m4, m5),
-			glm::dvec3(m6, m7, m8))
+								 glm::dvec3(m3, m4, m5),
+								 glm::dvec3(m6, m7, m8))
 	{}
 
 	void zoom(double dy)
@@ -150,8 +151,8 @@ public:
 
   void resize(Context* context) 
   {
-    this->aspectratio = static_cast<double>(context->extent.width) /
-                        static_cast<double>(context->extent.height);
+    this->aspectratio = static_cast<double>(context->state.extent.width) /
+                        static_cast<double>(context->state.extent.height);
 
     this->mat = glm::perspective(this->fieldofview,
                                  this->aspectratio,
@@ -936,7 +937,8 @@ public:
     VkDeviceSize memoryOffset = 0;
 
     for (uint32_t layer = 0; layer < texture->layers(); layer++) {
-      for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+      //for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+			for (uint32_t mip_level = 1; mip_level < 2; mip_level++) {
 
         VkExtent3D extent = texture->extent(mip_level);
 
@@ -1200,12 +1202,13 @@ public:
 
   void stage(Context* context) 
   {
-    this->view = std::make_unique<VulkanImageView>(context->device,
-                                                   context->state.image,
-                                                   context->state.texture->format(),
-                                                   context->state.texture->image_view_type(),
-                                                   this->component_mapping,
-                                                   context->state.texture->subresource_range());
+		this->view = std::make_unique<VulkanImageView>(
+			context->device,
+			context->state.image,
+			context->state.texture->format(),
+			context->state.texture->image_view_type(),
+			this->component_mapping,
+			context->state.texture->subresource_range());
   }
 
   void pipeline(Context* context) 
@@ -1218,11 +1221,44 @@ private:
   VkComponentMapping component_mapping;
 };
 
+
+class Extent : public Node {
+public:
+	IMPLEMENT_VISITABLE_INLINE
+	NO_COPY_OR_ASSIGNMENT(Extent)
+	Extent() = delete;
+	virtual ~Extent() = default;
+
+	Extent(uint32_t width, uint32_t height) :
+		extent{ width, height }
+	{
+		REGISTER_VISITOR_CALLBACK(allocvisitor, Extent, update);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, Extent, update);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Extent, update);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, Extent, update);
+		REGISTER_VISITOR_CALLBACK(resizevisitor, Extent, update);
+	}
+
+	void update(Context* context)
+	{
+		context->state.extent = this->extent;
+	}
+
+private:
+	void doRender(Context* context) override
+	{
+		this->update(context);
+	}
+
+	VkExtent2D extent;
+};
+
+
 class CullMode : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(CullMode)
-    CullMode() = delete;
+  CullMode() = delete;
   virtual ~CullMode() = default;
 
   explicit CullMode(VkCullModeFlags cullmode) :
@@ -1407,16 +1443,16 @@ public:
 
     std::vector<VkRect2D> scissors{ {
       { 0, 0 },
-      context->extent
+      context->state.extent
     } };
 
     std::vector<VkViewport> viewports{ {
-      0.0f,                                         // x
-      0.0f,                                         // y
-      static_cast<float>(context->extent.width),   // width
-      static_cast<float>(context->extent.height),  // height
-      0.0f,                                         // minDepth
-      1.0f                                          // maxDepth
+      0.0f,																								// x
+      0.0f,																								// y
+      static_cast<float>(context->state.extent.width),		// width
+      static_cast<float>(context->state.extent.height),		// height
+      0.0f,																								// minDepth
+      1.0f																								// maxDepth
     } };
 
     vkCmdSetScissor(this->command->buffer(), 
@@ -1564,31 +1600,41 @@ public:
 
 	void alloc(Context* context) 
   {
-    VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
-    this->image = std::make_shared<VulkanImage>(context->device,
-                                                VK_IMAGE_TYPE_2D,
-                                                this->format,
-                                                extent,
-                                                this->subresource_range.levelCount,
-                                                this->subresource_range.layerCount,
-                                                VK_SAMPLE_COUNT_1_BIT,
-                                                VK_IMAGE_TILING_OPTIMAL,
-                                                this->usage,
-                                                VK_SHARING_MODE_EXCLUSIVE);
+    VkExtent3D extent = { 
+			context->state.extent.width, context->state.extent.height, 1 
+		};
+    
+		this->image = std::make_shared<VulkanImage>(
+			context->device,
+			VK_IMAGE_TYPE_2D,
+			this->format,
+			extent,
+			this->subresource_range.levelCount,
+			this->subresource_range.layerCount,
+			VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TILING_OPTIMAL,
+			this->usage,
+			VK_SHARING_MODE_EXCLUSIVE);
 
-    this->imageobject = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    this->imageobject = std::make_shared<ImageObject>(
+			this->image, 
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    const auto memory = std::make_shared<VulkanMemory>(context->device,
-                                                       this->imageobject->memory_requirements.size,
-                                                       this->imageobject->memory_type_index);
+		const auto memory = std::make_shared<VulkanMemory>(
+			context->device,
+			this->imageobject->memory_requirements.size,
+			this->imageobject->memory_type_index);
+
     const VkDeviceSize offset = 0;
     this->imageobject->bind(memory, offset);
-    this->imageview = std::make_shared<VulkanImageView>(context->device,
-                                                        this->image->image,
-                                                        this->format,
-                                                        VK_IMAGE_VIEW_TYPE_2D,
-                                                        this->component_mapping,
-                                                        this->subresource_range);
+
+		this->imageview = std::make_shared<VulkanImageView>(
+			context->device,
+			this->image->image,
+			this->format,
+			VK_IMAGE_VIEW_TYPE_2D,
+			this->component_mapping,
+			this->subresource_range);
 
     context->state.framebuffer_attachments.push_back(this->imageview->view);
   }
@@ -1630,7 +1676,7 @@ public:
 			context->device,
 			context->state.renderpass,
 			context->state.framebuffer_attachments,
-			context->extent,
+			context->state.extent,
 			1);
 		context->state.framebuffer = this->framebuffer;
 	}
@@ -1863,8 +1909,8 @@ private:
   void doRender(Context* context) override
   {
     const VkRect2D renderarea{
-      { 0, 0 },                 // offset
-      context->extent           // extent
+      { 0, 0 },												// offset
+      context->state.extent           // extent
     };
 
     const std::vector<VkClearValue> clearvalues{
@@ -1914,9 +1960,14 @@ public:
     Group(std::move(children))
   {
 		REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(allocvisitor, RenderpassDescription, alloc);
-		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(resizevisitor, RenderpassDescription, resize);
-		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(pipelinevisitor, RenderpassDescription, pipeline);
-		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(recordvisitor, RenderpassDescription, record);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(resizevisitor, RenderpassDescription, update);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(pipelinevisitor, RenderpassDescription, update);
+		REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(recordvisitor, RenderpassDescription, update);
+	}
+
+	void update(Context* context)
+	{
+    context->state.renderpass = this->renderpass;
 	}
 
 	void alloc(Context* context) 
@@ -1924,22 +1975,7 @@ public:
     this->renderpass = std::make_shared<VulkanRenderpass>(context->device,
                                                           context->state.attachment_descriptions,
                                                           context->state.subpass_descriptions);
-    context->state.renderpass = this->renderpass;
-  }
-
-  void resize(Context* context)
-  {
-    context->state.renderpass = this->renderpass;
-  }
-
-  void pipeline(Context* context) 
-  {
-    context->state.renderpass = this->renderpass;
-  }
-
-  void record(Context* context)
-  {
-		context->state.renderpass = this->renderpass;
+		this->update(context);
   }
 
 public:
@@ -1986,7 +2022,7 @@ public:
       3,
       this->surface_format.format,
       this->surface_format.colorSpace,
-      context->extent,
+      context->state.extent,
       1,
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
       VK_SHARING_MODE_EXCLUSIVE,
@@ -2082,7 +2118,7 @@ public:
         0, 0, 0
       };
 
-      VkExtent3D extent3d = { context->extent.width, context->extent.height, 1 };
+      VkExtent3D extent3d = { context->state.extent.width, context->state.extent.height, 1 };
 
       VkImageCopy image_copy{
         subresource_layers,             // srcSubresource
@@ -2208,11 +2244,14 @@ public:
 	{
 		this->offscreen_fence = std::make_unique<VulkanFence>(context->device);
 
-		VkExtent3D extent = { context->extent.width, context->extent.height, 1 };
+		VkExtent3D extent = { 
+			context->state.extent.width, context->state.extent.height, 1 
+		};
 
-		this->image = std::make_shared<VulkanImage>(context->device,
+		this->image = std::make_shared<VulkanImage>(
+			context->device,
 			VK_IMAGE_TYPE_2D,
-			VK_FORMAT_R8G8B8A8_UNORM,
+			this->color_attachment->format,
 			extent,
 			this->subresource_range.levelCount,
 			this->subresource_range.layerCount,
@@ -2263,7 +2302,8 @@ public:
 			}
 		};
 
-		vkCmdPipelineBarrier(this->get_image_command->buffer(),
+		vkCmdPipelineBarrier(
+			this->get_image_command->buffer(),
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 			0, 0, nullptr, 0, nullptr,
@@ -2280,7 +2320,9 @@ public:
 			0, 0, 0
 		};
 
-		VkExtent3D extent3d = { context->extent.width, context->extent.height, 1 };
+		VkExtent3D extent3d = { 
+			context->state.extent.width, context->state.extent.height, 1 
+		};
 
 		VkImageCopy image_copy{
 			subresource_layers,             // srcSubresource
@@ -2290,7 +2332,8 @@ public:
 			extent3d                        // extent
 		};
 
-		vkCmdCopyImage(this->get_image_command->buffer(),
+		vkCmdCopyImage(
+			this->get_image_command->buffer(),
 			this->color_attachment->image->image,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			this->image->image,
@@ -2324,7 +2367,8 @@ public:
 			}
 		};
 
-		vkCmdPipelineBarrier(this->get_image_command->buffer(),
+		vkCmdPipelineBarrier(
+			this->get_image_command->buffer(),
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 			VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 			0, 0, nullptr, 0, nullptr,
@@ -2334,56 +2378,40 @@ public:
 	}
 
 private:
-	void doPresent(Context* context) override
+	void doRender(class Context* context) override
 	{
 		this->offscreen_fence->reset();
-		this->get_image_command->submit(context->queue,
+
+		this->get_image_command->submit(
+			context->queue,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			this->offscreen_fence->fence);
+		
 		this->offscreen_fence->wait();
 
 		VkImageSubresource image_subresource{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
 		VkSubresourceLayout subresource_layout;
 		vkGetImageSubresourceLayout(context->device->device, this->image->image, &image_subresource, &subresource_layout);
+		
+		std::map<uint32_t, uint32_t> tiles;
 
 		// Map image memory so we can start copying from it
-		const char* data;
-		vkMapMemory(context->device->device, this->image_object->memory->memory, 0, VK_WHOLE_SIZE, 0, (void**)&data);
+		const uint32_t* data = reinterpret_cast<uint32_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
 		data += subresource_layout.offset;
 
-		std::ofstream file("test.ppm", std::ios::out | std::ios::binary);
-
-		// ppm header
-		file << "P6\n" << context->extent.width << "\n" << context->extent.height << "\n" << 255 << "\n";
-
-		// If source is BGR (destination is always RGB) and we can't use blit (which does automatic conversion), we'll have to manually swizzle color components
-		bool colorSwizzle = false;
-		// Check if source is BGR 
-		// Note: Not complete, only contains most common and basic BGR surface formats for demonstation purposes
-		std::vector<VkFormat> formatsBGR = { VK_FORMAT_B8G8R8A8_SRGB, VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_B8G8R8A8_SNORM };
-		colorSwizzle = (std::find(formatsBGR.begin(), formatsBGR.end(), this->color_attachment->format) != formatsBGR.end());
-
-		// ppm binary pixel data
-		for (uint32_t y = 0; y < context->extent.height; y++) {
-			unsigned int* row = (unsigned int*)data;
-			for (uint32_t x = 0; x < context->extent.width; x++) {
-				if (colorSwizzle) {
-					file.write((char*)row + 2, 1);
-					file.write((char*)row + 1, 1);
-					file.write((char*)row + 0, 1);
+		for (VkDeviceSize i = 0; i < this->image_object->memory_requirements.size / 4; i++) {
+			uint32_t test = data[i];
+			if (test > 0) {
+				uint32_t key = data[i];
+				if (tiles.find(key) == tiles.end()) {
+						tiles[key] = key;
 				}
-				else {
-					file.write((char*)row, 3);
-				}
-				row++;
 			}
-			data += subresource_layout.rowPitch;
 		}
-		file.close();
-		vkUnmapMemory(context->device->device, this->image_object->memory->memory);
 
-		std::cout << "Screenshot saved to disk" << std::endl;
+		this->image_object->memory->unmap();
 	}
+
 
 	std::shared_ptr<FramebufferAttachment> color_attachment;
 	std::unique_ptr<VulkanCommandBuffers> get_image_command;

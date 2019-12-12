@@ -4,7 +4,7 @@
          (sampler 
             VK_FILTER_LINEAR
             VK_FILTER_LINEAR
-            VK_SAMPLER_MIPMAP_MODE_NEAREST
+            VK_SAMPLER_MIPMAP_MODE_LINEAR
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
@@ -155,12 +155,32 @@
          layout(location = 0) out vec4 FragColor;
 
          void main() {
-            FragColor = texture(Texture, texCoord);
+            float lod = textureQueryLod(Texture, texCoord).x;
+            int mip = int(lod);
+            if (mip == 0) {
+               FragColor = vec4(0.0, 0.0, 1.0, 1.0);
+            } 
+            else if (mip == 1) {
+               FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+            }
+            else if (mip == 2) {
+               FragColor = vec4(0.0, 1.0, 1.0, 1.0);
+            }
+            else if (mip == 3) {
+               FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            }
+            else if (mip == 4) {
+               FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+            }
          }
       ]])
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))))
 
-   (define vulkan-window (window main-renderpass main-color-attachment))
+   (define scene 
+      (group
+         main-renderpass))
+
+   (define vulkan-window (window scene main-color-attachment))
       vulkan-window)

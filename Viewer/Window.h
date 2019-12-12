@@ -42,7 +42,7 @@ public:
       _T("Windows Desktop Guided Tour Application"),
       WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT,
-      640, 480,
+      1920, 1080,
       NULL,
       NULL,
       hInstance,
@@ -135,28 +135,6 @@ protected:
   HWND hWnd;
   HMODULE hInstance;
 };
-
-
-template <typename T>
-std::shared_ptr<T> find_first(std::shared_ptr<Node> root)
-{
-	auto node = std::dynamic_pointer_cast<T>(root);
-	if (node) {
-		return node;
-	}
-
-	auto group = std::dynamic_pointer_cast<Group>(root);
-	if (group) {
-		for (auto node : group->children) {
-			auto first = find_first<T>(node);
-			if (first) {
-				return first;
-			}
-		}
-	}
-	return node;
-}
-
 
 class VulkanWindow : public Window {
 public:

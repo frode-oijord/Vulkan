@@ -12,7 +12,8 @@ int main(int argc, char *argv[])
   try {
     VulkanImageFactory::Register<DebugTextureImage>();
 
-		auto window = std::any_cast<std::shared_ptr<VulkanWindow>>(eval_file("crate/crate.scm"));
+		auto test = eval_file("crate/crate3.scm");
+		auto window = std::any_cast<std::shared_ptr<VulkanWindow>>(test);
     return window->show();
   }
   catch (std::exception & e) {

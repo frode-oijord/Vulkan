@@ -46,6 +46,7 @@ public:
   {
     this->redraw = false;
     this->state = State();
+		this->state.extent = this->extent;
   }
 
   void end()
@@ -54,7 +55,6 @@ public:
 
   std::shared_ptr<VulkanInstance> vulkan;
   std::shared_ptr<VulkanDevice> device;
-  VkExtent2D extent;
   VkQueue queue{ nullptr };
 
   State state;
@@ -67,4 +67,7 @@ public:
 
 	std::vector<class ImageObject*> imageobjects;
 	std::vector<class BufferObject*> bufferobjects;
+
+private:
+  VkExtent2D extent;
 };

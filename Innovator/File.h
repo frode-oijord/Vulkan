@@ -85,11 +85,17 @@ std::shared_ptr<VulkanWindow> window(const List& lst)
 	return std::make_shared<VulkanWindow>(scene, color_attachment);
 }
 
+std::shared_ptr<Node> offscreen(const List& lst)
+{
+	auto node = std::any_cast<std::shared_ptr<Node>>(lst[0]);
+	auto color_attachment = std::dynamic_pointer_cast<FramebufferAttachment>(node);
+	return std::make_shared<OffscreenImage>(color_attachment);
+}
+
 
 std::any eval_file(const std::string & filename)
 {
   env_ptr env = scm::global_env();
-
 	env->outer = std::make_shared<Env>();
   
   env->outer->inner.insert({ "int32", fun_ptr(make_object<int32_t, Number>) });
@@ -97,7 +103,8 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "float", fun_ptr(make_object<float, Number>) });
   env->outer->inner.insert({ "count", fun_ptr(count) });
 	env->outer->inner.insert({ "window", fun_ptr(window) });
-	env->outer->inner.insert({ "offscreen-image", fun_ptr(node<OffscreenImage, std::shared_ptr<FramebufferAttachment>>) });
+	env->outer->inner.insert({ "extent", fun_ptr(node<Extent, uint32_t, uint32_t>) });
+	env->outer->inner.insert({ "offscreen-image", fun_ptr(offscreen) });
   env->outer->inner.insert({ "pipeline-bindpoint", fun_ptr(node<PipelineBindpoint, VkPipelineBindPoint> ) });
   env->outer->inner.insert({ "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) });
   env->outer->inner.insert({ "depth-attachment", fun_ptr(node<DepthStencilAttachment, uint32_t, VkImageLayout>) });
@@ -284,6 +291,8 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "VK_FORMAT_R32G32_SINT", VK_FORMAT_R32G32_SINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT });
   env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM });
+	env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UINT", VK_FORMAT_B8G8R8A8_UINT});
+	env->outer->inner.insert({ "VK_FORMAT_A8B8G8R8_UINT_PACK32", VK_FORMAT_A8B8G8R8_UINT_PACK32 });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_UINT", VK_FORMAT_R32G32B32_UINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SINT", VK_FORMAT_R32G32B32_SINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT });
