@@ -161,4 +161,5 @@
          (bufferdata-uint32 0 1 3 3 2 0 4 6 7 7 5 4 0 4 5 5 1 0 6 2 3 3 7 6 0 2 6 6 4 0 1 5 7 7 3 1)
          (bufferdata-float 0 0 0 0 0 1 0 1 0 0 1 1 1 0 0 1 0 1 1 1 0 1 1 1))))
 
-(window main-renderpass main-color-attachment))
+   (define vulkan-window (window main-renderpass main-color-attachment))
+      vulkan-window)

@@ -137,12 +137,14 @@ namespace scm {
 
   class Env {
   public:
-    Env(std::unordered_map<std::string, std::any> inner)
-      : inner(inner)
-    {}
+		Env() = default;
     ~Env() = default;
 
-    explicit Env(const std::any& parm, const List& args, env_ptr outer)
+		explicit Env(std::unordered_map<std::string, std::any> inner)
+      : inner(inner)
+    {}
+
+    Env(const std::any& parm, const List& args, env_ptr outer)
       : outer(std::move(outer))
     {
       if (parm.type() == typeid(lst_ptr)) {
