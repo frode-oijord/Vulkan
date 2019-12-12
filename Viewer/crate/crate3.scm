@@ -4,7 +4,7 @@
          (sampler 
             VK_FILTER_LINEAR
             VK_FILTER_LINEAR
-            VK_SAMPLER_MIPMAP_MODE_NEAREST
+            VK_SAMPLER_MIPMAP_MODE_LINEAR
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
@@ -146,6 +146,9 @@
             FragColor = uvec4(i, j, 0, mip);
          }
       ]])
+
+      (texture2d "crate/texture.ktx")
+
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))
@@ -198,6 +201,9 @@
             FragColor = texture(Texture, texCoord);
          }
       ]])
+
+      (texture2d "crate/texture.ktx")
+
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))))
@@ -233,10 +239,8 @@
             }
          ]])
 
-         (texture2d "crate/texture.ktx")
-
          (separator 
-            (extent (uint32 480) (uint32 270))
+            (extent (uint32 1000) (uint32 600))
             (projmatrix 1000 0.1 1.0 0.7)
             lod-renderpass)
          (separator 

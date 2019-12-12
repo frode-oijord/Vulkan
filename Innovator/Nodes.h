@@ -1940,6 +1940,7 @@ private:
                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                                  this->render_fence->fence);
     this->render_fence->wait();
+    vkDeviceWaitIdle(context->device->device);
   }
 
 public:
