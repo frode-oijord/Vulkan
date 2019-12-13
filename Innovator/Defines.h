@@ -33,28 +33,6 @@
 	}();																																											\
 }																																														\
 
-#define REGISTER_VISITOR_CHILDREN_FIRST_CALLBACK(__visitor__, __nodetype__, __method__)			\
-{																																														\
-	static bool dummy	= []() {																																\
-		__visitor__.register_callback<__nodetype__>([](__nodetype__* self, Context* context) {	\
-			__visitor__.visit_group(self, context);																								\
-			self->__method__(context);																														\
-			});																																										\
-		return true;																																						\
-	}();																																											\
-}																																														\
-
-#define REGISTER_VISITOR_CHILDREN_LAST_CALLBACK(__visitor__, __nodetype__, __method__)			\
-{																																														\
-	static bool dummy	= []() {																																\
-		__visitor__.register_callback<__nodetype__>([](__nodetype__* self, Context* context) {	\
-			self->__method__(context);																														\
-			__visitor__.visit_group(self, context);																								\
-			});																																										\
-		return true;																																						\
-	}();																																											\
-}																																														\
-
 
 class VkException : public std::exception {};
 class VkTimeoutException : public VkException {};

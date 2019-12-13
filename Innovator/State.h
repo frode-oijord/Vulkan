@@ -38,6 +38,7 @@ struct State {
     1.0f,                                                       // lineWidth
   };
 
+	class Image* imagenode{ nullptr };
   VkImage image{ nullptr };
   VkImageView imageView { nullptr };
   VkImageLayout imageLayout { VK_IMAGE_LAYOUT_UNDEFINED };

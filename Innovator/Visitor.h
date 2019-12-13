@@ -32,7 +32,8 @@ public:
 		state(state),
 		ModelMatrix(state->ModelMatrix),
 		ViewMatrix(state->ViewMatrix),
-		ProjMatrix(state->ProjMatrix)
+		ProjMatrix(state->ProjMatrix),
+		extent(state->extent)
 	{}
 
 	~RenderStateScope()
@@ -40,6 +41,7 @@ public:
 		state->ModelMatrix = this->ModelMatrix;
 		state->ViewMatrix = this->ViewMatrix;
 		state->ProjMatrix = this->ProjMatrix;
+		state->extent = this->extent;
 	}
 
 	State* state;
@@ -47,6 +49,7 @@ public:
 	glm::dmat4 ModelMatrix{ 1.0 };
 	glm::dmat4 ViewMatrix{ 1.0 };
 	glm::dmat4 ProjMatrix{ 1.0 };
+	VkExtent2D extent;
 };
 
 
@@ -118,6 +121,18 @@ public:
 	void visit(class Node* node, class Context* context);
 };
 
+class RenderVisitor : public Visitor {
+public:
+	void visit(class Node* node, class Context* context);
+};
+
+
+class PresentVisitor : public Visitor {
+public:
+	void visit(class Node* node, class Context* context);
+};
+
+
 
 inline static EventVisitor eventvisitor;
 inline static AllocVisitor allocvisitor;
@@ -125,3 +140,5 @@ inline static StageVisitor stagevisitor;
 inline static ResizeVisitor resizevisitor;
 inline static PipelineVisitor pipelinevisitor;
 inline static RecordVisitor recordvisitor;
+inline static RenderVisitor rendervisitor;
+inline static PresentVisitor presentvisitor;

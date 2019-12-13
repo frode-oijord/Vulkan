@@ -157,3 +157,32 @@ RecordVisitor::visit(Node* node, Context* context)
 	node->visit(this, context);
 	context->end();
 }
+
+
+void
+RenderVisitor::visit(Node* node, Context* context)
+{
+	context->command->begin();
+
+	context->begin();
+	node->visit(this, context);
+	context->end();
+
+	context->fence->reset();
+	context->command->end();
+	context->command->submit(
+		context->queue,
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		context->fence->fence);
+
+	context->fence->wait();
+}
+
+
+void
+PresentVisitor::visit(Node* node, Context* context)
+{
+	context->begin();
+	node->visit(this, context);
+	context->end();
+}

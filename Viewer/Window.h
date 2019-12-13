@@ -225,8 +225,8 @@ public:
   void redraw() override
   {
 		try {
-			this->root->render(this->context.get());
-			this->root->present(this->context.get());
+			rendervisitor.visit(this->root.get(), this->context.get());
+			presentvisitor.visit(this->root.get(), this->context.get());
 		}
 		catch (VkException&) {
 			// recreate swapchain, try again next frame

@@ -147,8 +147,6 @@
          }
       ]])
 
-      (texture2d "crate/texture.ktx")
-
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))
@@ -202,8 +200,6 @@
          }
       ]])
 
-      (texture2d "crate/texture.ktx")
-
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))))
@@ -239,8 +235,10 @@
             }
          ]])
 
+         (texture2d "crate/texture.ktx")
+
          (separator 
-            (extent (uint32 1000) (uint32 600))
+            (extent (uint32 240) (uint32 135))
             (projmatrix 1000 0.1 1.0 0.7)
             lod-renderpass)
          (separator 
