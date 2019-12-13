@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
   }
   catch (std::exception & e) {
     std::cerr << std::string("caught exception in main(): ") + typeid(e).name() << std::endl;
+    std::cerr << std::string("message: ") + e.what() << std::endl;
   }
   return 1;
 }

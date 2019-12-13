@@ -68,6 +68,8 @@ public:
 	std::vector<class ImageObject*> imageobjects;
 	std::vector<class BufferObject*> bufferobjects;
 
+	class Image* imagenode{ nullptr };
+
 private:
   VkExtent2D extent;
 };

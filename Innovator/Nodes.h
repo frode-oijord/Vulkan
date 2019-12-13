@@ -14,7 +14,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <map>
+#include <set>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -310,8 +310,9 @@ public:
 	{
 		REGISTER_VISITOR_CALLBACK(allocvisitor, CpuMemoryBuffer, alloc);
 		REGISTER_VISITOR_CALLBACK(stagevisitor, CpuMemoryBuffer, stage);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CpuMemoryBuffer, updateState);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, CpuMemoryBuffer, updateState);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR_CALLBACK(rendervisitor, CpuMemoryBuffer, update);
 	}
 
 	void alloc(Context* context)
@@ -334,7 +335,7 @@ public:
     context->state.bufferdata->copy(memmap.mem);
   }
 
-  void updateState(Context* context) 
+  void update(Context* context) 
   {
     context->state.buffer = this->buffer->buffer->buffer;
   }
@@ -358,8 +359,9 @@ public:
   {
 		REGISTER_VISITOR_CALLBACK(allocvisitor, GpuMemoryBuffer, alloc);
 		REGISTER_VISITOR_CALLBACK(stagevisitor, GpuMemoryBuffer, stage);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, GpuMemoryBuffer, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, GpuMemoryBuffer, record);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR_CALLBACK(rendervisitor, GpuMemoryBuffer, update);
   }
 
 	void alloc(Context* context)
@@ -390,12 +392,7 @@ public:
                     regions.data());
   }
 
-  void pipeline(Context* context) 
-  {
-    context->state.buffer = this->buffer->buffer->buffer;
-  }
-
-  void record(Context* context) 
+  void update(Context* context) 
   {
     context->state.buffer = this->buffer->buffer->buffer;
   }
@@ -777,10 +774,11 @@ public:
   explicit TextureImage(const std::string& filename) :
     texture(VulkanImageFactory::Create(filename))
   {
-		REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, alloc);
-		REGISTER_VISITOR_CALLBACK(stagevisitor, TextureImage, stage);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, record);
+		REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, update);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, TextureImage, update);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, update);
+		REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, update);
+		REGISTER_VISITOR_CALLBACK(rendervisitor, TextureImage, update);
 	}
 
   void copy(char* dst) const override
@@ -798,25 +796,7 @@ public:
     return 0;
   }
 
-	void alloc(Context* context) 
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-  void stage(Context* context) 
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-  void pipeline(Context* context) 
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-  void record(Context* context) 
+	void update(Context* context) 
   {
     context->state.bufferdata = this;
     context->state.texture = this->texture.get();
@@ -853,8 +833,8 @@ public:
 	void alloc(Context* context)
 	{
 		VulkanTextureImage* texture = context->state.texture;
-		image_memory_binds.clear();
-		image_opaque_memory_binds.clear();
+
+		this->bind_fence = std::make_unique<VulkanFence>(context->device);
 
 		this->image = std::make_shared<VulkanImage>(
 			context->device,
@@ -869,11 +849,10 @@ public:
 			this->sharing_mode,
 			this->create_flags);
 
-    VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(
       context->device->device,
       this->image->image,
-      &memory_requirements);
+      &this->memory_requirements);
 
     uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
       memory_requirements.memoryTypeBits,
@@ -894,201 +873,15 @@ public:
       throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
     }();
 
-
     this->image_memory = std::make_shared<VulkanMemory>(
       context->device,
-      memory_requirements.size,
+      this->memory_requirements.size,
       memory_type_index);
-
-    VkDeviceSize memoryOffset = 0;
-    VkExtent3D imageGranularity = this->sparse_memory_requirement.formatProperties.imageGranularity;
-
-    for (uint32_t layer = 0; layer < texture->layers(); layer++) {
-      //for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
-			for (uint32_t mip_level = 1; mip_level < 2; mip_level++) {
-
-        VkExtent3D extent = texture->extent(mip_level);
-
-        assert(extent.width % imageGranularity.width == 0);
-        assert(extent.height % imageGranularity.height == 0);
-        assert(extent.depth % imageGranularity.depth == 0);
-
-        for (int32_t i = 0; i < extent.width; i += imageGranularity.width) {
-          for (int32_t j = 0; j < extent.height; j += imageGranularity.height) {
-            for (int32_t k = 0; k < extent.depth; k += imageGranularity.depth) {
-
-              VkOffset3D offset{ i, j, k };
-
-              VkExtent3D extent {
-                imageGranularity.width,
-                imageGranularity.height,
-                imageGranularity.depth,
-              };
-
-              VkImageSubresource subresource = {
-                texture->subresource_range().aspectMask,
-                mip_level,
-                layer
-              };
-
-              this->image_memory_binds.push_back({
-                subresource,
-                offset,
-                extent,
-                this->image_memory->memory,
-                memoryOffset,
-                0,  // flags
-              });
-              memoryOffset += memory_requirements.alignment;
-            }
-          }
-        }
-      } // end mips
-
-			bool single_miptail = this->sparse_memory_requirement.formatProperties.flags & VK_SPARSE_IMAGE_FORMAT_SINGLE_MIPTAIL_BIT;
-      if (!single_miptail && this->sparse_memory_requirement.imageMipTailFirstLod < texture->levels()) {
-
-        VkDeviceSize resourceOffset = 
-          this->sparse_memory_requirement.imageMipTailOffset +
-          layer * this->sparse_memory_requirement.imageMipTailStride;
-
-        this->mip_tail_offset = memoryOffset;
-				this->image_opaque_memory_binds.push_back({
-          resourceOffset,                                   // resourceOffset
-          this->sparse_memory_requirement.imageMipTailSize, // size
-          this->image_memory->memory,                       // memory
-          this->mip_tail_offset,                            // memoryOffset
-          0                                                 // flags
-        });
-      } 
-    } // end layers
-
-    std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info{ {
-      this->image->image,
-      static_cast<uint32_t>(this->image_memory_binds.size()),
-			this->image_memory_binds.data(),
-    } };
-
-    std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos{ {
-      this->image->image,
-      static_cast<uint32_t>(this->image_opaque_memory_binds.size()),
-			this->image_opaque_memory_binds.data(),
-    } };
-
-    std::vector<VkSemaphore> wait_semaphores;
-    std::vector<VkSemaphore> signal_semaphores;
-    std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
-
-    VkBindSparseInfo bind_sparse_info = {
-      VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                           // sType
-      nullptr,                                                      // pNext
-      static_cast<uint32_t>(wait_semaphores.size()),                // waitSemaphoreCount
-      wait_semaphores.data(),                                       // pWaitSemaphores
-      static_cast<uint32_t>(buffer_memory_bind_infos.size()),       // bufferBindCount
-      buffer_memory_bind_infos.data(),                              // pBufferBinds;
-      static_cast<uint32_t>(image_opaque_memory_bind_infos.size()), // imageOpaqueBindCount
-      image_opaque_memory_bind_infos.data(),                        // pImageOpaqueBinds
-      static_cast<uint32_t>(image_memory_bind_info.size()),         // imageBindCount
-      image_memory_bind_info.data(),                                // pImageBinds
-      static_cast<uint32_t>(signal_semaphores.size()),              // signalSemaphoreCount
-      signal_semaphores.data(),                                     // pSignalSemaphores
-    };
-
-    vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 	}
 
   void stage(Context* context) 
   {
-    context->state.image = this->image->image;
-    VulkanTextureImage* texture = context->state.texture;
-    {
-      VkImageMemoryBarrier memory_barrier{
-        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                // sType
-        nullptr,                                               // pNext
-        0,                                                     // srcAccessMask
-        VK_ACCESS_TRANSFER_WRITE_BIT,                          // dstAccessMask
-        VK_IMAGE_LAYOUT_UNDEFINED,                             // oldLayout
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                  // newLayout
-        0,                                                     // srcQueueFamilyIndex
-        0,                                                     // dstQueueFamilyIndex
-        this->image->image,                                    // image
-        texture->subresource_range(),                          // subresourceRange
-      };
-
-      vkCmdPipelineBarrier(context->command->buffer(),
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           0, 0, nullptr, 0, nullptr, 1,
-                           &memory_barrier);
-    }
-
-    std::vector<VkBufferImageCopy> regions;
-
-    for (VkSparseImageMemoryBind memory_bind : this->image_memory_binds) {
-      const VkImageSubresourceLayers subresource_layers{
-        texture->subresource_range().aspectMask,               // aspectMask
-        memory_bind.subresource.mipLevel,                      // mipLevel
-        texture->subresource_range().baseArrayLayer,           // baseArrayLayer
-        texture->subresource_range().layerCount,               // layerCount
-      };
-
-      regions.push_back({
-        memory_bind.memoryOffset,                  // bufferOffset 
-        0,                                         // bufferRowLength
-        0,                                         // bufferImageHeight
-        subresource_layers,                        // imageSubresource
-        memory_bind.offset,                        // imageOffset
-        memory_bind.extent,                        // imageExtent
-      });
-    }
-
-    for (uint32_t mip_level = this->sparse_memory_requirement.imageMipTailFirstLod; mip_level < texture->levels(); mip_level++) {
-
-      const VkImageSubresourceLayers subresource_layers{
-        texture->subresource_range().aspectMask,               // aspectMask
-        mip_level,                                             // mipLevel
-        texture->subresource_range().baseArrayLayer,           // baseArrayLayer
-        texture->subresource_range().layerCount,               // layerCount
-      };
-
-      regions.push_back({
-        this->mip_tail_offset,                     // bufferOffset 
-        0,                                         // bufferRowLength
-        0,                                         // bufferImageHeight
-        subresource_layers,                        // imageSubresource
-        { 0, 0, 0 },                               // imageOffset
-        texture->extent(mip_level),                // imageExtent
-        });
-
-      this->mip_tail_offset += texture->size(mip_level);
-    }
-
-    vkCmdCopyBufferToImage(context->command->buffer(),
-                           context->state.buffer,
-                           this->image->image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           static_cast<uint32_t>(regions.size()),
-                           regions.data());
-    {
-      VkImageMemoryBarrier memory_barrier{
-        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                // sType
-        nullptr,                                               // pNext
-        0,                                                     // srcAccessMask
-        VK_ACCESS_TRANSFER_WRITE_BIT,                          // dstAccessMask
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                  // oldLayout
-        this->layout,                                          // newLayout
-        0,                                                     // srcQueueFamilyIndex
-        0,                                                     // dstQueueFamilyIndex
-        this->image->image,                                    // image
-        texture->subresource_range(),                          // subresourceRange
-      };
-
-      vkCmdPipelineBarrier(context->command->buffer(),
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           0, 0, nullptr, 0, nullptr, 1,
-                           &memory_barrier);
-    }
+		context->state.image = this->image->image;
   }
 
   void pipeline(Context* context) 
@@ -1096,9 +889,225 @@ public:
     context->state.imageLayout = this->layout;
   }
 
+  void map_memory(std::set<uint64_t>& tiles, Context* context)
+  {
+    VulkanTextureImage* texture = context->state.texture;
+    VkDeviceSize memoryOffset = 0;
+
+    VkExtent3D imageGranularity = this->sparse_memory_requirement.formatProperties.imageGranularity;
+
+    this->image_memory_binds.clear();
+
+    std::set<uint64_t> compressed_tiles;
+
+    for (uint64_t tile : tiles) {
+      uint64_t i = (tile >> 00) & 0xFFFF;
+      uint64_t j = (tile >> 16) & 0xFFFF;
+      uint64_t m = (tile >> 48) & 0xFFFF;
+
+      if (m >= this->sparse_memory_requirement.imageMipTailFirstLod)
+        continue;
+
+      uint64_t x = i / imageGranularity.width;
+      uint64_t y = j / imageGranularity.height;
+
+      uint64_t compressed_tile = x << 00 | y << 16 | m << 48;
+      compressed_tiles.insert(compressed_tile);
+    }
+
+    int count = 0;
+    for (uint64_t tile : compressed_tiles) {
+
+      int32_t i = (tile >> 00) & 0xFFFF;
+      int32_t j = (tile >> 16) & 0xFFFF;
+      uint32_t mip_level = (tile >> 48) & 0xFFFF;
+
+      mip_level = 0;
+
+      if (count++ > 5)
+        break;
+
+      i *= imageGranularity.width;
+      j *= imageGranularity.height;
+
+      VkOffset3D offset{ i, j, 0 };
+
+      VkExtent3D extent{
+        imageGranularity.width,
+        imageGranularity.height,
+        imageGranularity.depth,
+      };
+
+      VkImageSubresource subresource = {
+        texture->subresource_range().aspectMask,
+        mip_level,
+        0
+      };
+
+      this->image_memory_binds.push_back({
+        subresource,
+        offset,
+        extent,
+        this->image_memory->memory,
+        memoryOffset,
+        0,  // flags
+        });
+      memoryOffset += this->memory_requirements.alignment;
+    }
+
+    //for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+    //  VkExtent3D extent = texture->extent(mip_level);
+
+    //  assert(extent.width % imageGranularity.width == 0);
+    //  assert(extent.height % imageGranularity.height == 0);
+    //  assert(extent.depth % imageGranularity.depth == 0);
+
+    //  for (int32_t i = 0; i < extent.width; i += imageGranularity.width) {
+    //    for (int32_t j = 0; j < extent.height; j += imageGranularity.height) {
+    //      for (int32_t k = 0; k < extent.depth; k += imageGranularity.depth) {
+
+    //        VkOffset3D offset{ i, j, k };
+
+    //        VkExtent3D extent{
+    //          imageGranularity.width,
+    //          imageGranularity.height,
+    //          imageGranularity.depth,
+    //        };
+
+    //        VkImageSubresource subresource = {
+    //          texture->subresource_range().aspectMask,
+    //          mip_level,
+    //          0
+    //        };
+
+    //        this->image_memory_binds.push_back({
+    //          subresource,
+    //          offset,
+    //          extent,
+    //          this->image_memory->memory,
+    //          memoryOffset,
+    //          0,  // flags
+    //          });
+    //        memoryOffset += this->memory_requirements.alignment;
+    //      }
+    //    }
+    //  }
+    //}
+  }
+
 	void render(Context* context)
 	{
-		context->state.imagenode = this;
+		context->imagenode = this;
+
+		if (this->image_memory_binds.empty()) {
+			return;
+		}
+
+		VulkanTextureImage* texture = context->state.texture;
+
+		std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info
+		{ {
+			this->image->image,
+			static_cast<uint32_t>(this->image_memory_binds.size()),
+			this->image_memory_binds.data(),
+		} };
+
+		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
+
+		std::vector<VkSemaphore> wait_semaphores;
+		std::vector<VkSemaphore> signal_semaphores;
+		std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
+
+		VkBindSparseInfo bind_sparse_info = {
+			VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                           // sType
+			nullptr,                                                      // pNext
+			static_cast<uint32_t>(wait_semaphores.size()),                // waitSemaphoreCount
+			wait_semaphores.data(),                                       // pWaitSemaphores
+			static_cast<uint32_t>(buffer_memory_bind_infos.size()),       // bufferBindCount
+			buffer_memory_bind_infos.data(),                              // pBufferBinds;
+			static_cast<uint32_t>(image_opaque_memory_bind_infos.size()), // imageOpaqueBindCount
+			image_opaque_memory_bind_infos.data(),                        // pImageOpaqueBinds
+			static_cast<uint32_t>(image_memory_bind_info.size()),         // imageBindCount
+			image_memory_bind_info.data(),                                // pImageBinds
+			static_cast<uint32_t>(signal_semaphores.size()),              // signalSemaphoreCount
+			signal_semaphores.data(),                                     // pSignalSemaphores
+		};
+
+		this->bind_fence->reset();
+		vkQueueBindSparse(context->queue, 1, &bind_sparse_info, this->bind_fence->fence);
+		this->bind_fence->wait();
+
+		{
+			VkImageMemoryBarrier memory_barrier{
+				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                // sType
+				nullptr,                                               // pNext
+				0,                                                     // srcAccessMask
+				VK_ACCESS_TRANSFER_WRITE_BIT,                          // dstAccessMask
+				VK_IMAGE_LAYOUT_UNDEFINED,                             // oldLayout
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,                  // newLayout
+				0,                                                     // srcQueueFamilyIndex
+				0,                                                     // dstQueueFamilyIndex
+				this->image->image,                                    // image
+				texture->subresource_range(),                          // subresourceRange
+			};
+
+			vkCmdPipelineBarrier(
+				context->command->buffer(),
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				0, 0, nullptr, 0, nullptr, 1,
+				&memory_barrier);
+		}
+
+		std::vector<VkBufferImageCopy> regions;
+
+		for (VkSparseImageMemoryBind memory_bind : this->image_memory_binds) {
+			const VkImageSubresourceLayers subresource_layers{
+				texture->subresource_range().aspectMask,               // aspectMask
+				memory_bind.subresource.mipLevel,                      // mipLevel
+				texture->subresource_range().baseArrayLayer,           // baseArrayLayer
+				texture->subresource_range().layerCount,               // layerCount
+			};
+
+			regions.push_back({
+				memory_bind.memoryOffset,																// bufferOffset 
+				0,																											// bufferRowLength
+				0,																											// bufferImageHeight
+				subresource_layers,																			// imageSubresource
+				memory_bind.offset,																			// imageOffset
+				memory_bind.extent,																			// imageExtent
+				});
+		}
+
+		vkCmdCopyBufferToImage(
+			context->command->buffer(),
+			context->state.buffer,
+			this->image->image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			static_cast<uint32_t>(regions.size()),
+			regions.data());
+
+		{
+			VkImageMemoryBarrier memory_barrier{
+				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,										// sType
+				nullptr,																									// pNext
+				0,																												// srcAccessMask
+				VK_ACCESS_TRANSFER_WRITE_BIT,															// dstAccessMask
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,											// oldLayout
+				this->layout,																							// newLayout
+				0,																												// srcQueueFamilyIndex
+				0,																												// dstQueueFamilyIndex
+				this->image->image,																				// image
+				texture->subresource_range(),															// subresourceRange
+			};
+
+			vkCmdPipelineBarrier(
+				context->command->buffer(),
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+				0, 0, nullptr, 0, nullptr, 1,
+				&memory_barrier);
+		}
 	}
 
 private:
@@ -1111,12 +1120,11 @@ private:
   VkImageCreateFlags create_flags;
   VkImageLayout layout;
 
-  VkDeviceSize mip_tail_offset;
+	std::unique_ptr<VulkanFence> bind_fence;
+	VkMemoryRequirements memory_requirements;
   VkSparseImageMemoryRequirements sparse_memory_requirement;
   std::shared_ptr<VulkanMemory> image_memory;
-  std::shared_ptr<VulkanMemory> opaque_image_memory;
-  std::vector<VkSparseImageMemoryBind> image_memory_binds;
-  std::vector<VkSparseMemoryBind> image_opaque_memory_binds;
+	std::vector<VkSparseImageMemoryBind> image_memory_binds;
 };
 
 
@@ -2360,23 +2368,26 @@ public:
 		VkSubresourceLayout subresource_layout;
 		vkGetImageSubresourceLayout(context->device->device, this->image->image, &image_subresource, &subresource_layout);
 		
-		std::map<uint32_t, uint32_t> tiles;
+		std::set<uint64_t> tiles;
 
-		// Map image memory so we can start copying from it
-		const uint32_t* data = reinterpret_cast<uint32_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
+		const uint64_t* data = reinterpret_cast<uint64_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
 		data += subresource_layout.offset;
 
-		for (VkDeviceSize i = 0; i < this->image_object->memory_requirements.size / 4; i++) {
-			uint32_t test = data[i];
-			if (test > 0) {
-				uint32_t key = data[i];
-				if (tiles.find(key) == tiles.end()) {
-						tiles[key] = key;
-				}
+		for (VkDeviceSize i = 0; i < this->image_object->memory_requirements.size / 8; i++) {
+      
+      uint16_t x = (data[i] >> 00) & 0xFFFF;
+      uint16_t y = (data[i] >> 16) & 0xFFFF;
+      uint16_t z = (data[i] >> 32) & 0xFFFF;
+      uint16_t a = (data[i] >> 48) & 0xFFFF;
+
+			if (z == 1) {
+				tiles.insert(data[i]);
 			}
 		}
 
 		this->image_object->memory->unmap();
+
+		context->imagenode->map_memory(tiles, context);
 	}
 
 private:

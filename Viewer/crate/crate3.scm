@@ -77,7 +77,7 @@
 
    (define lod-color-attachment 
       (framebuffer-attachment 
-         VK_FORMAT_A8B8G8R8_UINT_PACK32
+         VK_FORMAT_R16G16B16A16_UINT
          (imageusageflags 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
@@ -96,7 +96,7 @@
    (define lod-renderpass (renderpass
       (renderpass-description
          (renderpass-attachment
-            VK_FORMAT_A8B8G8R8_UINT_PACK32
+            VK_FORMAT_R16G16B16A16_UINT
             VK_SAMPLE_COUNT_1_BIT
             VK_ATTACHMENT_LOAD_OP_CLEAR
             VK_ATTACHMENT_STORE_OP_STORE
@@ -138,12 +138,13 @@
          {
             uint mip = uint(textureQueryLod(Texture, texCoord).x);
 
-            uint factor = (32 << mip);
+            uint i = uint(texCoord.s * 511.0);
+            uint j = uint(texCoord.t * 511.0);
 
-            uint i = uint(gl_FragCoord.x) / factor;
-            uint j = uint(gl_FragCoord.y) / factor;
+            // uint i = uint(gl_FragCoord.x);
+            // uint j = uint(gl_FragCoord.y);
 
-            FragColor = uvec4(i, j, 0, mip);
+            FragColor = uvec4(i, j, 1, mip);
          }
       ]])
 
@@ -238,7 +239,6 @@
          (texture2d "crate/texture.ktx")
 
          (separator 
-            (extent (uint32 240) (uint32 135))
             (projmatrix 1000 0.1 1.0 0.7)
             lod-renderpass)
          (separator 

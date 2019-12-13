@@ -296,6 +296,7 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_UINT", VK_FORMAT_R32G32B32_UINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SINT", VK_FORMAT_R32G32B32_SINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT });
+  env->outer->inner.insert({ "VK_FORMAT_R16G16B16A16_UINT", VK_FORMAT_R16G16B16A16_UINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_UINT", VK_FORMAT_R32G32B32A32_UINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_SINT", VK_FORMAT_R32G32B32A32_SINT });
 	env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_SFLOAT", VK_FORMAT_R32G32B32A32_SFLOAT });
