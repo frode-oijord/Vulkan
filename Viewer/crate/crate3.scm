@@ -4,7 +4,7 @@
          (sampler 
             VK_FILTER_LINEAR
             VK_FILTER_LINEAR
-            VK_SAMPLER_MIPMAP_MODE_LINEAR
+            VK_SAMPLER_MIPMAP_MODE_NEAREST
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
@@ -77,7 +77,7 @@
 
    (define lod-color-attachment 
       (framebuffer-attachment 
-         VK_FORMAT_R16G16B16A16_UINT
+         VK_FORMAT_A8B8G8R8_UINT_PACK32
          (imageusageflags 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
@@ -96,7 +96,7 @@
    (define lod-renderpass (renderpass
       (renderpass-description
          (renderpass-attachment
-            VK_FORMAT_R16G16B16A16_UINT
+            VK_FORMAT_A8B8G8R8_UINT_PACK32
             VK_SAMPLE_COUNT_1_BIT
             VK_ATTACHMENT_LOAD_OP_CLEAR
             VK_ATTACHMENT_STORE_OP_STORE
@@ -136,15 +136,15 @@
 
          void main() 
          {
-            uint mip = uint(textureQueryLod(Texture, texCoord).x);
+            float lod = textureQueryLod(Texture, texCoord).x;
 
-            uint i = uint(texCoord.s * 511.0);
-            uint j = uint(texCoord.t * 511.0);
+            uint mip = uint(lod);
+            mip = max(0, mip - 4);
 
-            // uint i = uint(gl_FragCoord.x);
-            // uint j = uint(gl_FragCoord.y);
+            uint i = uint(texCoord.s * 3.0);
+            uint j = uint(texCoord.t * 3.0);
 
-            FragColor = uvec4(i, j, 1, mip);
+            FragColor = uvec4(i >> mip, j >> mip, 0, mip);
          }
       ]])
 
@@ -198,6 +198,7 @@
 
          void main() {
             FragColor = texture(Texture, texCoord);
+            // FragColor = textureLod(Texture, texCoord, 1.0);
          }
       ]])
 
@@ -239,6 +240,7 @@
          (texture2d "crate/texture.ktx")
 
          (separator 
+            (extent (uint32 80) (uint32 45))
             (projmatrix 1000 0.1 1.0 0.7)
             lod-renderpass)
          (separator 

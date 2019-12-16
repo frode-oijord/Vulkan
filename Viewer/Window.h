@@ -167,7 +167,8 @@ public:
       vulkan,
       VK_DEBUG_REPORT_WARNING_BIT_EXT |
       VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-      VK_DEBUG_REPORT_ERROR_BIT_EXT);
+      VK_DEBUG_REPORT_ERROR_BIT_EXT | 
+      VK_DEBUG_REPORT_DEBUG_BIT_EXT);
 #endif
 
     std::vector<const char*> device_layers{
