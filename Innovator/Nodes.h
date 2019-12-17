@@ -1020,9 +1020,9 @@ public:
       texture->subresource_range());
 
     std::vector<VkBufferImageCopy> regions;
-
-    VkDeviceSize buffer_offset = 0;
-    VkExtent3D imageGranularity = this->sparse_memory_requirement.formatProperties.imageGranularity;
+    VkDeviceSize mip_offset = 0;
+    VkDeviceSize element_size = 4; // 4 bytes per pixel
+    VkExtent3D imageExtent = this->sparse_memory_requirement.formatProperties.imageGranularity;
 
     for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
 
@@ -1035,26 +1035,42 @@ public:
 
       VkExtent3D extent = texture->extent(mip_level);
 
-      for (int32_t i = 0; i < extent.width; i += imageGranularity.width) {
-        for (int32_t j = 0; j < extent.height; j += imageGranularity.height) {
-          for (int32_t k = 0; k < extent.depth; k += imageGranularity.depth) {
+      VkDeviceSize width = extent.width;
+      VkDeviceSize height = extent.height;
+      VkDeviceSize depth = extent.depth;
+
+      for (uint32_t i = 0; i < extent.width / imageExtent.width; i++) {
+        for (uint32_t j = 0; j < extent.height / imageExtent.height; j++) {
+          for (uint32_t k = 0; k < extent.depth / imageExtent.depth; k++) {
+
+            VkOffset3D imageOffset = {
+              int32_t(i * imageExtent.width),
+              int32_t(j * imageExtent.height),
+              int32_t(k * imageExtent.depth)
+            };
+
+            VkDeviceSize x = imageOffset.x;
+            VkDeviceSize y = imageOffset.y;
+            VkDeviceSize z = imageOffset.z;
+
+            VkDeviceSize buffer_offset = mip_offset + (((z * height) + y) * width + x) * element_size;
 
             regions.push_back({
               buffer_offset,                              // bufferOffset 
-              0,                                          // bufferRowLength
-              0,                                          // bufferImageHeight
+              extent.width,                               // bufferRowLength
+              extent.height,                              // bufferImageHeight
               subresource_layers,                         // imageSubresource
-              { i, j, k },                                // imageOffset
-              imageGranularity,                           // imageExtent
+              imageOffset,                                // imageOffset
+              imageExtent,                                // imageExtent
               });
-            
-            buffer_offset += this->memory_requirements.alignment;
           }
         }
       }
+      mip_offset += texture->size(mip_level);
     }
 
-    vkCmdCopyBufferToImage(context->command->buffer(),
+    vkCmdCopyBufferToImage(
+      context->command->buffer(),
       context->state.buffer,
       this->image->image,
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
