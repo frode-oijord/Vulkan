@@ -75,6 +75,8 @@ AllocVisitor::visit(Node* node, Context* context)
 	context->imageobjects.clear();
 	context->bufferobjects.clear();
 
+	context->command->begin();
+
 	context->begin();
 	node->visit(this, context);
 	context->end();
@@ -98,6 +100,15 @@ AllocVisitor::visit(Node* node, Context* context)
 		const VkDeviceSize offset = 0;
 		buffer_object->bind(memory, offset);
 	}
+
+	context->fence->reset();
+	context->command->end();
+	context->command->submit(
+		context->queue,
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		context->fence->fence);
+
+	context->fence->wait();
 }
 
 

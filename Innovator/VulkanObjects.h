@@ -87,3 +87,38 @@ public:
   uint32_t memory_type_index;
   std::shared_ptr<VulkanMemory> memory;
 };
+
+
+class VulkanImageMemoryBarrier {
+public:
+  VulkanImageMemoryBarrier(
+    Context* context,
+    std::vector<VkImageMemoryBarrier> memorybarriers) :
+    context(context),
+    memorybarriers(memorybarriers)
+  {
+    this->execute();
+  }
+
+  ~VulkanImageMemoryBarrier()
+  {
+    for (auto& barrier : this->memorybarriers) {
+      std::swap(barrier.oldLayout, barrier.newLayout);
+    }
+    this->execute();
+  }
+
+  void execute()
+  {
+    vkCmdPipelineBarrier(
+      this->context->command->buffer(),
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+      0, 0, nullptr, 0, nullptr,
+      this->memorybarriers.size(),
+      this->memorybarriers.data());
+  }
+
+  Context* context;
+  std::vector<VkImageMemoryBarrier> memorybarriers;
+};

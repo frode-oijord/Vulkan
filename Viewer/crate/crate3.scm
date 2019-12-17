@@ -139,10 +139,10 @@
             float lod = textureQueryLod(Texture, texCoord).x;
 
             uint mip = uint(lod);
-            mip = max(0, mip - 4);
+            // mip = max(0, mip - 4);
 
-            uint i = uint(texCoord.s * 3.0);
-            uint j = uint(texCoord.t * 3.0);
+            uint i = uint(texCoord.s * 4.0);
+            uint j = uint(texCoord.t * 4.0);
 
             FragColor = uvec4(i >> mip, j >> mip, 0, mip);
          }
@@ -198,7 +198,7 @@
 
          void main() {
             FragColor = texture(Texture, texCoord);
-            // FragColor = textureLod(Texture, texCoord, 1.0);
+            // FragColor = textureLod(Texture, texCoord, float(mip));
          }
       ]])
 
@@ -237,14 +237,13 @@
             }
          ]])
 
-         (texture2d "crate/texture.ktx")
-
          (separator 
-            (extent (uint32 80) (uint32 45))
             (projmatrix 1000 0.1 1.0 0.7)
+            (texture2d "crate/texture.ktx")
             lod-renderpass)
          (separator 
             (projmatrix 1000 0.1 1.0 0.7)
+            (texture2d "crate/texture.ktx")
             main-renderpass)
          ))
 

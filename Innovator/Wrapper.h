@@ -750,6 +750,24 @@ public:
 class VulkanCommandBuffers {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanCommandBuffers)
+
+  class Scope {
+  public:
+    Scope(VulkanCommandBuffers * buffer, size_t index = 0)
+      : buffer(buffer), index(index)
+    {
+      this->buffer->begin(this->index);
+    }
+
+    ~Scope() 
+    {
+      this->buffer->end(this->index);
+    }
+
+    size_t index;
+    VulkanCommandBuffers * buffer;
+  };
+
   VulkanCommandBuffers() = delete;
 
   VulkanCommandBuffers(std::shared_ptr<VulkanDevice> device, 
@@ -902,8 +920,116 @@ public:
     vkDestroyImage(this->device->device, this->image, nullptr);
   }
 
+  static VkImageMemoryBarrier MemoryBarrier(VkImage image,
+                                            VkAccessFlags srcAccessMask,
+                                            VkAccessFlags dstAccessMask,
+                                            VkImageLayout oldLayout,
+                                            VkImageLayout newLayout,
+                                            VkImageSubresourceRange subresourceRange)
+  {
+    return {
+      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      nullptr,
+      srcAccessMask,
+      dstAccessMask,
+      oldLayout,
+      newLayout,
+      0,
+      0,
+      image,
+      subresourceRange
+    };
+  }
+
+  class LayoutScope {
+  public:
+    LayoutScope(VkCommandBuffer command, std::vector<VkImageMemoryBarrier> barriers) :
+      command(command),
+      barriers(barriers)
+    {
+      VulkanImage::PipelineBarrier(this->command, this->barriers);
+    }
+
+    ~LayoutScope()
+    {
+      for (auto& barrier : this->barriers) {
+        std::swap(barrier.newLayout, barrier.oldLayout);
+      }
+      VulkanImage::PipelineBarrier(this->command, this->barriers);
+    }
+
+    VkCommandBuffer command;
+    std::vector<VkImageMemoryBarrier> barriers;
+  };
+
+  static void PipelineBarrier(VkCommandBuffer command, 
+                              std::vector<VkImageMemoryBarrier> barriers)
+  {
+    vkCmdPipelineBarrier(
+      command,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+      0, 0, nullptr, 0, nullptr,
+      static_cast<uint32_t>(barriers.size()),
+      barriers.data());
+  }
+
+  static void ChangeLayout(VkImage image,
+                           VkCommandBuffer command,
+                           VkAccessFlags srcAccessMask,
+                           VkAccessFlags dstAccessMask,
+                           VkImageLayout oldLayout,
+                           VkImageLayout newLayout,
+                           VkImageSubresourceRange subresourceRange)
+  {
+    VulkanImage::PipelineBarrier(
+      command, { VulkanImage::MemoryBarrier(image, srcAccessMask, dstAccessMask, oldLayout, newLayout, subresourceRange) });
+  }
+
+
+  void changeLayout(VkCommandBuffer command, 
+                    VkImageLayout oldLayout,
+                    VkImageLayout newLayout,
+                    VkImageSubresourceRange subresourceRange)
+  {
+    VulkanImage::ChangeLayout(
+      this->image,
+      command,
+      0,
+      VK_ACCESS_TRANSFER_WRITE_BIT,
+      oldLayout,
+      newLayout,
+      subresourceRange);
+  }
+
+  void copyBuffer(VkCommandBuffer command,
+                  VkBuffer buffer,
+                  std::vector<VkBufferImageCopy>& regions,
+                  VkImageSubresourceRange subresourceRange)
+  {
+    this->changeLayout(
+      command, 
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+      subresourceRange);
+
+    vkCmdCopyBufferToImage(
+      command,
+      buffer,
+      this->image,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      static_cast<uint32_t>(regions.size()),
+      regions.data());
+
+    this->changeLayout(
+      command,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      subresourceRange);
+  }
+
   std::shared_ptr<VulkanDevice> device;
-  VkImage image{ nullptr };;
+  VkImage image{ nullptr };
 };
 
 class VulkanBuffer {

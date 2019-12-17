@@ -4,6 +4,7 @@
 #include <Innovator/State.h>
 #include <Innovator/Events.h>
 
+#include <set>
 #include <memory>
 #include <vector>
 #include <iostream>
@@ -68,7 +69,7 @@ public:
 	std::vector<class ImageObject*> imageobjects;
 	std::vector<class BufferObject*> bufferobjects;
 
-	class Image* imagenode{ nullptr };
+  std::set<uint32_t> tiles;
 
 private:
   VkExtent2D extent;

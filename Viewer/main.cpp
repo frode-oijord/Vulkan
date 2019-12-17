@@ -10,7 +10,7 @@
 int main(int argc, char *argv[])
 {
   try {
-    VulkanImageFactory::Register<DebugTextureImage>();
+    VulkanImageFactory::Register<GliTextureImage>();
 
 		auto test = eval_file("crate/crate3.scm");
 		auto window = std::any_cast<std::shared_ptr<VulkanWindow>>(test);
