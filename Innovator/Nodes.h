@@ -1076,7 +1076,6 @@ public:
 
       std::vector<VkSemaphore> wait_semaphores{ this->bind_sparse_finished->semaphore };
       std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
-      context->bind_sparse_finished = this->copy_sparse_finished->semaphore;
 
       this->copy_sparse_command->submit(
         context->queue,
@@ -1084,6 +1083,8 @@ public:
         VK_NULL_HANDLE,
         wait_semaphores,
         signal_semaphores);
+
+      context->render_wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
     }
   }
 
@@ -2350,14 +2351,13 @@ public:
 
 	void render(class Context* context)
 	{
-		this->offscreen_fence->reset();
+		//this->offscreen_fence->reset();
 
 		this->get_image_command->submit(
 			context->queue,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-			this->offscreen_fence->fence);
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 		
-		this->offscreen_fence->wait();
+		//this->offscreen_fence->wait();
 
 		VkImageSubresource image_subresource{ 
       VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 
