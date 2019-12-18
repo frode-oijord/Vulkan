@@ -21,7 +21,7 @@
          (textureimage filename)
          (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
 
-         (image 
+         (sparse-image 
             VK_SAMPLE_COUNT_1_BIT
             VK_IMAGE_TILING_OPTIMAL
             (imageusageflags VK_IMAGE_USAGE_TRANSFER_DST_BIT VK_IMAGE_USAGE_SAMPLED_BIT)
@@ -144,7 +144,7 @@
             uint i = uint(texCoord.s * 4.0);
             uint j = uint(texCoord.t * 4.0);
 
-            FragColor = uvec4(i >> mip, j >> mip, 0, mip);
+            FragColor = uvec4(i >> mip, j >> mip, 1, mip);
          }
       ]])
 

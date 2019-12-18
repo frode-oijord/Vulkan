@@ -70,6 +70,7 @@ public:
 	std::vector<class BufferObject*> bufferobjects;
 
   std::set<uint32_t> tiles;
+  VkSemaphore bind_sparse_finished{ nullptr };
 
 private:
   VkExtent2D extent;

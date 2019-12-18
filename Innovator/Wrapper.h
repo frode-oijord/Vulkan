@@ -891,8 +891,8 @@ public:
               VkSharingMode sharing_mode,
               VkImageCreateFlags flags = 0,
               std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>(),
-              VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED)
-    : device(std::move(device))
+              VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) : 
+    device(std::move(device))
   {
     VkImageCreateInfo create_info {
       VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,                // sType  
@@ -988,6 +988,8 @@ public:
 
 
   void changeLayout(VkCommandBuffer command, 
+                    VkAccessFlags srcAccessMask,
+                    VkAccessFlags dstAccessMask,
                     VkImageLayout oldLayout,
                     VkImageLayout newLayout,
                     VkImageSubresourceRange subresourceRange)
@@ -995,8 +997,8 @@ public:
     VulkanImage::ChangeLayout(
       this->image,
       command,
-      0,
-      VK_ACCESS_TRANSFER_WRITE_BIT,
+      srcAccessMask,
+      dstAccessMask,
       oldLayout,
       newLayout,
       subresourceRange);
@@ -1005,13 +1007,20 @@ public:
   void copyBuffer(VkCommandBuffer command,
                   VkBuffer buffer,
                   std::vector<VkBufferImageCopy>& regions,
+                  VkAccessFlags srcAccessMask,
+                  VkAccessFlags dstAccessMask,
+                  VkImageLayout oldLayout,
                   VkImageSubresourceRange subresourceRange)
   {
-    this->changeLayout(
-      command, 
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
-      subresourceRange);
+    LayoutScope scope(command, { 
+      VulkanImage::MemoryBarrier(
+        this->image,
+        srcAccessMask,
+        dstAccessMask,
+        oldLayout,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        subresourceRange)
+      });
 
     vkCmdCopyBufferToImage(
       command,
@@ -1020,12 +1029,6 @@ public:
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       static_cast<uint32_t>(regions.size()),
       regions.data());
-
-    this->changeLayout(
-      command,
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      subresourceRange);
   }
 
   std::shared_ptr<VulkanDevice> device;

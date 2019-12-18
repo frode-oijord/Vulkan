@@ -808,64 +808,22 @@ private:
 
 
 struct ImageMemoryPage {
-  ImageMemoryPage(
-    VkImageAspectFlags aspectMask,
-    uint32_t mipLevel,
-    uint32_t arrayLayer,
-    VkOffset3D offset,
-    VkExtent3D extent,
-    VkDeviceMemory memory,
-    VkDeviceSize memoryOffset,
-    VkSparseMemoryBindFlags flags)
-  {
-    const VkImageSubresource subresource {
-      aspectMask,
-      mipLevel,
-      arrayLayer
-    };
-
-    this->image_memory_bind = {
-      subresource,
-      offset,
-      extent,
-      memory,
-      memoryOffset,
-      flags
-    };
-
-    const VkImageSubresourceLayers subresource_layers {
-      aspectMask,
-      mipLevel,
-      0,
-      1,
-    };
-
-    this->buffer_image_copy = {
-      memoryOffset,
-      0,
-      0,
-      subresource_layers,
-      offset,
-      extent
-    };
-  }
-
   VkSparseImageMemoryBind image_memory_bind;
   VkBufferImageCopy buffer_image_copy;
 };
 
 
-class Image : public Node {
+class SparseImage : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(Image)
-  virtual ~Image() = default;
-  Image(VkSampleCountFlagBits sample_count,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage_flags,
-        VkSharingMode sharing_mode,
-        VkImageCreateFlags create_flags,
-        VkImageLayout layout) :
+  NO_COPY_OR_ASSIGNMENT(SparseImage)
+  virtual ~SparseImage() = default;
+  SparseImage(VkSampleCountFlagBits sample_count,
+              VkImageTiling tiling,
+              VkImageUsageFlags usage_flags,
+              VkSharingMode sharing_mode,
+              VkImageCreateFlags create_flags,
+              VkImageLayout layout) :
     sample_count(sample_count),
     tiling(tiling),
     usage_flags(usage_flags),
@@ -873,19 +831,19 @@ public:
     create_flags(create_flags),
     layout(layout)
   {
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Image, alloc);
-		REGISTER_VISITOR_CALLBACK(stagevisitor, Image, stage);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Image, pipeline);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, Image, render);
+		REGISTER_VISITOR_CALLBACK(allocvisitor, SparseImage, alloc);
+		REGISTER_VISITOR_CALLBACK(stagevisitor, SparseImage, stage);
+		REGISTER_VISITOR_CALLBACK(pipelinevisitor, SparseImage, pipeline);
+		REGISTER_VISITOR_CALLBACK(rendervisitor, SparseImage, render);
 	}
 
 	void alloc(Context* context)
 	{
-		VulkanTextureImage* texture = context->state.texture;
-		this->bind_fence = std::make_unique<VulkanFence>(context->device);
-    this->copy_fence = std::make_unique<VulkanFence>(context->device);
-    this->copy_command = std::make_unique<VulkanCommandBuffers>(context->device);
+    this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
+    this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
+    this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->device);
 
+		VulkanTextureImage* texture = context->state.texture;
 		this->image = std::make_shared<VulkanImage>(
 			context->device,
 			texture->image_type(),
@@ -901,14 +859,17 @@ public:
 
     this->image->changeLayout(
       context->command->buffer(),
+      0,
+      VK_ACCESS_TRANSFER_WRITE_BIT,
       VK_IMAGE_LAYOUT_UNDEFINED,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
       context->state.texture->subresource_range());
 
+    VkMemoryRequirements memory_requirements;
     vkGetImageMemoryRequirements(
       context->device->device,
       this->image->image,
-      &this->memory_requirements);
+      &memory_requirements);
 
     uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
       memory_requirements.memoryTypeBits,
@@ -920,7 +881,8 @@ public:
     std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
     vkGetImageSparseMemoryRequirements(context->device->device, this->image->image, &sparse_memory_requirements_count, sparse_memory_requirements.data());
 
-    this->sparse_memory_requirement = [&]() {
+    VkSparseImageMemoryRequirements sparse_memory_requirement;
+    sparse_memory_requirement = [&]() {
       for (auto requirements : sparse_memory_requirements) {
         if (requirements.formatProperties.aspectMask & texture->subresource_range().aspectMask) {
           return requirements;
@@ -931,52 +893,141 @@ public:
 
     this->image_memory = std::make_shared<VulkanMemory>(
       context->device,
-      this->memory_requirements.size,
+      memory_requirements.size,
       memory_type_index);
 
     VkDeviceSize memoryOffset = 0;
-    VkExtent3D imageGranularity = this->sparse_memory_requirement.formatProperties.imageGranularity;
+    VkDeviceSize mip_offset = 0;
+    VkDeviceSize element_size = 4; // 4 bytes per pixel
 
-    for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+    VkExtent3D imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
+
+    for (uint32_t mip_level = 0; mip_level < sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
       VkExtent3D extent = texture->extent(mip_level);
 
-      assert(extent.width % imageGranularity.width == 0);
-      assert(extent.height % imageGranularity.height == 0);
-      assert(extent.depth % imageGranularity.depth == 0);
+      assert(extent.width % imageExtent.width == 0);
+      assert(extent.height % imageExtent.height == 0);
+      assert(extent.depth % imageExtent.depth == 0);
 
-      for (int32_t i = 0; i < extent.width; i += imageGranularity.width) {
-        for (int32_t j = 0; j < extent.height; j += imageGranularity.height) {
-          for (int32_t k = 0; k < extent.depth; k += imageGranularity.depth) {
+      VkDeviceSize width = extent.width;
+      VkDeviceSize height = extent.height;
+      VkDeviceSize depth = extent.depth;
 
-            ImageMemoryPage page{
+      const VkImageSubresourceLayers subresource_layers{
+        texture->subresource_range().aspectMask,               // aspectMask
+        mip_level,                                             // mipLevel
+        texture->subresource_range().baseArrayLayer,           // baseArrayLayer
+        texture->subresource_range().layerCount,               // layerCount
+      };
+
+      for (uint32_t i = 0; i < extent.width / imageExtent.width; i++) {
+        for (uint32_t j = 0; j < extent.height / imageExtent.height; j++) {
+          for (uint32_t k = 0; k < extent.depth / imageExtent.depth; k++) {
+
+            VkOffset3D imageOffset = {
+              int32_t(i * imageExtent.width),
+              int32_t(j * imageExtent.height),
+              int32_t(k * imageExtent.depth)
+            };
+
+            ImageMemoryPage page;
+
+            const VkImageSubresource subresource{
               texture->subresource_range().aspectMask,
               mip_level,
-              0,
-              VkOffset3D{ i, j, k },
-              imageGranularity,
-              this->image_memory->memory,
-              memoryOffset,
               0
-              };
+            };
 
-            this->image_memory_pages.push_back(page);
-            memoryOffset += this->memory_requirements.alignment;
+            page.image_memory_bind = {
+              subresource,                                // subresource
+              imageOffset,                                // offset
+              imageExtent,                                // extent
+              this->image_memory->memory,                 // memory
+              memoryOffset,                               // memoryOffset
+              0                                           // flags
+            };
+
+            VkDeviceSize x = imageOffset.x;
+            VkDeviceSize y = imageOffset.y;
+            VkDeviceSize z = imageOffset.z;
+
+            VkDeviceSize buffer_offset = mip_offset + (((z * height) + y) * width + x) * element_size;
+
+            page.buffer_image_copy = {
+              buffer_offset,                              // bufferOffset 
+              extent.width,                               // bufferRowLength
+              extent.height,                              // bufferImageHeight
+              subresource_layers,                         // imageSubresource
+              imageOffset,                                // imageOffset
+              imageExtent,                                // imageExtent
+            };
+
+            uint32_t key = i | j << 8 | 1 << 16 | mip_level << 24;
+
+            this->image_memory_pages.insert({ key, page });
+            memoryOffset += memory_requirements.alignment;
           }
         }
       }
+      mip_offset += texture->size(mip_level);
     }
 	}
 
   void stage(Context* context) 
   {
 		context->state.image = this->image->image;
+  }
+
+  void pipeline(Context* context) 
+  {
+    context->state.imageLayout = this->layout;
+  }
+
+  void render(Context* context)
+  {
+    if (context->tiles == this->bound_memory_pages) {
+      return;
+    }
+
+    std::set<uint32_t> memory_pages_bind;
+
+    std::set_difference(
+      context->tiles.begin(), context->tiles.end(),
+      this->bound_memory_pages.begin(), this->bound_memory_pages.end(),
+      std::inserter(memory_pages_bind, memory_pages_bind.begin()));
+
+    std::set<uint32_t> memory_pages_free;
+
+    std::set_difference(
+      this->bound_memory_pages.begin(), this->bound_memory_pages.end(),
+      context->tiles.begin(), context->tiles.end(),
+      std::inserter(memory_pages_free, memory_pages_free.begin()));
+
+    this->bound_memory_pages = context->tiles;
 
     std::vector<VkSparseImageMemoryBind> image_memory_binds;
-    //std::vector<VkBufferImageCopy> regions;
+    std::vector<VkBufferImageCopy> regions;
 
-    for (auto& page : this->image_memory_pages) {
-      image_memory_binds.push_back(page.image_memory_bind);
-      //regions.push_back(page.buffer_image_copy);
+    for (auto& key : memory_pages_bind) {
+      if (this->image_memory_pages.find(key) != this->image_memory_pages.end()) {
+        auto page = this->image_memory_pages.at(key);
+        page.image_memory_bind.memory = this->image_memory->memory;
+        image_memory_binds.push_back(page.image_memory_bind);
+        regions.push_back(page.buffer_image_copy);
+      }
+    }
+
+    for (auto& key : memory_pages_free) {
+      if (this->image_memory_pages.find(key) != this->image_memory_pages.end()) {
+        auto page = this->image_memory_pages.at(key);
+        page.image_memory_bind.memory = nullptr;
+        image_memory_binds.push_back(page.image_memory_bind);
+        regions.push_back(page.buffer_image_copy);
+      }
+    }
+
+    if (image_memory_binds.empty()) {
+      return;
     }
 
     std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info
@@ -989,7 +1040,7 @@ public:
     std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
 
     std::vector<VkSemaphore> wait_semaphores;
-    std::vector<VkSemaphore> signal_semaphores;
+    std::vector<VkSemaphore> signal_semaphores{ this->bind_sparse_finished->semaphore };
     std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
 
     VkBindSparseInfo bind_sparse_info = {
@@ -1007,91 +1058,34 @@ public:
       signal_semaphores.data(),                                     // pSignalSemaphores
     };
 
-    this->bind_fence->reset();
-    vkQueueBindSparse(context->queue, 1, &bind_sparse_info, this->bind_fence->fence);
-    this->bind_fence->wait();
+    vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 
-    VulkanTextureImage* texture = context->state.texture;
+    {
+      this->copy_sparse_command->begin();
 
-    this->image->changeLayout(
-      context->command->buffer(),
-      VK_IMAGE_LAYOUT_UNDEFINED,
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      texture->subresource_range());
+      this->image->copyBuffer(
+        this->copy_sparse_command->buffer(),
+        context->state.buffer,
+        regions,
+        0,
+        VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        context->state.texture->subresource_range());
 
-    std::vector<VkBufferImageCopy> regions;
-    VkDeviceSize mip_offset = 0;
-    VkDeviceSize element_size = 4; // 4 bytes per pixel
-    VkExtent3D imageExtent = this->sparse_memory_requirement.formatProperties.imageGranularity;
+      this->copy_sparse_command->end();
 
-    for (uint32_t mip_level = 0; mip_level < this->sparse_memory_requirement.imageMipTailFirstLod; mip_level++) {
+      std::vector<VkSemaphore> wait_semaphores{ this->bind_sparse_finished->semaphore };
+      std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
+      context->bind_sparse_finished = this->copy_sparse_finished->semaphore;
 
-      const VkImageSubresourceLayers subresource_layers{
-        texture->subresource_range().aspectMask,               // aspectMask
-        mip_level,                                             // mipLevel
-        texture->subresource_range().baseArrayLayer,           // baseArrayLayer
-        texture->subresource_range().layerCount,               // layerCount
-      };
-
-      VkExtent3D extent = texture->extent(mip_level);
-
-      VkDeviceSize width = extent.width;
-      VkDeviceSize height = extent.height;
-      VkDeviceSize depth = extent.depth;
-
-      for (uint32_t i = 0; i < extent.width / imageExtent.width; i++) {
-        for (uint32_t j = 0; j < extent.height / imageExtent.height; j++) {
-          for (uint32_t k = 0; k < extent.depth / imageExtent.depth; k++) {
-
-            VkOffset3D imageOffset = {
-              int32_t(i * imageExtent.width),
-              int32_t(j * imageExtent.height),
-              int32_t(k * imageExtent.depth)
-            };
-
-            VkDeviceSize x = imageOffset.x;
-            VkDeviceSize y = imageOffset.y;
-            VkDeviceSize z = imageOffset.z;
-
-            VkDeviceSize buffer_offset = mip_offset + (((z * height) + y) * width + x) * element_size;
-
-            regions.push_back({
-              buffer_offset,                              // bufferOffset 
-              extent.width,                               // bufferRowLength
-              extent.height,                              // bufferImageHeight
-              subresource_layers,                         // imageSubresource
-              imageOffset,                                // imageOffset
-              imageExtent,                                // imageExtent
-              });
-          }
-        }
-      }
-      mip_offset += texture->size(mip_level);
+      this->copy_sparse_command->submit(
+        context->queue,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        VK_NULL_HANDLE,
+        wait_semaphores,
+        signal_semaphores);
     }
-
-    vkCmdCopyBufferToImage(
-      context->command->buffer(),
-      context->state.buffer,
-      this->image->image,
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      static_cast<uint32_t>(regions.size()),
-      regions.data());
-
-    this->image->changeLayout(
-      context->command->buffer(),
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      this->layout,
-      texture->subresource_range());
   }
-
-  void pipeline(Context* context) 
-  {
-    context->state.imageLayout = this->layout;
-  }
-
-	void render(Context* context)
-	{
-	}
 
 private:
   std::shared_ptr<VulkanImage> image;
@@ -1103,18 +1097,124 @@ private:
   VkImageCreateFlags create_flags;
   VkImageLayout layout;
 
-  std::unique_ptr<VulkanFence> copy_fence;
-  std::unique_ptr<VulkanCommandBuffers> copy_command;
-
-	std::unique_ptr<VulkanFence> bind_fence;
-	VkMemoryRequirements memory_requirements;
-  VkSparseImageMemoryRequirements sparse_memory_requirement;
   std::shared_ptr<VulkanMemory> image_memory;
-
-  std::set<uint32_t> memory_pages_bind;
-  std::set<uint32_t> memory_pages_free;
+  std::unordered_map<uint32_t, ImageMemoryPage> image_memory_pages;
   std::set<uint32_t> bound_memory_pages;
-  std::vector<ImageMemoryPage> image_memory_pages;
+  std::unique_ptr<VulkanSemaphore> bind_sparse_finished;
+  std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
+  std::unique_ptr<VulkanCommandBuffers> copy_sparse_command;
+};
+
+
+class Image : public Node {
+public:
+  IMPLEMENT_VISITABLE_INLINE
+  NO_COPY_OR_ASSIGNMENT(Image)
+  virtual ~Image() = default;
+  Image(VkSampleCountFlagBits sample_count,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage_flags,
+        VkSharingMode sharing_mode,
+        VkImageCreateFlags create_flags,
+        VkImageLayout layout) :
+        sample_count(sample_count),
+        tiling(tiling),
+        usage_flags(usage_flags),
+        sharing_mode(sharing_mode),
+        create_flags(create_flags),
+        layout(layout)
+  {
+    REGISTER_VISITOR_CALLBACK(allocvisitor, Image, alloc);
+    REGISTER_VISITOR_CALLBACK(stagevisitor, Image, stage);
+    REGISTER_VISITOR_CALLBACK(pipelinevisitor, Image, pipeline);
+  }
+
+  void alloc(Context* context)
+  {
+    this->image = std::make_shared<VulkanImage>(context->device,
+      context->state.texture->image_type(),
+      context->state.texture->format(),
+      context->state.texture->extent(0),
+      context->state.texture->levels(),
+      context->state.texture->layers(),
+      this->sample_count,
+      this->tiling,
+      this->usage_flags,
+      this->sharing_mode,
+      this->create_flags);
+
+    this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    context->imageobjects.push_back(this->image_object.get());
+  }
+
+  void stage(Context* context)
+  {
+    context->state.image = this->image->image;
+    VulkanTextureImage* texture = context->state.texture;
+
+    std::vector<VkBufferImageCopy> regions;
+
+    VkDeviceSize bufferOffset = 0;
+    for (uint32_t mip_level = 0; mip_level < texture->levels(); mip_level++) {
+
+      const VkImageSubresourceLayers imageSubresource{
+        texture->subresource_range().aspectMask,               // aspectMask
+        mip_level,                                             // mipLevel
+        texture->subresource_range().baseArrayLayer,           // baseArrayLayer
+        texture->subresource_range().layerCount,               // layerCount
+      };
+
+      uint32_t bufferRowLength = 0;
+      uint32_t bufferImageHeight = 0;
+      VkOffset3D imageOffset = { 0, 0, 0 };
+      VkExtent3D imageExtent = texture->extent(mip_level);
+
+      VkBufferImageCopy region{
+        bufferOffset,
+        bufferRowLength,
+        bufferImageHeight,
+        imageSubresource,
+        imageOffset,
+        imageExtent
+      };
+
+      regions.push_back(region);
+      bufferOffset += texture->size(mip_level);
+    }
+
+    this->image->changeLayout(
+      context->command->buffer(),
+      0,
+      VK_ACCESS_TRANSFER_WRITE_BIT,
+      VK_IMAGE_LAYOUT_UNDEFINED,
+      this->layout,
+      texture->subresource_range());
+
+    this->image->copyBuffer(
+      context->command->buffer(),
+      context->state.buffer,
+      regions,
+      0,
+      VK_ACCESS_TRANSFER_WRITE_BIT,
+      this->layout,
+      texture->subresource_range());
+  }
+
+  void pipeline(Context* context)
+  {
+    context->state.imageLayout = this->layout;
+  }
+
+private:
+  std::shared_ptr<VulkanImage> image;
+  std::shared_ptr<ImageObject> image_object;
+
+  VkSampleCountFlagBits sample_count;
+  VkImageTiling tiling;
+  VkImageUsageFlags usage_flags;
+  VkSharingMode sharing_mode;
+  VkImageCreateFlags create_flags;
+  VkImageLayout layout;
 };
 
 
@@ -2084,7 +2184,7 @@ public:
       this->swapchain->swapchain,
       UINT64_MAX,
       this->swapchain_image_ready->semaphore,
-      nullptr,
+      VK_NULL_HANDLE,
       &this->image_index));
 
     std::vector<VkSemaphore> wait_semaphores = { this->swapchain_image_ready->semaphore };
@@ -2183,95 +2283,109 @@ public:
 
     this->image->changeLayout(
       context->command->buffer(),
+      0,
+      VK_ACCESS_TRANSFER_WRITE_BIT,
       VK_IMAGE_LAYOUT_UNDEFINED,
       VK_IMAGE_LAYOUT_GENERAL,
       this->subresource_range);
 	}
 
-	void record(Context* context)
-	{
+  void record(Context* context)
+  {
+    const VkImageSubresourceLayers subresource_layers{
+      this->subresource_range.aspectMask,                             // aspectMask
+      this->subresource_range.baseMipLevel,                           // mipLevel
+      this->subresource_range.baseArrayLayer,                         // baseArrayLayer
+      this->subresource_range.layerCount                              // layerCount;
+    };
+
+    const VkOffset3D offset = {
+      0, 0, 0
+    };
+
+    VkExtent3D extent3d = {
+      context->state.extent.width, context->state.extent.height, 1
+    };
+
+    VkImageCopy image_copy{
+      subresource_layers,                                             // srcSubresource
+      offset,                                                         // srcOffset
+      subresource_layers,                                             // dstSubresource
+      offset,                                                         // dstOffset
+      extent3d                                                        // extent
+    };
+
     VulkanCommandBuffers::Scope command_scope(this->get_image_command.get());
+
+    VulkanImage::PipelineBarrier(this->get_image_command->buffer(), {
+      VulkanImage::MemoryBarrier(this->color_attachment->image->image,
+                                 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+                                 VK_ACCESS_TRANSFER_READ_BIT,
+                                 VK_IMAGE_LAYOUT_UNDEFINED,
+                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                 this->subresource_range)});
 
     VulkanImage::LayoutScope layout_scope(this->get_image_command->buffer(), {
       VulkanImage::MemoryBarrier(this->color_attachment->image->image,
-                                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                 VK_ACCESS_TRANSFER_READ_BIT,
-                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                 this->subresource_range),
-
+                                  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+                                  VK_ACCESS_TRANSFER_READ_BIT,
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                  this->subresource_range),
       VulkanImage::MemoryBarrier(this->image->image,
-                                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                 VK_ACCESS_TRANSFER_WRITE_BIT,
-                                 VK_IMAGE_LAYOUT_GENERAL,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                 this->subresource_range),
-      });
+                                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                                  VK_ACCESS_TRANSFER_WRITE_BIT,
+                                  VK_IMAGE_LAYOUT_GENERAL,
+                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                  this->subresource_range)});
 
-		const VkImageSubresourceLayers subresource_layers{
-			this->subresource_range.aspectMask,                             // aspectMask
-			this->subresource_range.baseMipLevel,                           // mipLevel
-			this->subresource_range.baseArrayLayer,                         // baseArrayLayer
-			this->subresource_range.layerCount                              // layerCount;
-		};
-
-		const VkOffset3D offset = {
-			0, 0, 0
-		};
-
-		VkExtent3D extent3d = { 
-			context->state.extent.width, context->state.extent.height, 1 
-		};
-
-		VkImageCopy image_copy{
-			subresource_layers,                                             // srcSubresource
-			offset,                                                         // srcOffset
-			subresource_layers,                                             // dstSubresource
-			offset,                                                         // dstOffset
-			extent3d                                                        // extent
-		};
-
-		vkCmdCopyImage(
-			this->get_image_command->buffer(),
-			this->color_attachment->image->image,
-			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			this->image->image,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			1, &image_copy);
-	}
+    vkCmdCopyImage(
+      this->get_image_command->buffer(),
+      this->color_attachment->image->image,
+      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      this->image->image,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      1, &image_copy);
+  }
 
 	void render(class Context* context)
 	{
-		//this->offscreen_fence->reset();
+		this->offscreen_fence->reset();
 
-		//this->get_image_command->submit(
-		//	context->queue,
-		//	VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		//	this->offscreen_fence->fence);
-		//
-		//this->offscreen_fence->wait();
+		this->get_image_command->submit(
+			context->queue,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			this->offscreen_fence->fence);
+		
+		this->offscreen_fence->wait();
 
-		//VkImageSubresource image_subresource{ 
-  //    VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 
-  //  };
-		//VkSubresourceLayout subresource_layout;
-		//
-  //  vkGetImageSubresourceLayout(
-  //    context->device->device, 
-  //    this->image->image, 
-  //    &image_subresource, 
-  //    &subresource_layout);
+		VkImageSubresource image_subresource{ 
+      VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 
+    };
+		VkSubresourceLayout subresource_layout;
+		
+    vkGetImageSubresourceLayout(
+      context->device->device, 
+      this->image->image, 
+      &image_subresource, 
+      &subresource_layout);
 
-		//const uint32_t* data = reinterpret_cast<uint32_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
-		//data += subresource_layout.offset;
+		const uint32_t* data = reinterpret_cast<uint32_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
+		data += subresource_layout.offset;
 
-  //  context->tiles.clear();
+    context->tiles.clear();
 
-		//for (VkDeviceSize i = 0; i < this->image_object->memory_requirements.size / sizeof(uint32_t); i++) {
-  //  	context->tiles.insert(data[i]);
-		//}
+		for (VkDeviceSize p = 0; p < this->image_object->memory_requirements.size / sizeof(uint32_t); p++) {
+      //uint32_t i = (data[p] >> 0) & 0xFF;
+      //uint32_t j = (data[p] >> 8) & 0xFF;
+      uint32_t k = (data[p] >> 16) & 0xFF;
+      //uint32_t m = (data[p] >> 24) & 0xFF;
+      if (k == 1) {
+        context->tiles.insert(data[p]);
+      }
+		}
 
-		//this->image_object->memory->unmap();
+		this->image_object->memory->unmap();
 	}
 
 private:
