@@ -211,7 +211,10 @@ public:
   explicit InlineBufferData(std::vector<T> values) :
     values(std::move(values))
   {
-		REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<float>, stage);
+    REGISTER_VISITOR_CALLBACK(allocvisitor, InlineBufferData<float>, alloc);
+    REGISTER_VISITOR_CALLBACK(alloc visitor, InlineBufferData<uint32_t>, alloc);
+
+    REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<float>, stage);
 		REGISTER_VISITOR_CALLBACK(stagevisitor, InlineBufferData<uint32_t>, stage);
 
 		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<float>, pipeline);
@@ -240,6 +243,50 @@ public:
 
   std::vector<T> values;
 };
+
+
+class TextureImage : public BufferData {
+public:
+  IMPLEMENT_VISITABLE_INLINE
+    NO_COPY_OR_ASSIGNMENT(TextureImage)
+    TextureImage() = delete;
+  virtual ~TextureImage() = default;
+
+  explicit TextureImage(const std::string& filename) :
+    texture(VulkanImageFactory::Create(filename))
+  {
+    REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, update);
+    REGISTER_VISITOR_CALLBACK(stagevisitor, TextureImage, update);
+    REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, update);
+    REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, update);
+    REGISTER_VISITOR_CALLBACK(rendervisitor, TextureImage, update);
+  }
+
+  void copy(char* dst) const override
+  {
+    std::copy(this->texture->data(), this->texture->data() + this->texture->size(), dst);
+  }
+
+  size_t size() const override
+  {
+    return this->texture->size();
+  }
+
+  size_t stride() const override
+  {
+    return 0;
+  }
+
+  void update(Context* context)
+  {
+    context->state.bufferdata = this;
+    context->state.texture = this->texture.get();
+  }
+
+private:
+  std::shared_ptr<VulkanTextureImage> texture;
+};
+
 
 class STLBufferData : public BufferData {
 public:
@@ -764,54 +811,6 @@ private:
   VkBool32 unnormalizedCoordinates;
 };
 
-class TextureImage : public BufferData {
-public:
-	IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(TextureImage)
-  TextureImage() = delete;
-  virtual ~TextureImage() = default;
-
-  explicit TextureImage(const std::string& filename) :
-    texture(VulkanImageFactory::Create(filename))
-  {
-		REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(stagevisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, TextureImage, update);
-	}
-
-  void copy(char* dst) const override
-  {
-    std::copy(this->texture->data(), this->texture->data() + this->texture->size(), dst);
-  }
-
-  size_t size() const override
-  {
-    return this->texture->size();
-  }
-
-  size_t stride() const override
-  {
-    return 0;
-  }
-
-	void update(Context* context) 
-  {
-    context->state.bufferdata = this;
-    context->state.texture = this->texture.get();
-  }
-
-private:
-  std::shared_ptr<VulkanTextureImage> texture;
-};
-
-
-struct ImageMemoryPage {
-  VkSparseImageMemoryBind image_memory_bind;
-  VkBufferImageCopy buffer_image_copy;
-};
-
 
 class SparseImage : public Node {
 public:
@@ -836,6 +835,11 @@ public:
 		REGISTER_VISITOR_CALLBACK(pipelinevisitor, SparseImage, pipeline);
 		REGISTER_VISITOR_CALLBACK(rendervisitor, SparseImage, render);
 	}
+
+  struct ImageMemoryPage {
+    VkSparseImageMemoryBind image_memory_bind;
+    VkBufferImageCopy buffer_image_copy;
+  };
 
 	void alloc(Context* context)
 	{
@@ -2289,6 +2293,19 @@ public:
       VK_IMAGE_LAYOUT_UNDEFINED,
       VK_IMAGE_LAYOUT_GENERAL,
       this->subresource_range);
+
+    VkImageSubresource image_subresource{
+      VK_IMAGE_ASPECT_COLOR_BIT, 0, 0
+    };
+    VkSubresourceLayout subresource_layout;
+
+    vkGetImageSubresourceLayout(
+      context->device->device,
+      this->image->image,
+      &image_subresource,
+      &subresource_layout);
+
+    this->dataOffset = subresource_layout.offset;
 	}
 
   void record(Context* context)
@@ -2351,27 +2368,17 @@ public:
 
 	void render(class Context* context)
 	{
-		//this->offscreen_fence->reset();
+		this->offscreen_fence->reset();
 
 		this->get_image_command->submit(
 			context->queue,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      this->offscreen_fence->fence);
 		
-		//this->offscreen_fence->wait();
-
-		VkImageSubresource image_subresource{ 
-      VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 
-    };
-		VkSubresourceLayout subresource_layout;
-		
-    vkGetImageSubresourceLayout(
-      context->device->device, 
-      this->image->image, 
-      &image_subresource, 
-      &subresource_layout);
+		this->offscreen_fence->wait();
 
 		const uint32_t* data = reinterpret_cast<uint32_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
-		data += subresource_layout.offset;
+    data += this->dataOffset;
 
     context->tiles.clear();
 
@@ -2397,4 +2404,5 @@ private:
 	std::shared_ptr<VulkanImage> image;
 	std::shared_ptr<ImageObject> image_object;
 	std::shared_ptr<VulkanFence> offscreen_fence;
+  VkDeviceSize dataOffset;
 };
