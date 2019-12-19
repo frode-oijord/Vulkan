@@ -145,7 +145,7 @@
          {
             float lod = mipmapLevel(texCoord);
 
-            uint mip = uint(lod + 0.5); // nearest?
+            uint mip = uint(lod + 0.5) - 3; // nearest?
 
             uint i = uint(texCoord.s * 4.0);
             uint j = uint(texCoord.t * 4.0);
@@ -244,7 +244,9 @@
             }
          ]])
 
-         (separator lod-renderpass)
+         (separator 
+            (extent (uint32 160) (uint32 90))
+            lod-renderpass)
          (separator main-renderpass)))
 
    (define vulkan-window (window scene main-color-attachment))

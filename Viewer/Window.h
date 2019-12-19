@@ -34,7 +34,7 @@ public:
     wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
 
     if (!RegisterClassEx(&wcex)) {
-      //throw std::runtime_error("unable to register window class");
+      throw std::runtime_error("unable to register window class");
     }
 
     this->hWnd = CreateWindow(

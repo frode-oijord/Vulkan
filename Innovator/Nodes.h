@@ -952,6 +952,8 @@ public:
 
   void updateBindings(Context* context)
   {
+    Timer timer("updateBindings()");
+
     std::set<uint32_t> memory_pages_bind;
 
     std::set_difference(
@@ -2419,6 +2421,8 @@ public:
 
 	void render(class Context* context)
 	{
+    Timer timer("offscreen render");
+
 		this->offscreen_fence->reset();
 
 		this->get_image_command->submit(
