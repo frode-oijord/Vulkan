@@ -179,19 +179,13 @@ RenderVisitor::visit(Node* node, Context* context)
 	node->visit(this, context);
 	context->end();
 
-	std::vector<VkSemaphore> wait_semaphores;
-	if (context->bind_sparse_finished) {
-		wait_semaphores.push_back(context->bind_sparse_finished);
-		context->bind_sparse_finished = nullptr;
-	}
-
 	context->fence->reset();
 	context->command->end();
 	context->command->submit(
 		context->queue,
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 		context->fence->fence,
-		wait_semaphores);
+		context->render_wait_semaphores);
 
 	context->fence->wait();
 }

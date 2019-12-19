@@ -45,6 +45,7 @@ public:
 
   void begin()
   {
+    this->render_wait_semaphores.clear();
     this->redraw = false;
     this->state = State();
 		this->state.extent = this->extent;
@@ -70,7 +71,7 @@ public:
 	std::vector<class BufferObject*> bufferobjects;
 
   std::set<uint32_t> tiles;
-  VkSemaphore bind_sparse_finished{ nullptr };
+  std::vector<VkSemaphore> render_wait_semaphores;
 
 private:
   VkExtent2D extent;
