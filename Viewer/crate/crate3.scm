@@ -77,7 +77,7 @@
 
    (define lod-color-attachment 
       (framebuffer-attachment 
-         VK_FORMAT_A8B8G8R8_UINT_PACK32
+         VK_FORMAT_R8G8B8A8_UINT
          (imageusageflags 
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
             VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
@@ -96,7 +96,7 @@
    (define lod-renderpass (renderpass
       (renderpass-description
          (renderpass-attachment
-            VK_FORMAT_A8B8G8R8_UINT_PACK32
+            VK_FORMAT_R8G8B8A8_UINT
             VK_SAMPLE_COUNT_1_BIT
             VK_ATTACHMENT_LOAD_OP_CLEAR
             VK_ATTACHMENT_STORE_OP_STORE

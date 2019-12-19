@@ -294,7 +294,7 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM });
 	env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UINT", VK_FORMAT_B8G8R8A8_UINT});
 	env->outer->inner.insert({ "VK_FORMAT_A8B8G8R8_UINT_PACK32", VK_FORMAT_A8B8G8R8_UINT_PACK32 });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32B32_UINT", VK_FORMAT_R32G32B32_UINT });
+  env->outer->inner.insert({ "VK_FORMAT_R8G8B8A8_UINT", VK_FORMAT_R8G8B8A8_UINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SINT", VK_FORMAT_R32G32B32_SINT });
   env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT });
   env->outer->inner.insert({ "VK_FORMAT_R16G16B16A16_UINT", VK_FORMAT_R16G16B16A16_UINT });
