@@ -24,34 +24,6 @@ public:
 	State statecpy;
 };
 
-class RenderStateScope {
-public:
-	RenderStateScope() = delete;
-
-	explicit RenderStateScope(State* state) :
-		state(state),
-		ModelMatrix(state->ModelMatrix),
-		ViewMatrix(state->ViewMatrix),
-		ProjMatrix(state->ProjMatrix),
-		extent(state->extent)
-	{}
-
-	~RenderStateScope()
-	{
-		state->ModelMatrix = this->ModelMatrix;
-		state->ViewMatrix = this->ViewMatrix;
-		state->ProjMatrix = this->ProjMatrix;
-		state->extent = this->extent;
-	}
-
-	State* state;
-
-	glm::dmat4 ModelMatrix{ 1.0 };
-	glm::dmat4 ViewMatrix{ 1.0 };
-	glm::dmat4 ProjMatrix{ 1.0 };
-	VkExtent2D extent;
-};
-
 
 class Context;
 
@@ -75,6 +47,7 @@ public:
 		}
 	}
 
+	void visit(class Node* node, class Context* context);
 	void visit_group(class Group* node, class Context* context);
 	void visit_separator(class Separator* node, class Context* context);
 
@@ -91,54 +64,12 @@ private:
 	std::shared_ptr<class MousePressEvent> press{ nullptr };
 };
 
-
-class AllocVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-
-class StageVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-
-class ResizeVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-
-class PipelineVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-
-class RecordVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-class RenderVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-
-class PresentVisitor : public Visitor {
-public:
-	void visit(class Node* node, class Context* context);
-};
-
-
-
 inline static EventVisitor eventvisitor;
-inline static AllocVisitor allocvisitor;
-inline static StageVisitor stagevisitor;
-inline static ResizeVisitor resizevisitor;
-inline static PipelineVisitor pipelinevisitor;
-inline static RecordVisitor recordvisitor;
-inline static RenderVisitor rendervisitor;
-inline static PresentVisitor presentvisitor;
+
+inline static Visitor allocvisitor;
+inline static Visitor stagevisitor;
+inline static Visitor resizevisitor;
+inline static Visitor pipelinevisitor;
+inline static Visitor recordvisitor;
+inline static Visitor rendervisitor;
+inline static Visitor presentvisitor;

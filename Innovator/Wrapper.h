@@ -421,6 +421,12 @@ public:
     vkDestroyDevice(this->device, nullptr);
   }
 
+  void bindImageMemory(VkImage image, VkDeviceMemory memory, VkDeviceSize offset)
+  {
+    THROW_ON_ERROR(vkBindImageMemory(this->device, image, memory, offset));
+  }
+
+
   VkQueue getQueue(VkQueueFlags required_flags)
   {
     std::vector<VkBool32> filter(this->physical_device.queue_family_properties.size(), VK_TRUE);
@@ -918,6 +924,25 @@ public:
   ~VulkanImage()
   {
     vkDestroyImage(this->device->device, this->image, nullptr);
+  }
+
+  VkMemoryRequirements getMemoryRequirements()
+  {
+    VkMemoryRequirements memory_requirements;
+    vkGetImageMemoryRequirements(
+      this->device->device,
+      this->image,
+      &memory_requirements);
+
+    return memory_requirements;
+  }
+
+  uint32_t getMemoryTypeIndex(VkMemoryRequirements memory_requirements,
+                              VkMemoryPropertyFlags memory_property_flags)
+  {
+    uint32_t memory_type_index = this->device->physical_device.getMemoryTypeIndex(
+      memory_requirements.memoryTypeBits,
+      memory_property_flags);
   }
 
   static VkImageMemoryBarrier MemoryBarrier(VkImage image,

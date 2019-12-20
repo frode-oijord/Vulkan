@@ -35,42 +35,8 @@ Visitor::visit_separator(Separator* node, Context* context)
 	this->visit_group(node, context);
 }
 
-
-EventVisitor::EventVisitor()
-{
-	this->register_callback<ViewMatrix>([this](ViewMatrix* node, Context* context) {
-		this->visit(node, context);
-	});
-}
-
 void
-EventVisitor::visit(ViewMatrix* node, Context* context)
-{
-	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-	if (press) {
-		this->press = press;
-	}
-
-	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-		this->press.reset();
-	}
-
-	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-	if (move && this->press) {
-		glm::dvec2 dx = (this->press->pos - move->pos) * .01;
-		dx[1] = -dx[1];
-		switch (this->press->button) {
-		case 1: node->pan(dx); break;
-		case 2: node->zoom(dx[1]); break;
-		default: break;
-		}
-		this->press->pos = move->pos;
-	}
-}
-
-
-void
-AllocVisitor::visit(Node* node, Context* context)
+Visitor::visit(Node* node, Context* context)
 {
 	context->imageobjects.clear();
 	context->bufferobjects.clear();
@@ -106,95 +72,41 @@ AllocVisitor::visit(Node* node, Context* context)
 	context->command->submit(
 		context->queue,
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		context->fence->fence);
-
-	context->fence->wait();
-}
-
-
-void
-StageVisitor::visit(Node* node, Context* context)
-{
-	context->command->begin();
-
-	context->begin();
-	node->visit(this, context);
-	context->end();
-
-	context->fence->reset();
-	context->command->end();
-	context->command->submit(
-		context->queue,
-		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		context->fence->fence);
-
-	context->fence->wait();
-}
-
-
-void
-ResizeVisitor::visit(Node* node, Context* context)
-{
-	context->command->begin();
-
-	context->begin();
-	node->visit(this, context);
-	context->end();
-
-	context->fence->reset();
-	context->command->end();
-	context->command->submit(
-		context->queue,
-		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		context->fence->fence);
-
-	context->fence->wait();
-}
-
-
-void
-PipelineVisitor::visit(Node* node, Context* context)
-{
-	context->begin();
-	node->visit(this, context);
-	context->end();
-}
-
-
-void
-RecordVisitor::visit(Node* node, Context* context)
-{
-	context->begin();
-	node->visit(this, context);
-	context->end();
-}
-
-
-void
-RenderVisitor::visit(Node* node, Context* context)
-{
-	context->command->begin();
-
-	context->begin();
-	node->visit(this, context);
-	context->end();
-
-	context->fence->reset();
-	context->command->end();
-	context->command->submit(
-		context->queue,
-		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 		context->fence->fence,
-		context->render_wait_semaphores);
+		context->wait_semaphores);
 
 	context->fence->wait();
 }
 
 
-void
-PresentVisitor::visit(Node* node, Context* context)
+EventVisitor::EventVisitor()
 {
-	context->begin();
-	node->visit(this, context);
-	context->end();
+	this->register_callback<ViewMatrix>([this](ViewMatrix* node, Context* context) {
+		this->visit(node, context);
+	});
+}
+
+void
+EventVisitor::visit(ViewMatrix* node, Context* context)
+{
+	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
+	if (press) {
+		this->press = press;
+	}
+
+	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
+		this->press.reset();
+	}
+
+	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
+	if (move && this->press) {
+		glm::dvec2 dx = (this->press->pos - move->pos) * .01;
+		dx[1] = -dx[1];
+		switch (this->press->button) {
+		case 1: node->pan(dx * 0.1); break;
+		case 2: node->zoom(dx[1] * 0.5); break;
+		default: break;
+		}
+		this->press->pos = move->pos;
+	}
 }

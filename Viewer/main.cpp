@@ -12,7 +12,8 @@ int main(int argc, char *argv[])
   try {
     VulkanImageFactory::Register<GliTextureImage>();
 
-		auto test = eval_file("crate/crate3.scm");
+		//auto test = eval_file("world/world.scm");
+    auto test = eval_file("crate/crate.scm");
 		auto window = std::any_cast<std::shared_ptr<VulkanWindow>>(test);
     return window->show();
   }

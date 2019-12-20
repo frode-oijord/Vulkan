@@ -45,7 +45,7 @@ public:
 
   void begin()
   {
-    this->render_wait_semaphores.clear();
+    this->wait_semaphores.clear();
     this->redraw = false;
     this->state = State();
 		this->state.extent = this->extent;
@@ -64,6 +64,7 @@ public:
   bool redraw;
 
   std::shared_ptr<VulkanFence> fence;
+  std::vector<VkSemaphore> wait_semaphores;
   std::unique_ptr<VulkanCommandBuffers> command;
   std::shared_ptr<VulkanPipelineCache> pipelinecache;
 
@@ -71,7 +72,6 @@ public:
 	std::vector<class BufferObject*> bufferobjects;
 
   std::set<uint32_t> tiles;
-  std::vector<VkSemaphore> render_wait_semaphores;
 
 private:
   VkExtent2D extent;

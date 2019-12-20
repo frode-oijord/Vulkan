@@ -854,6 +854,9 @@ public:
       0                                           // flags
     };
 
+    if (mipLevel >= texture->levels()) {
+      throw std::runtime_error("invalid mip level");
+    }
     VkExtent3D extent = texture->extent(mipLevel);
 
     VkDeviceSize width = extent.width;
@@ -931,15 +934,17 @@ public:
       throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
     }();
 
+    uint32_t numTiles = 1000;
+
     this->image_memory = std::make_shared<VulkanMemory>(
       context->device,
-      memory_requirements.size,
+      numTiles * memory_requirements.alignment,
       memory_type_index);
 
     VkDeviceSize memoryOffset = 0;
     VkExtent3D imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
 
-    for (uint32_t i = 0; i < 21; i++) {
+    for (uint32_t i = 0; i < numTiles; i++) {
       MemoryPage page(
         context->state.texture,
         imageExtent,
@@ -952,8 +957,6 @@ public:
 
   void updateBindings(Context* context)
   {
-    Timer timer("updateBindings()");
-
     std::set<uint32_t> memory_pages_bind;
 
     std::set_difference(
@@ -974,7 +977,6 @@ public:
     std::vector<VkSparseImageMemoryBind> image_memory_binds;
 
     for (auto& key : memory_pages_bind) {
-
       // find free page
       size_t i = [this]() {
         for (size_t i = 0; i < this->image_memory_pages.size(); i++) {
@@ -1041,10 +1043,9 @@ public:
     vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 
     if (regions.empty()) {
-      return;
+      context->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
     }
-
-    {
+    else {
       this->copy_sparse_command->begin();
 
       this->image->copyBuffer(
@@ -1068,7 +1069,7 @@ public:
         wait_semaphores,
         signal_semaphores);
 
-      context->render_wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
+      context->wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
     }
   }
 
@@ -1147,6 +1148,7 @@ public:
 
   void render(Context* context)
   {
+    //Timer timer("updateBindings");
     this->memory_manager->updateBindings(context);
   }
 
@@ -1201,8 +1203,21 @@ public:
       this->sharing_mode,
       this->create_flags);
 
-    this->image_object = std::make_shared<ImageObject>(this->image, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    context->imageobjects.push_back(this->image_object.get());
+    VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
+
+    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+      memory_requirements.memoryTypeBits,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    this->memory = std::make_shared<VulkanMemory>(
+      context->device,
+      memory_requirements.size,
+      memory_type_index);
+
+    context->device->bindImageMemory(
+      this->image->image,
+      this->memory->memory,
+      0);
   }
 
   void stage(Context* context)
@@ -1265,7 +1280,7 @@ public:
 
 private:
   std::shared_ptr<VulkanImage> image;
-  std::shared_ptr<ImageObject> image_object;
+  std::shared_ptr<VulkanMemory> memory;
 
   VkSampleCountFlagBits sample_count;
   VkImageTiling tiling;
@@ -1705,17 +1720,21 @@ public:
 			this->usage,
 			VK_SHARING_MODE_EXCLUSIVE);
 
-    this->imageobject = std::make_shared<ImageObject>(
-			this->image, 
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
 
-		const auto memory = std::make_shared<VulkanMemory>(
-			context->device,
-			this->imageobject->memory_requirements.size,
-			this->imageobject->memory_type_index);
+    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+      memory_requirements.memoryTypeBits,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    const VkDeviceSize offset = 0;
-    this->imageobject->bind(memory, offset);
+    this->memory = std::make_shared<VulkanMemory>(
+      context->device,
+      memory_requirements.size,
+      memory_type_index);
+
+    context->device->bindImageMemory(
+      this->image->image,
+      this->memory->memory,
+      0);
 
 		this->imageview = std::make_shared<VulkanImageView>(
 			context->device,
@@ -1742,7 +1761,7 @@ public:
 
 public:
   std::shared_ptr<VulkanImage> image;
-  std::shared_ptr<ImageObject> imageobject;
+  std::shared_ptr<VulkanMemory> memory;
   std::shared_ptr<VulkanImageView> imageview;
 };
 
@@ -2327,17 +2346,21 @@ public:
 			VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_SHARING_MODE_EXCLUSIVE);
 
-		this->image_object = std::make_shared<ImageObject>(
-      this->image, 
+    this->memory_requirements = this->image->getMemoryRequirements();
+
+    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+      this->memory_requirements.memoryTypeBits,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-		const auto memory = std::make_shared<VulkanMemory>(
+		this->memory = std::make_shared<VulkanMemory>(
 			context->device,
-			this->image_object->memory_requirements.size,
-			this->image_object->memory_type_index);
+      this->memory_requirements.size,
+			memory_type_index);
 
-		const VkDeviceSize offset = 0;
-		this->image_object->bind(memory, offset);
+    context->device->bindImageMemory(
+      this->image->image, 
+      this->memory->memory, 
+      0);
 
     this->image->changeLayout(
       context->command->buffer(),
@@ -2421,8 +2444,7 @@ public:
 
 	void render(class Context* context)
 	{
-    Timer timer("offscreen render");
-
+    //Timer timer("offscreen render");
 		this->offscreen_fence->reset();
 
 		this->get_image_command->submit(
@@ -2432,22 +2454,23 @@ public:
 		
 		this->offscreen_fence->wait();
 
-		const uint8_t* data = reinterpret_cast<uint8_t*>(this->image_object->memory->map(VK_WHOLE_SIZE, 0, 0));
+		const uint8_t* data = reinterpret_cast<uint8_t*>(this->memory->map(VK_WHOLE_SIZE, 0, 0));
     data += this->dataOffset;
 
     context->tiles.clear();
 
-		for (VkDeviceSize p = 0; p < this->image_object->memory_requirements.size; p+=4) {
+		for (VkDeviceSize p = 0; p < this->memory_requirements.size; p+=4) {
       uint8_t i = data[p + 0];
       uint8_t j = data[p + 1];
       uint8_t k = data[p + 2];
       uint8_t m = data[p + 3];
       if (k == 1) {
         context->tiles.insert(i << 24 | j << 16 | 0 << 8 | m);
+        context->tiles.insert((i / 2) << 24 | (j / 2) << 16 | 0 << 8 | m + 1);
       }
 		}
 
-		this->image_object->memory->unmap();
+		this->memory->unmap();
 	}
 
 private:
@@ -2457,7 +2480,8 @@ private:
 		VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
 	};
 	std::shared_ptr<VulkanImage> image;
-	std::shared_ptr<ImageObject> image_object;
+  std::shared_ptr<VulkanMemory> memory;
+  VkMemoryRequirements memory_requirements;
 	std::shared_ptr<VulkanFence> offscreen_fence;
   VkDeviceSize dataOffset;
 };

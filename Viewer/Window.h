@@ -42,7 +42,7 @@ public:
       _T("Windows Desktop Guided Tour Application"),
       WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT,
-      1280, 720,
+      1920, 1080,
       NULL,
       NULL,
       hInstance,
