@@ -38,34 +38,11 @@ Visitor::visit_separator(Separator* node, Context* context)
 void
 Visitor::visit(Node* node, Context* context)
 {
-	context->imageobjects.clear();
-	context->bufferobjects.clear();
-
 	context->command->begin();
 
 	context->begin();
 	node->visit(this, context);
 	context->end();
-
-	for (auto image_object : context->imageobjects) {
-		const auto memory = std::make_shared<VulkanMemory>(
-			context->device,
-			image_object->memory_requirements.size,
-			image_object->memory_type_index);
-
-		const VkDeviceSize offset = 0;
-		image_object->bind(memory, offset);
-	}
-
-	for (auto buffer_object : context->bufferobjects) {
-		const auto memory = std::make_shared<VulkanMemory>(
-			context->device,
-			buffer_object->memory_requirements.size,
-			buffer_object->memory_type_index);
-
-		const VkDeviceSize offset = 0;
-		buffer_object->bind(memory, offset);
-	}
 
 	context->fence->reset();
 	context->command->end();

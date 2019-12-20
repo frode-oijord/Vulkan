@@ -67,7 +67,6 @@ private:
 inline static EventVisitor eventvisitor;
 
 inline static Visitor allocvisitor;
-inline static Visitor stagevisitor;
 inline static Visitor resizevisitor;
 inline static Visitor pipelinevisitor;
 inline static Visitor recordvisitor;

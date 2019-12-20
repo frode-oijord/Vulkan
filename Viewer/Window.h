@@ -217,7 +217,6 @@ public:
     };
 
 		allocvisitor.visit(this->root.get(), this->context.get());
-		stagevisitor.visit(this->root.get(), this->context.get());
 		pipelinevisitor.visit(this->root.get(), this->context.get());
 		recordvisitor.visit(this->root.get(), this->context.get());
 	}

@@ -16,7 +16,6 @@ add_executable(Viewer
   ${PROJECT_SOURCE_DIR}/../Innovator/Timer.h
   ${PROJECT_SOURCE_DIR}/../Innovator/Visitor.cpp
   ${PROJECT_SOURCE_DIR}/../Innovator/Visitor.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/VulkanObjects.h
   ${PROJECT_SOURCE_DIR}/../Innovator/VulkanSurface.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Wrapper.h)
 

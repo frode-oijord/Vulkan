@@ -426,6 +426,10 @@ public:
     THROW_ON_ERROR(vkBindImageMemory(this->device, image, memory, offset));
   }
 
+  void bindBufferMemory(VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset)
+  {
+    THROW_ON_ERROR(vkBindBufferMemory(this->device, buffer, memory, offset));
+  }
 
   VkQueue getQueue(VkQueueFlags required_flags)
   {
@@ -937,14 +941,6 @@ public:
     return memory_requirements;
   }
 
-  uint32_t getMemoryTypeIndex(VkMemoryRequirements memory_requirements,
-                              VkMemoryPropertyFlags memory_property_flags)
-  {
-    uint32_t memory_type_index = this->device->physical_device.getMemoryTypeIndex(
-      memory_requirements.memoryTypeBits,
-      memory_property_flags);
-  }
-
   static VkImageMemoryBarrier MemoryBarrier(VkImage image,
                                             VkAccessFlags srcAccessMask,
                                             VkAccessFlags dstAccessMask,
@@ -1090,6 +1086,17 @@ public:
   ~VulkanBuffer()
   {
     vkDestroyBuffer(this->device->device, this->buffer, nullptr);
+  }
+
+  VkMemoryRequirements getMemoryRequirements()
+  {
+    VkMemoryRequirements memory_requirements;
+    vkGetBufferMemoryRequirements(
+      this->device->device,
+      this->buffer,
+      &memory_requirements);
+
+    return memory_requirements;
   }
 
   std::shared_ptr<VulkanDevice> device;
