@@ -133,8 +133,8 @@
          layout(location = 0) in vec2 texCoord;
          layout(location = 0) out uvec4 FragColor;
 
-         const float textureSize = 8192.0;
-         const float tileSize = 128.0;
+         const vec2 textureSize = vec2(8192.0);
+         const vec2 tileSize = vec2(128.0);
 
          float mipmapLevel(vec2 uv)
          {
@@ -150,11 +150,9 @@
 
             uint mip = uint(lod);
             mip = uint(max(int(mip) - 4, 0));
+            uvec2 ij = uvec2(texCoord * (textureSize / tileSize));
 
-            uint i = uint(texCoord.s * (textureSize / tileSize));
-            uint j = uint(texCoord.t * (textureSize / tileSize));
-
-            FragColor = uvec4(i >> mip, j >> mip, 1, mip);
+            FragColor = uvec4(ij.x >> mip, ij.y >> mip, 1, mip);
          }
       ]])
 
