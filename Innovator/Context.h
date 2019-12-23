@@ -68,7 +68,7 @@ public:
   std::unique_ptr<VulkanCommandBuffers> command;
   std::shared_ptr<VulkanPipelineCache> pipelinecache;
 
-  std::set<uint32_t> tiles;
+  class OffscreenImage* image;
 
 private:
   VkExtent2D extent;
