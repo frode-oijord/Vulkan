@@ -61,6 +61,9 @@ EventVisitor::EventVisitor()
 	this->register_callback<ViewMatrix>([this](ViewMatrix* node, Context* context) {
 		this->visit(node, context);
 	});
+	this->register_callback<TextureOffset>([this](TextureOffset* node, Context* context) {
+		this->visit(node, context);
+	});
 }
 
 void
@@ -86,4 +89,29 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 		}
 		this->press->pos = move->pos;
 	}
+}
+
+
+void 
+EventVisitor::visit(class TextureOffset* node, class Context* context)
+{
+	//auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
+	//if (press) {
+	//	this->press = press;
+	//}
+
+	//if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
+	//	this->press.reset();
+	//}
+
+	//auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
+	//if (move && this->press) {
+	//	glm::dvec2 dx = (this->press->pos - move->pos) * .01;
+	//	dx[1] = -dx[1];
+	//	switch (this->press->button) {
+	//	case 0: node->offset += dx[1] * 0.05f; break;
+	//	default: break;
+	//	}
+	//	this->press->pos = move->pos;
+	//}
 }

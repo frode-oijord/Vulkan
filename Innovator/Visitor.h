@@ -59,6 +59,7 @@ class EventVisitor : public Visitor {
 public:
 	EventVisitor();
 	void visit(class ViewMatrix* node, class Context* context);
+	void visit(class TextureOffset* node, class Context* context);
 
 private:
 	std::shared_ptr<class MousePressEvent> press{ nullptr };

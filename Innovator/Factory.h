@@ -2,8 +2,10 @@
 
 #include <Innovator/Defines.h>
 #include <vulkan/vulkan.h>
-#include <functional>
+
 #include <memory>
+#include <fstream>
+#include <functional>
 
 class VulkanTextureImage {
 public:
@@ -12,6 +14,7 @@ public:
   virtual ~VulkanTextureImage() = default;
 
   virtual VkExtent3D extent(size_t mip_level) const = 0;
+  virtual uint32_t element_size() const = 0;
   virtual uint32_t base_level() const = 0;
   virtual uint32_t levels() const = 0;
   virtual uint32_t base_layer() const = 0;
@@ -65,6 +68,11 @@ public:
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().y)),
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().z)),
     };
+  }
+
+  uint32_t element_size() const override 
+  {
+    return 4;
   }
 
   uint32_t base_level() const override
@@ -137,20 +145,32 @@ public:
 
   explicit DebugTextureImage(const std::string& filename)
   {
-    this->texture = gli::texture2d(
-      gli::texture::format_type::FORMAT_RGBA8_UNORM_PACK8,
-      gli::extent2d(512, 512));
+    this->texture = gli::texture3d(
+      gli::texture::format_type::FORMAT_R8_UNORM_PACK8,
+      gli::extent3d(512, 512, 512));
 
-      this->texture[0].clear(glm::u8vec4(0, 0, 255, 255));
-      this->texture[1].clear(glm::u8vec4(0, 255, 0, 255));
-      this->texture[2].clear(glm::u8vec4(0, 255, 255, 255));
-      this->texture[3].clear(glm::u8vec4(255, 0, 0, 255));
-      this->texture[4].clear(glm::u8vec4(255, 0, 255, 255));
-      this->texture[5].clear(glm::u8vec4(255, 255, 0, 255));
-      this->texture[6].clear(glm::u8vec4(255, 255, 255, 255));
-      this->texture[7].clear(glm::u8vec4(255, 0, 0, 255));
-      this->texture[8].clear(glm::u8vec4(255, 0, 0, 255));
-      this->texture[9].clear(glm::u8vec4(255, 0, 0, 255));
+      for (int lod = 0; lod < 3; lod++) {
+        std::string filename("sparse3d/blob");
+        filename += std::to_string(lod) + ".dat";
+
+        std::ifstream input(filename, std::ios::in | std::ios::binary);
+        std::vector<char> signed_data(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
+
+        std::vector<glm::u8vec1> unsigned_data(signed_data.size());
+        for (size_t i = 0; i < signed_data.size(); i++) {
+          unsigned_data[i] = glm::u8vec1(int(signed_data[i]) + 127);
+        }
+
+        std::copy(unsigned_data.begin(), unsigned_data.end(), reinterpret_cast<glm::u8vec1*>(this->texture[lod].data()));
+      }
+
+      this->texture[3].clear(glm::u8vec1(0));
+      this->texture[4].clear(glm::u8vec1(55));
+      this->texture[5].clear(glm::u8vec1(0));
+      this->texture[6].clear(glm::u8vec1(0));
+      this->texture[7].clear(glm::u8vec1(0));
+      this->texture[8].clear(glm::u8vec1(0));
+      this->texture[9].clear(glm::u8vec1(0));
   }
 
   virtual ~DebugTextureImage() = default;
@@ -162,6 +182,11 @@ public:
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().y)),
       static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().z)),
     };
+  }
+
+  uint32_t element_size() const override
+  {
+    return 1;
   }
 
   uint32_t base_level() const override
@@ -201,17 +226,17 @@ public:
 
   VkFormat format() const override
   {
-    return VK_FORMAT_R8G8B8A8_UNORM;
+    return VK_FORMAT_R8_UNORM;
   }
 
   VkImageType image_type() const override
   {
-    return VK_IMAGE_TYPE_2D;
+    return VK_IMAGE_TYPE_3D;
   }
 
   VkImageViewType image_view_type() const override
   {
-    return VK_IMAGE_VIEW_TYPE_2D;
+    return VK_IMAGE_VIEW_TYPE_3D;
   }
 
   VkImageSubresourceRange subresource_range() const override
@@ -225,5 +250,5 @@ public:
     };
   }
 
-  gli::texture2d texture;
+  gli::texture3d texture;
 };

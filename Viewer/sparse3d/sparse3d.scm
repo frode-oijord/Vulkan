@@ -130,16 +130,16 @@
       (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
          #version 450
 
-         layout(location = 0) in vec2 texCoord;
+         layout(location = 0) in vec3 texCoord;
          layout(location = 0) out uvec4 FragColor;
 
-         const vec2 textureSize = vec2(8192.0);
-         const vec2 tileSize = vec2(128.0);
+         const vec3 textureSize = vec3(512.0);
+         const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
-         float mipmapLevel(vec2 uv)
+         float mipmapLevel(vec3 uv)
          {
-            vec2 dx = dFdx(uv);
-            vec2 dy = dFdy(uv);
+            vec3 dx = dFdx(uv);
+            vec3 dy = dFdy(uv);
             float d = max(dot(dx, dx), dot(dy, dy));
             return 0.5 * log2(d);
          }
@@ -149,10 +149,10 @@
             float lod = mipmapLevel(texCoord * textureSize);
 
             uint mip = uint(lod);
-            mip = uint(max(int(mip) - 4, 0));
-            uvec2 ij = uvec2(texCoord * (textureSize / tileSize));
+            mip = uint(max(int(mip) - 3, 0));
+            uvec3 ijk = uvec3(texCoord * (textureSize / tileSize));
 
-            FragColor = uvec4(ij.x >> mip, ij.y >> mip, 0, mip);
+            FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip);
          }
       ]])
 
@@ -200,16 +200,31 @@
       (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
          #version 450
 
-         layout(binding = 1) uniform sampler2D Texture;
-         layout(location = 0) in vec2 texCoord;
+         layout(binding = 1) uniform sampler3D Texture;
+         layout(location = 0) in vec3 texCoord;
          layout(location = 0) out vec4 FragColor;
 
+         layout(std140, binding = 2) uniform Test {
+            float textureOffset;
+         };
+
          void main() {
-            FragColor = texture(Texture, texCoord);
+            vec3 tc = texCoord;
+            tc.z += textureOffset;
+            float r = texture(Texture, tc).r;
+            FragColor = vec4(r, r, r, 1.0);
          }
+         
       ]])
 
       (sparse-texture2d "world/world.ktx")
+
+      (textureoffset)
+      (descriptorsetlayoutbinding 
+         (uint32 2) 
+         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER 
+         VK_SHADER_STAGE_FRAGMENT_BIT)
+
 
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
@@ -233,7 +248,7 @@
             };
 
             layout(location = 0) in vec3 Position;
-            layout(location = 0) out vec2 texCoord;
+            layout(location = 0) out vec3 texCoord;
 
             out gl_PerVertex {
                vec4 gl_Position;
@@ -241,13 +256,13 @@
 
             void main() 
             {
-               texCoord = Position.xy;
+               texCoord = Position;
                gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
             }
          ]])
 
          (separator 
-            (extent (uint32 120) (uint32 68))
+            (extent (uint32 240) (uint32 135))
             lod-renderpass)
          (separator main-renderpass)))
 

@@ -133,6 +133,7 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "cpumemorybuffer", fun_ptr(node<CpuMemoryBuffer, VkBufferUsageFlags>) });
   env->outer->inner.insert({ "gpumemorybuffer", fun_ptr(node<GpuMemoryBuffer, VkBufferUsageFlags>) });
   env->outer->inner.insert({ "transformbuffer", fun_ptr(node<TransformBuffer>) });
+  env->outer->inner.insert({ "textureoffset", fun_ptr(node<TextureOffset>) });
   env->outer->inner.insert({ "indexeddrawcommand", fun_ptr(node<IndexedDrawCommand, uint32_t, uint32_t, uint32_t, int32_t, uint32_t, VkPrimitiveTopology>) });
   env->outer->inner.insert({ "indexbufferdescription", fun_ptr(node<IndexBufferDescription, VkIndexType>) });
   env->outer->inner.insert({ "descriptorsetlayoutbinding", fun_ptr(node<DescriptorSetLayoutBinding, uint32_t, VkDescriptorType, VkShaderStageFlagBits>) });

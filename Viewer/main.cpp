@@ -11,8 +11,11 @@ int main(int argc, char *argv[])
 {
   try {
     VulkanImageFactory::Register<GliTextureImage>();
-
 		auto test = eval_file("world/world.scm");
+
+    //VulkanImageFactory::Register<DebugTextureImage>();
+    //auto test = eval_file("sparse3d/sparse3d.scm");
+
 		auto window = std::any_cast<std::shared_ptr<VulkanWindow>>(test);
     return window->show();
   }

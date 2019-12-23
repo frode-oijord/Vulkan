@@ -183,8 +183,9 @@ public:
 
     VkPhysicalDeviceFeatures device_features;
     ::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
-		device_features.sparseBinding = VK_TRUE;
+    device_features.sparseBinding = VK_TRUE;
     device_features.sparseResidencyImage2D = VK_TRUE;
+    device_features.sparseResidencyImage3D = VK_TRUE;
 
     auto device = std::make_shared<VulkanDevice>(
       vulkan,

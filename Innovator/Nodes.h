@@ -451,6 +451,71 @@ private:
   std::shared_ptr<VulkanMemory> memory;
 };
 
+class TextureOffset : public Node {
+public:
+  IMPLEMENT_VISITABLE_INLINE
+  NO_COPY_OR_ASSIGNMENT(TextureOffset)
+  virtual ~TextureOffset() = default;
+
+  TextureOffset()
+    : size(sizeof(float)),
+      offset(0.0f)
+  {
+    REGISTER_VISITOR_CALLBACK(allocvisitor, TextureOffset, alloc);
+    REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureOffset, pipeline);
+    REGISTER_VISITOR_CALLBACK(rendervisitor, TextureOffset, render);
+  }
+
+  void alloc(Context* context)
+  {
+    this->buffer = std::make_shared<VulkanBuffer>(
+      context->device,
+      0,
+      this->size,
+      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+      VK_SHARING_MODE_EXCLUSIVE);
+
+    VkMemoryRequirements memory_requirements = this->buffer->getMemoryRequirements();
+
+    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+      memory_requirements.memoryTypeBits,
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    this->memory = std::make_shared<VulkanMemory>(
+      context->device,
+      memory_requirements.size,
+      memory_type_index);
+
+    context->device->bindBufferMemory(
+      this->buffer->buffer,
+      this->memory->memory,
+      0);
+  }
+
+  void pipeline(Context* creator)
+  {
+    creator->state.buffer = this->buffer->buffer;
+  }
+
+  void render(Context* context)
+  {
+    std::array<float, 1> data = {
+      this->offset
+    };
+
+    MemoryMap map(this->memory.get(), this->size, 0);
+    std::copy(data.begin(), data.end(), reinterpret_cast<float*>(map.mem));
+  }
+
+  float offset;
+
+private:
+  size_t size;
+  std::shared_ptr<VulkanBuffer> buffer;
+  std::shared_ptr<VulkanMemory> memory;
+};
+
+
 class TransformBuffer : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -2122,9 +2187,10 @@ public:
       uint8_t j = data[p + 1];
       uint8_t k = data[p + 2];
       uint8_t m = data[p + 3];
-      if (k == 1) {
-        tiles.insert(i << 24 | j << 16 | 0 << 8 | m);
-        tiles.insert((i / 2) << 24 | (j / 2) << 16 | 0 << 8 | m + 1);
+
+      if (i != 0 || j != 0 || k != 0 || m != 0) {
+        tiles.insert((i >> 0) << 24 | (j >> 0) << 16 | (k >> 0) << 8 | m + 0);
+        tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m + 1);
       }
 		}
 
@@ -2211,7 +2277,7 @@ public:
       mipOffset += texture->size(m);
     }
 
-    VkDeviceSize elementSize = 4; // 4 bytes per pixel
+    VkDeviceSize elementSize = texture->element_size();
     VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
 
     const VkImageSubresourceLayers imageSubresource{
@@ -2298,7 +2364,6 @@ public:
   void updateBindings(Context* context)
   {
     std::set<uint32_t> tiles = context->image->getTiles(context);
-
     std::set<uint32_t> memory_pages_bind;
 
     std::set_difference(
@@ -2429,20 +2494,20 @@ public:
 class SparseImage : public Node {
 public:
   IMPLEMENT_VISITABLE_INLINE
-    NO_COPY_OR_ASSIGNMENT(SparseImage)
-    virtual ~SparseImage() = default;
+  NO_COPY_OR_ASSIGNMENT(SparseImage)
+  virtual ~SparseImage() = default;
   SparseImage(VkSampleCountFlagBits sample_count,
-    VkImageTiling tiling,
-    VkImageUsageFlags usage_flags,
-    VkSharingMode sharing_mode,
-    VkImageCreateFlags create_flags,
-    VkImageLayout layout) :
-    sample_count(sample_count),
-    tiling(tiling),
-    usage_flags(usage_flags),
-    sharing_mode(sharing_mode),
-    create_flags(create_flags),
-    layout(layout)
+              VkImageTiling tiling,
+              VkImageUsageFlags usage_flags,
+              VkSharingMode sharing_mode,
+              VkImageCreateFlags create_flags,
+              VkImageLayout layout) :
+              sample_count(sample_count),
+              tiling(tiling),
+              usage_flags(usage_flags),
+              sharing_mode(sharing_mode),
+              create_flags(create_flags),
+              layout(layout)
   {
     REGISTER_VISITOR_CALLBACK(allocvisitor, SparseImage, alloc);
     REGISTER_VISITOR_CALLBACK(pipelinevisitor, SparseImage, pipeline);
