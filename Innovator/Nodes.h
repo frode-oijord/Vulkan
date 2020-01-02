@@ -2050,7 +2050,6 @@ public:
 
 	void alloc(Context* context)
 	{
-		this->offscreen_fence = std::make_unique<VulkanFence>(context->device);
     this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
 
 		VkExtent3D extent = { 
@@ -2132,15 +2131,15 @@ public:
       extent3d                                                        // extent
     };
 
-    VulkanCommandBuffers::Scope command_scope(this->get_image_command.get());
-
-    VulkanImage::PipelineBarrier(this->get_image_command->buffer(), {
+    VulkanImage::PipelineBarrier(context->command->buffer(), {
       VulkanImage::MemoryBarrier(this->color_attachment->image->image,
-                                 VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-                                 VK_ACCESS_TRANSFER_READ_BIT,
-                                 VK_IMAGE_LAYOUT_UNDEFINED,
-                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                 this->subresource_range)});
+                                  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+                                  VK_ACCESS_TRANSFER_READ_BIT,
+                                  VK_IMAGE_LAYOUT_UNDEFINED,
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                  this->subresource_range) });
+
+    VulkanCommandBuffers::Scope command_scope(this->get_image_command.get());
 
     VulkanImage::LayoutScope layout_scope(this->get_image_command->buffer(), {
       VulkanImage::MemoryBarrier(this->color_attachment->image->image,
@@ -2151,10 +2150,10 @@ public:
                                   this->subresource_range),
       VulkanImage::MemoryBarrier(this->image->image,
                                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                  VK_ACCESS_TRANSFER_WRITE_BIT,
+                                  VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT,
                                   VK_IMAGE_LAYOUT_GENERAL,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  this->subresource_range)});
+                                  this->subresource_range) });
 
     vkCmdCopyImage(
       this->get_image_command->buffer(),
@@ -2168,14 +2167,10 @@ public:
   std::set<uint32_t> getTiles(class Context* context)
 	{
     //Timer timer("offscreen render");
-		this->offscreen_fence->reset();
 
 		this->get_image_command->submit(
 			context->queue,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-      this->offscreen_fence->fence);
-		
-		this->offscreen_fence->wait();
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 
 		const uint8_t* data = reinterpret_cast<uint8_t*>(this->memory->map(VK_WHOLE_SIZE, 0, 0));
     data += this->dataOffset;
@@ -2212,8 +2207,7 @@ private:
 	std::shared_ptr<VulkanImage> image;
   std::shared_ptr<VulkanMemory> memory;
   VkMemoryRequirements memory_requirements;
-	std::shared_ptr<VulkanFence> offscreen_fence;
-  VkDeviceSize dataOffset;
+	VkDeviceSize dataOffset;
 };
 
 
@@ -2567,4 +2561,3 @@ private:
 
   std::unique_ptr<MemoryPageManager> memory_manager;
 };
-
