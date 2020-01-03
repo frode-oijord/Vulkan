@@ -55,6 +55,14 @@ public:
 };
 
 
+class RenderVisitor : public Visitor {
+public:
+	RenderVisitor() = default;
+
+	void visit(class Node* node, class Context* context);
+};
+
+
 class EventVisitor : public Visitor {
 public:
 	EventVisitor();

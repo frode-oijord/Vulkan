@@ -916,7 +916,8 @@ public:
 
   void alloc(Context* context)
   {
-    this->image = std::make_shared<VulkanImage>(context->device,
+    this->image = std::make_shared<VulkanImage>(
+      context->device,
       context->state.texture->image_type(),
       context->state.texture->format(),
       context->state.texture->extent(0),
@@ -976,22 +977,39 @@ public:
       bufferOffset += texture->size(mip_level);
     }
 
-    this->image->changeLayout(
-      context->command->buffer(),
-      0,
-      VK_ACCESS_TRANSFER_WRITE_BIT,
-      VK_IMAGE_LAYOUT_UNDEFINED,
-      this->layout,
-      texture->subresource_range());
+    context->command->pipelineBarrier(
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,          // don't wait for anything
+      VK_PIPELINE_STAGE_TRANSFER_BIT,             // but block transfer 
+      { 
+        VulkanImage::MemoryBarrier(
+          this->image->image,
+          0,
+          0,
+          VK_IMAGE_LAYOUT_UNDEFINED,
+          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          context->state.texture->subresource_range()) 
+      });
 
-    this->image->copyBuffer(
+    vkCmdCopyBufferToImage(
       context->command->buffer(),
       context->state.buffer,
-      regions,
-      0,
-      VK_ACCESS_TRANSFER_WRITE_BIT,
-      this->layout,
-      texture->subresource_range());
+      this->image->image,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      static_cast<uint32_t>(regions.size()),
+      regions.data());
+
+    context->command->pipelineBarrier(
+      VK_PIPELINE_STAGE_TRANSFER_BIT,               // wait for transfer
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,         // don't block anything
+      {
+        VulkanImage::MemoryBarrier(
+          this->image->image,
+          0,
+          0,
+          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          this->layout,
+          context->state.texture->subresource_range())
+      });
 
     context->state.image = this->image->image;
   }
@@ -1740,8 +1758,6 @@ public:
 
     this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
     this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
-    this->render_fence = std::make_unique<VulkanFence>(context->device);
-    this->rendering_finished = std::make_unique<VulkanSemaphore>(context->device);
 
     this->renderpass = context->state.renderpass;
     this->framebuffer = context->state.framebuffer;
@@ -1779,22 +1795,14 @@ public:
     }
     this->render_command->end();
 
-    std::vector<VkSemaphore> wait_semaphores{};
-    std::vector<VkSemaphore> signal_semaphores = { this->rendering_finished->semaphore };
-
-    this->render_fence->reset();
-    this->render_command->submit(this->render_queue,
-                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                 this->render_fence->fence);
-    this->render_fence->wait();
-    vkDeviceWaitIdle(context->device->device);
+    this->render_command->submit(
+      this->render_queue,
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
   }
 
 public:
   VkQueue render_queue{ nullptr };
-  std::unique_ptr<VulkanSemaphore> rendering_finished;
   std::unique_ptr<VulkanCommandBuffers> render_command;
-  std::shared_ptr<VulkanFence> render_fence;
   std::shared_ptr<VulkanRenderpass> renderpass;
   std::shared_ptr<VulkanFramebuffer> framebuffer;
 };
@@ -1910,13 +1918,16 @@ public:
                                                         this->swapchain_images.data()));
 
     for (uint32_t i = 0; i < count; i++) {
-      VulkanImage::ChangeLayout(this->swapchain_images[i],
-                                context->command->buffer(),
-                                0,
-                                VK_ACCESS_TRANSFER_WRITE_BIT,
-                                VK_IMAGE_LAYOUT_UNDEFINED,
-                                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                                this->subresource_range);
+      context->command->pipelineBarrier(
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+          VulkanImage::MemoryBarrier(
+            this->swapchain_images[i],
+            0,
+            0,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            this->subresource_range) });
       }
   }
 
@@ -1927,24 +1938,6 @@ public:
                                                                         VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
     for (size_t i = 0; i < this->swapchain_images.size(); i++) {
-      VulkanCommandBuffers::Scope command_scope(this->swap_buffers_command.get(), i);
-
-      VulkanImage::LayoutScope layout_scope(this->swap_buffers_command->buffer(i), {
-        VulkanImage::MemoryBarrier(this->swapchain_images[i],
-                                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                   VK_ACCESS_TRANSFER_WRITE_BIT,
-                                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                   this->subresource_range),
-
-        VulkanImage::MemoryBarrier(this->color_attachment->image->image,
-                                   VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                   VK_ACCESS_TRANSFER_READ_BIT,
-                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                   this->subresource_range),
-        });
-
       const VkImageSubresourceLayers subresource_layers{
         this->subresource_range.aspectMask,     // aspectMask
         this->subresource_range.baseMipLevel,   // mipLevel
@@ -1956,24 +1949,67 @@ public:
         0, 0, 0
       };
 
-      VkExtent3D extent3d = { 
-        context->state.extent.width, context->state.extent.height, 1 
+      VkExtent3D extent3d = {
+        context->state.extent.width, context->state.extent.height, 1
       };
 
-      VkImageCopy image_copy{
+      std::vector<VkImageCopy> regions{ {
         subresource_layers,             // srcSubresource
         offset,                         // srcOffset
         subresource_layers,             // dstSubresource
         offset,                         // dstOffset
         extent3d                        // extent
-      };
+      } };
+
+      VulkanCommandBuffers::Scope command_scope(this->swap_buffers_command.get(), i);
+
+      VkImage srcImage = this->color_attachment->image->image;
+      VkImage dstImage = this->swapchain_images[i];
+
+      this->swap_buffers_command->pipelineBarrier(
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // wait until color attachment is written
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,           // no later stages to block, we're done
+        {
+          VulkanImage::MemoryBarrier(
+            srcImage,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,       // srcAccessMask
+            0,                                          // dstAccessMask 
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,   // oldLayout
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,       // newLayout
+            this->subresource_range),
+          VulkanImage::MemoryBarrier(
+            dstImage,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            0,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            this->subresource_range)
+          }, i);
 
       vkCmdCopyImage(this->swap_buffers_command->buffer(i),
-                     color_attachment->image->image,
-                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                     this->swapchain_images[i],
-                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                     1, &image_copy);
+                     srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                     dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                     static_cast<uint32_t>(regions.size()), regions.data());
+
+      this->swap_buffers_command->pipelineBarrier(
+        VK_PIPELINE_STAGE_TRANSFER_BIT,                 // wait until copy is done
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,           // nothing to block
+        {
+          VulkanImage::MemoryBarrier(
+            srcImage,
+            0,                                          // srcAccessMask
+            0,                                          // dstAccessMask 
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            this->subresource_range),
+          VulkanImage::MemoryBarrier(
+            dstImage,
+            0,                                          // srcAccessMask
+            0,                                          // dstAccessMask 
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            this->subresource_range)
+        }, i);
     }
   }
 
@@ -2048,25 +2084,25 @@ public:
 		REGISTER_VISITOR_CALLBACK(rendervisitor, OffscreenImage, render);
 	}
 
-	void alloc(Context* context)
-	{
+  void alloc(Context* context)
+  {
     this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
 
-		VkExtent3D extent = { 
-			context->state.extent.width, context->state.extent.height, 1 
-		};
+    VkExtent3D extent = {
+      context->state.extent.width, context->state.extent.height, 1
+    };
 
-		this->image = std::make_shared<VulkanImage>(
-			context->device,
-			VK_IMAGE_TYPE_2D,
-			this->color_attachment->format,
-			extent,
-			this->subresource_range.levelCount,
-			this->subresource_range.layerCount,
-			VK_SAMPLE_COUNT_1_BIT,
-			VK_IMAGE_TILING_LINEAR,
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-			VK_SHARING_MODE_EXCLUSIVE);
+    this->image = std::make_shared<VulkanImage>(
+      context->device,
+      VK_IMAGE_TYPE_2D,
+      this->color_attachment->format,
+      extent,
+      this->subresource_range.levelCount,
+      this->subresource_range.layerCount,
+      VK_SAMPLE_COUNT_1_BIT,
+      VK_IMAGE_TILING_LINEAR,
+      VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+      VK_SHARING_MODE_EXCLUSIVE);
 
     this->memory_requirements = this->image->getMemoryRequirements();
 
@@ -2074,23 +2110,25 @@ public:
       this->memory_requirements.memoryTypeBits,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-		this->memory = std::make_shared<VulkanMemory>(
-			context->device,
+    this->memory = std::make_shared<VulkanMemory>(
+      context->device,
       this->memory_requirements.size,
-			memory_type_index);
+      memory_type_index);
 
     context->device->bindImageMemory(
-      this->image->image, 
-      this->memory->memory, 
+      this->image->image,
+      this->memory->memory,
       0);
 
-    this->image->changeLayout(
-      context->command->buffer(),
-      0,
-      VK_ACCESS_TRANSFER_WRITE_BIT,
-      VK_IMAGE_LAYOUT_UNDEFINED,
-      VK_IMAGE_LAYOUT_GENERAL,
-      this->subresource_range);
+    context->command->pipelineBarrier(
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+      this->image->memoryBarrier(
+        0,
+        0,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL,
+        this->subresource_range) });
 
     VkImageSubresource image_subresource{
       VK_IMAGE_ASPECT_COLOR_BIT, 0, 0
@@ -2104,7 +2142,7 @@ public:
       &subresource_layout);
 
     this->dataOffset = subresource_layout.offset;
-	}
+  }
 
   void record(Context* context)
   {
@@ -2131,29 +2169,24 @@ public:
       extent3d                                                        // extent
     };
 
-    VulkanImage::PipelineBarrier(context->command->buffer(), {
-      VulkanImage::MemoryBarrier(this->color_attachment->image->image,
-                                  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-                                  VK_ACCESS_TRANSFER_READ_BIT,
-                                  VK_IMAGE_LAYOUT_UNDEFINED,
-                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                  this->subresource_range) });
-
     VulkanCommandBuffers::Scope command_scope(this->get_image_command.get());
 
-    VulkanImage::LayoutScope layout_scope(this->get_image_command->buffer(), {
-      VulkanImage::MemoryBarrier(this->color_attachment->image->image,
-                                  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
-                                  VK_ACCESS_TRANSFER_READ_BIT,
-                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                  this->subresource_range),
-      VulkanImage::MemoryBarrier(this->image->image,
-                                  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                  VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT,
-                                  VK_IMAGE_LAYOUT_GENERAL,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  this->subresource_range) });
+    this->get_image_command->pipelineBarrier(
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,          // don't wait for anything, the color attachment was rendered to in preceding render pass
+      VK_PIPELINE_STAGE_TRANSFER_BIT,             // block transfer stage (copy)
+      {
+        this->color_attachment->image->memoryBarrier(
+          0,
+          0,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          this->subresource_range),
+        this->image->memoryBarrier(
+          0,
+          0,
+          VK_IMAGE_LAYOUT_GENERAL,
+          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          this->subresource_range) });
 
     vkCmdCopyImage(
       this->get_image_command->buffer(),
@@ -2162,6 +2195,23 @@ public:
       this->image->image,
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       1, &image_copy);
+
+    this->get_image_command->pipelineBarrier(
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+      {
+        this->color_attachment->image->memoryBarrier(
+          0,
+          0,
+          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+          this->subresource_range),
+        this->image->memoryBarrier(
+          0,
+          0,
+          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+          VK_IMAGE_LAYOUT_GENERAL,
+          this->subresource_range) });
   }
 
   std::set<uint32_t> getTiles(class Context* context)
@@ -2449,14 +2499,39 @@ public:
     else {
       this->copy_sparse_command->begin();
 
-      this->image->copyBuffer(
+      this->copy_sparse_command->pipelineBarrier(
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        { 
+          VulkanImage::MemoryBarrier(
+            this->image->image,
+            0,
+            0,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            context->state.texture->subresource_range())
+        });
+
+      vkCmdCopyBufferToImage(
         this->copy_sparse_command->buffer(),
         context->state.buffer,
-        regions,
-        0,
-        VK_ACCESS_TRANSFER_WRITE_BIT,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        context->state.texture->subresource_range());
+        this->image->image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        static_cast<uint32_t>(regions.size()),
+        regions.data());
+
+      this->copy_sparse_command->pipelineBarrier(
+        VK_PIPELINE_STAGE_TRANSFER_BIT,                     // wait for transfer operation (copy)
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,              // block fragment shader where texture is sampled
+        {
+          VulkanImage::MemoryBarrier(
+            this->image->image,
+            0,
+            0,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            context->state.texture->subresource_range())
+        });
 
       this->copy_sparse_command->end();
 
@@ -2508,7 +2583,6 @@ public:
     REGISTER_VISITOR_CALLBACK(rendervisitor, SparseImage, render);
   }
 
-
   void alloc(Context* context)
   {
     VulkanTextureImage* texture = context->state.texture;
@@ -2525,16 +2599,17 @@ public:
       this->sharing_mode,
       this->create_flags);
 
-    this->image->changeLayout(
-      context->command->buffer(),
-      0,
-      VK_ACCESS_TRANSFER_WRITE_BIT,
-      VK_IMAGE_LAYOUT_UNDEFINED,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      context->state.texture->subresource_range());
+    context->command->pipelineBarrier(
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+      this->image->memoryBarrier(
+        0,
+        0,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        context->state.texture->subresource_range()) });
 
     this->memory_manager = std::make_unique<MemoryPageManager>(context, this->image);
-
     context->state.image = this->image->image;
   }
 

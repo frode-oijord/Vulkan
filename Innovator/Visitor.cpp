@@ -56,6 +56,15 @@ Visitor::visit(Node* node, Context* context)
 }
 
 
+void 
+RenderVisitor::visit(class Node* node, class Context* context)
+{
+	context->begin();
+	node->visit(this, context);
+	context->end();
+}
+
+
 EventVisitor::EventVisitor()
 {
 	this->register_callback<ViewMatrix>([this](ViewMatrix* node, Context* context) {

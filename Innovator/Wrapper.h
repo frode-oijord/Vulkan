@@ -431,18 +431,13 @@ public:
     THROW_ON_ERROR(vkBindBufferMemory(this->device, buffer, memory, offset));
   }
 
-  VkQueue getQueue(VkQueueFlags required_flags)
-  {
-    std::vector<VkBool32> filter(this->physical_device.queue_family_properties.size(), VK_TRUE);
-    uint32_t queue_index = this->physical_device.getQueueIndex(required_flags, filter);
-    return this->queues[queue_index];
-  }
-
-  VkQueue getQueue(VkQueueFlags required_flags, VkSurfaceKHR surface)
+  VkQueue getQueue(VkQueueFlags required_flags, VkSurfaceKHR surface = VK_NULL_HANDLE)
   {
     std::vector<VkBool32> filter(physical_device.queue_family_properties.size(), VK_TRUE);
-    for (uint32_t i = 0; i < physical_device.queue_family_properties.size(); i++) {
-      vkGetPhysicalDeviceSurfaceSupportKHR(physical_device.device, i, surface, &filter[i]);
+    if (surface != VK_NULL_HANDLE) {
+      for (uint32_t i = 0; i < physical_device.queue_family_properties.size(); i++) {
+        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device.device, i, surface, &filter[i]);
+      }
     }
     uint32_t queue_index = this->physical_device.getQueueIndex(required_flags, filter);
     return this->queues[queue_index];
@@ -757,6 +752,154 @@ public:
   VkFence fence { nullptr };
 };
 
+
+class VulkanImage {
+public:
+  NO_COPY_OR_ASSIGNMENT(VulkanImage)
+    VulkanImage() = delete;
+
+  VulkanImage(std::shared_ptr<VulkanDevice> device,
+    VkImageType image_type,
+    VkFormat format,
+    VkExtent3D extent,
+    uint32_t mip_levels,
+    uint32_t array_layers,
+    VkSampleCountFlagBits samples,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkSharingMode sharing_mode,
+    VkImageCreateFlags flags = 0,
+    std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>(),
+    VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) :
+    device(std::move(device))
+  {
+    VkImageCreateInfo create_info{
+      VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,                // sType  
+      nullptr,                                            // pNext  
+      flags,                                              // flags  
+      image_type,                                         // imageType  
+      format,                                             // format  
+      extent,                                             // extent  
+      mip_levels,                                         // mipLevels  
+      array_layers,                                       // arrayLayers  
+      samples,                                            // samples  
+      tiling,                                             // tiling  
+      usage,                                              // usage  
+      sharing_mode,                                       // sharingMode  
+      static_cast<uint32_t>(queue_family_indices.size()), // queueFamilyIndexCount
+      queue_family_indices.data(),                        // pQueueFamilyIndices
+      initial_layout,                                     // initialLayout
+    };
+
+    THROW_ON_ERROR(vkCreateImage(this->device->device, &create_info, nullptr, &this->image));
+  }
+
+  ~VulkanImage()
+  {
+    vkDestroyImage(this->device->device, this->image, nullptr);
+  }
+
+  VkMemoryRequirements getMemoryRequirements()
+  {
+    VkMemoryRequirements memory_requirements;
+    vkGetImageMemoryRequirements(
+      this->device->device,
+      this->image,
+      &memory_requirements);
+
+    return memory_requirements;
+  }
+
+  static VkImageMemoryBarrier MemoryBarrier(
+    VkImage image,
+    VkAccessFlags srcAccessMask,
+    VkAccessFlags dstAccessMask,
+    VkImageLayout oldLayout,
+    VkImageLayout newLayout,
+    VkImageSubresourceRange subresourceRange)
+  {
+    return {
+      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      nullptr,
+      srcAccessMask,
+      dstAccessMask,
+      oldLayout,
+      newLayout,
+      0,
+      0,
+      image,
+      subresourceRange
+    };
+  }
+
+  VkImageMemoryBarrier memoryBarrier(
+    VkAccessFlags srcAccessMask,
+    VkAccessFlags dstAccessMask,
+    VkImageLayout oldLayout,
+    VkImageLayout newLayout,
+    VkImageSubresourceRange subresourceRange)
+  {
+    return MemoryBarrier(
+      this->image,
+      srcAccessMask,
+      dstAccessMask,
+      oldLayout,
+      newLayout,
+      subresourceRange);
+  }
+
+  std::shared_ptr<VulkanDevice> device;
+  VkImage image{ nullptr };
+};
+
+class VulkanBuffer {
+public:
+  NO_COPY_OR_ASSIGNMENT(VulkanBuffer)
+  VulkanBuffer() = delete;
+
+  VulkanBuffer(std::shared_ptr<VulkanDevice> device,
+    VkBufferCreateFlags flags,
+    VkDeviceSize size,
+    VkBufferUsageFlags usage,
+    VkSharingMode sharingMode,
+    const std::vector<uint32_t>& queueFamilyIndices = std::vector<uint32_t>())
+    : device(std::move(device))
+  {
+    VkBufferCreateInfo create_info{
+      VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,             // sType  
+      nullptr,                                          // pNext  
+      flags,                                            // flags  
+      size,                                             // size  
+      usage,                                            // usage  
+      sharingMode,                                      // sharingMode  
+      static_cast<uint32_t>(queueFamilyIndices.size()), // queueFamilyIndexCount  
+      queueFamilyIndices.data(),                        // pQueueFamilyIndices  
+    };
+
+    THROW_ON_ERROR(vkCreateBuffer(this->device->device, &create_info, nullptr, &this->buffer));
+  }
+
+  ~VulkanBuffer()
+  {
+    vkDestroyBuffer(this->device->device, this->buffer, nullptr);
+  }
+
+  VkMemoryRequirements getMemoryRequirements()
+  {
+    VkMemoryRequirements memory_requirements;
+    vkGetBufferMemoryRequirements(
+      this->device->device,
+      this->buffer,
+      &memory_requirements);
+
+    return memory_requirements;
+  }
+
+  std::shared_ptr<VulkanDevice> device;
+  VkBuffer buffer{ nullptr };
+};
+
+
 class VulkanCommandBuffers {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanCommandBuffers)
@@ -799,7 +942,11 @@ public:
 
   ~VulkanCommandBuffers()
   {
-    vkFreeCommandBuffers(this->device->device, this->device->default_pool, static_cast<uint32_t>(this->buffers.size()), this->buffers.data());
+    vkFreeCommandBuffers(
+      this->device->device, 
+      this->device->default_pool, 
+      static_cast<uint32_t>(this->buffers.size()), 
+      this->buffers.data());
   }
 
   void begin(size_t buffer_index = 0,
@@ -880,227 +1027,37 @@ public:
     return this->buffers[buffer_index];
   }
 
-  std::shared_ptr<VulkanDevice> device;
-  std::vector<VkCommandBuffer> buffers;
-};
-
-class VulkanImage {
-public:
-  NO_COPY_OR_ASSIGNMENT(VulkanImage)
-  VulkanImage() = delete;
-
-  VulkanImage(std::shared_ptr<VulkanDevice> device, 
-              VkImageType image_type, 
-              VkFormat format, 
-              VkExtent3D extent,
-              uint32_t mip_levels,
-              uint32_t array_layers,
-              VkSampleCountFlagBits samples,
-              VkImageTiling tiling, 
-              VkImageUsageFlags usage, 
-              VkSharingMode sharing_mode,
-              VkImageCreateFlags flags = 0,
-              std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>(),
-              VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) : 
-    device(std::move(device))
-  {
-    VkImageCreateInfo create_info {
-      VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,                // sType  
-      nullptr,                                            // pNext  
-      flags,                                              // flags  
-      image_type,                                         // imageType  
-      format,                                             // format  
-      extent,                                             // extent  
-      mip_levels,                                         // mipLevels  
-      array_layers,                                       // arrayLayers  
-      samples,                                            // samples  
-      tiling,                                             // tiling  
-      usage,                                              // usage  
-      sharing_mode,                                       // sharingMode  
-      static_cast<uint32_t>(queue_family_indices.size()), // queueFamilyIndexCount
-      queue_family_indices.data(),                        // pQueueFamilyIndices
-      initial_layout,                                     // initialLayout
-    };
-
-    THROW_ON_ERROR(vkCreateImage(this->device->device, &create_info, nullptr, &this->image));
-  }
-
-  ~VulkanImage()
-  {
-    vkDestroyImage(this->device->device, this->image, nullptr);
-  }
-
-  VkMemoryRequirements getMemoryRequirements()
-  {
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(
-      this->device->device,
-      this->image,
-      &memory_requirements);
-
-    return memory_requirements;
-  }
-
-  static VkImageMemoryBarrier MemoryBarrier(VkImage image,
-                                            VkAccessFlags srcAccessMask,
-                                            VkAccessFlags dstAccessMask,
-                                            VkImageLayout oldLayout,
-                                            VkImageLayout newLayout,
-                                            VkImageSubresourceRange subresourceRange)
-  {
-    return {
-      VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-      nullptr,
-      srcAccessMask,
-      dstAccessMask,
-      oldLayout,
-      newLayout,
-      0,
-      0,
-      image,
-      subresourceRange
-    };
-  }
-
-  class LayoutScope {
-  public:
-    LayoutScope(VkCommandBuffer command, std::vector<VkImageMemoryBarrier> barriers) :
-      command(command),
-      barriers(barriers)
-    {
-      VulkanImage::PipelineBarrier(this->command, this->barriers);
-    }
-
-    ~LayoutScope()
-    {
-      for (auto& barrier : this->barriers) {
-        std::swap(barrier.newLayout, barrier.oldLayout);
-      }
-      VulkanImage::PipelineBarrier(this->command, this->barriers);
-    }
-
-    VkCommandBuffer command;
-    std::vector<VkImageMemoryBarrier> barriers;
-  };
-
-  static void PipelineBarrier(VkCommandBuffer command, 
-                              std::vector<VkImageMemoryBarrier> barriers)
+  static void PipelineBarrier(
+    VkCommandBuffer buffer,
+    VkPipelineStageFlags srcStageMask,
+    VkPipelineStageFlags dstStageMask,
+    std::vector<VkImageMemoryBarrier> barriers,
+    size_t buffer_index = 0)
   {
     vkCmdPipelineBarrier(
-      command,
-      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+      buffer,
+      srcStageMask,
+      dstStageMask,
       0, 0, nullptr, 0, nullptr,
       static_cast<uint32_t>(barriers.size()),
       barriers.data());
   }
 
-  static void ChangeLayout(VkImage image,
-                           VkCommandBuffer command,
-                           VkAccessFlags srcAccessMask,
-                           VkAccessFlags dstAccessMask,
-                           VkImageLayout oldLayout,
-                           VkImageLayout newLayout,
-                           VkImageSubresourceRange subresourceRange)
+  void pipelineBarrier(
+    VkPipelineStageFlags srcStageMask,
+    VkPipelineStageFlags dstStageMask,
+    std::vector<VkImageMemoryBarrier> barriers,
+    size_t buffer_index = 0)
   {
-    VulkanImage::PipelineBarrier(
-      command, { VulkanImage::MemoryBarrier(image, srcAccessMask, dstAccessMask, oldLayout, newLayout, subresourceRange) });
-  }
-
-
-  void changeLayout(VkCommandBuffer command, 
-                    VkAccessFlags srcAccessMask,
-                    VkAccessFlags dstAccessMask,
-                    VkImageLayout oldLayout,
-                    VkImageLayout newLayout,
-                    VkImageSubresourceRange subresourceRange)
-  {
-    VulkanImage::ChangeLayout(
-      this->image,
-      command,
-      srcAccessMask,
-      dstAccessMask,
-      oldLayout,
-      newLayout,
-      subresourceRange);
-  }
-
-  void copyBuffer(VkCommandBuffer command,
-                  VkBuffer buffer,
-                  std::vector<VkBufferImageCopy>& regions,
-                  VkAccessFlags srcAccessMask,
-                  VkAccessFlags dstAccessMask,
-                  VkImageLayout oldLayout,
-                  VkImageSubresourceRange subresourceRange)
-  {
-    LayoutScope scope(command, { 
-      VulkanImage::MemoryBarrier(
-        this->image,
-        srcAccessMask,
-        dstAccessMask,
-        oldLayout,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        subresourceRange)
-      });
-
-    vkCmdCopyBufferToImage(
-      command,
-      buffer,
-      this->image,
-      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      static_cast<uint32_t>(regions.size()),
-      regions.data());
+    PipelineBarrier(
+      this->buffers[buffer_index],
+      srcStageMask,
+      dstStageMask,
+      barriers);
   }
 
   std::shared_ptr<VulkanDevice> device;
-  VkImage image{ nullptr };
-};
-
-class VulkanBuffer {
-public:
-  NO_COPY_OR_ASSIGNMENT(VulkanBuffer)
-  VulkanBuffer() = delete;
-
-  VulkanBuffer(std::shared_ptr<VulkanDevice> device,
-               VkBufferCreateFlags flags, 
-               VkDeviceSize size, 
-               VkBufferUsageFlags usage,
-               VkSharingMode sharingMode,
-               const std::vector<uint32_t> & queueFamilyIndices = std::vector<uint32_t>())
-    : device(std::move(device))
-  {
-    VkBufferCreateInfo create_info {
-      VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,             // sType  
-      nullptr,                                          // pNext  
-      flags,                                            // flags  
-      size,                                             // size  
-      usage,                                            // usage  
-      sharingMode,                                      // sharingMode  
-      static_cast<uint32_t>(queueFamilyIndices.size()), // queueFamilyIndexCount  
-      queueFamilyIndices.data(),                        // pQueueFamilyIndices  
-    };
-
-    THROW_ON_ERROR(vkCreateBuffer(this->device->device, &create_info, nullptr, &this->buffer));
-  }
-
-  ~VulkanBuffer()
-  {
-    vkDestroyBuffer(this->device->device, this->buffer, nullptr);
-  }
-
-  VkMemoryRequirements getMemoryRequirements()
-  {
-    VkMemoryRequirements memory_requirements;
-    vkGetBufferMemoryRequirements(
-      this->device->device,
-      this->buffer,
-      &memory_requirements);
-
-    return memory_requirements;
-  }
-
-  std::shared_ptr<VulkanDevice> device;
-  VkBuffer buffer{ nullptr };
+  std::vector<VkCommandBuffer> buffers;
 };
 
 inline 
