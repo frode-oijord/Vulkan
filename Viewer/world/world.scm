@@ -160,7 +160,7 @@
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))
 
-      (offscreen-image lod-color-attachment)))
+      ))
 
 
    (define main-renderpass (renderpass
@@ -189,6 +189,10 @@
             (pipeline-bindpoint VK_PIPELINE_BIND_POINT_GRAPHICS)
             (color-attachment (uint32 0) VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
             (depth-attachment (uint32 1) VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)))
+
+      (separator
+         (extent (uint32 120) (uint32 68))
+         (offscreen-image lod-color-attachment))
 
       (framebuffer
          main-color-attachment

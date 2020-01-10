@@ -38,8 +38,6 @@ public:
 
   void resize(VkExtent2D extent)
   {
-    // make sure all work submitted is done before we start recreating stuff
-    THROW_ON_ERROR(vkDeviceWaitIdle(this->device->device));
     this->extent = extent;
   }
 

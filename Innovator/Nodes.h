@@ -2220,7 +2220,7 @@ public:
 
 		this->get_image_command->submit(
 			context->queue,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
 		const uint8_t* data = reinterpret_cast<uint8_t*>(this->memory->map(VK_WHOLE_SIZE, 0, 0));
     data += this->dataOffset;
