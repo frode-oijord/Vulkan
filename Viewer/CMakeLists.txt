@@ -42,3 +42,4 @@ include_directories(${Vulkan_INCLUDE_DIRS})
 
 target_link_libraries(Viewer ${Vulkan_LIBRARIES})
 target_link_libraries(Viewer $ENV{VULKAN_SDK}/Lib/shaderc_shared.lib)
+target_link_libraries(Viewer $ENV{BOOST_ROOT}/stage/lib/libboost_iostreams-vc142-mt-gd-x64-1_71.lib)

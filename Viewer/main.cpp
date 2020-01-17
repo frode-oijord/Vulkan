@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <vector>
+#include <boost/iostreams/device/mapped_file.hpp>
 
 
 int main(int argc, char *argv[])
