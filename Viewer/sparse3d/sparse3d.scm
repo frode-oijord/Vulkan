@@ -2,9 +2,9 @@
    (define sparse-texture2d (filename)
       (group
          (sampler 
-            VK_FILTER_LINEAR
-            VK_FILTER_LINEAR
-            VK_SAMPLER_MIPMAP_MODE_LINEAR
+            VK_FILTER_NEAREST
+            VK_FILTER_NEAREST
+            VK_SAMPLER_MIPMAP_MODE_NEAREST
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
             VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
@@ -133,7 +133,7 @@
          layout(location = 0) in vec3 texCoord;
          layout(location = 0) out uvec4 FragColor;
 
-         const vec3 textureSize = vec3(512.0);
+         const vec3 textureSize = vec3(256.0);
          const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
          float mipmapLevel(vec3 uv)
@@ -210,7 +210,7 @@
 
          void main() {
             vec3 tc = texCoord;
-            tc.z += textureOffset;
+            // tc.z += textureOffset;
             float r = texture(Texture, tc).r;
             FragColor = vec4(r, r, r, 1.0);
          }
@@ -228,7 +228,7 @@
 
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))))
+         (bufferdata-float 0 0 0.51  1 0 0.51  1 1 0.51  0 1 0.51))))
 
    (define scene 
       (group

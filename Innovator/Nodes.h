@@ -331,10 +331,10 @@ public:
   virtual ~CpuMemoryBuffer() = default;
 	
 	explicit CpuMemoryBuffer(VkBufferUsageFlags usage_flags,
-		VkBufferCreateFlags create_flags = 0) :
-		usage_flags(usage_flags),
-		create_flags(create_flags)
-	{
+                           VkBufferCreateFlags create_flags = 0) :
+      usage_flags(usage_flags),
+      create_flags(create_flags)
+  {    
 		REGISTER_VISITOR_CALLBACK(allocvisitor, CpuMemoryBuffer, alloc);
 		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CpuMemoryBuffer, update);
 		REGISTER_VISITOR_CALLBACK(recordvisitor, CpuMemoryBuffer, update);
@@ -2264,12 +2264,12 @@ private:
 class MemoryPage {
 public:
   MemoryPage(VulkanTextureImage* texture,
-    VkExtent3D imageExtent,
-    VkDeviceSize memoryOffset) :
-    texture(texture),
-    imageExtent(imageExtent),
-    memoryOffset(memoryOffset),
-    key(0)
+             VkExtent3D imageExtent,
+             VkDeviceSize memoryOffset) :
+             texture(texture),
+             imageExtent(imageExtent),
+             memoryOffset(memoryOffset),
+             key(0)
   {
     this->image_memory_bind.memory = nullptr;
   }
@@ -2307,10 +2307,6 @@ public:
     if (mipLevel >= texture->levels()) {
       throw std::runtime_error("invalid mip level");
     }
-    VkExtent3D extent = texture->extent(mipLevel);
-
-    VkDeviceSize width = extent.width;
-    VkDeviceSize height = extent.height;
 
     VkDeviceSize x = imageOffset.x;
     VkDeviceSize y = imageOffset.y;
@@ -2321,6 +2317,9 @@ public:
       mipOffset += texture->size(m);
     }
 
+    VkExtent3D extent = texture->extent(mipLevel);
+    VkDeviceSize width = extent.width;
+    VkDeviceSize height = extent.height;
     VkDeviceSize elementSize = texture->element_size();
     VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
 
@@ -2369,10 +2368,18 @@ public:
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     uint32_t sparse_memory_requirements_count;
-    vkGetImageSparseMemoryRequirements(context->device->device, this->image->image, &sparse_memory_requirements_count, nullptr);
+    vkGetImageSparseMemoryRequirements(
+      context->device->device, 
+      this->image->image, 
+      &sparse_memory_requirements_count, 
+      nullptr);
 
     std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
-    vkGetImageSparseMemoryRequirements(context->device->device, this->image->image, &sparse_memory_requirements_count, sparse_memory_requirements.data());
+    vkGetImageSparseMemoryRequirements(
+      context->device->device, 
+      this->image->image, 
+      &sparse_memory_requirements_count, 
+      sparse_memory_requirements.data());
 
     VkSparseImageMemoryRequirements sparse_memory_requirement;
     sparse_memory_requirement = [&]() {

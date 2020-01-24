@@ -145,32 +145,49 @@ public:
 
   explicit DebugTextureImage(const std::string& filename)
   {
+    size_t full_size = 256;
+
     this->texture = gli::texture3d(
       gli::texture::format_type::FORMAT_R8_UNORM_PACK8,
-      gli::extent3d(512, 512, 512));
+      gli::extent3d(full_size, full_size, full_size));
 
-      for (int lod = 0; lod < 3; lod++) {
-        std::string filename("sparse3d/blob");
-        filename += std::to_string(lod) + ".dat";
-
-        std::ifstream input(filename, std::ios::in | std::ios::binary);
-        std::vector<char> signed_data(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
-
-        std::vector<glm::u8vec1> unsigned_data(signed_data.size());
-        for (size_t i = 0; i < signed_data.size(); i++) {
-          unsigned_data[i] = glm::u8vec1(int(signed_data[i]) + 127);
-        }
-
-        std::copy(unsigned_data.begin(), unsigned_data.end(), reinterpret_cast<glm::u8vec1*>(this->texture[lod].data()));
-      }
-
+      this->texture[0].clear(glm::u8vec1(0));
+      this->texture[1].clear(glm::u8vec1(0));
+      this->texture[2].clear(glm::u8vec1(0));
       this->texture[3].clear(glm::u8vec1(0));
-      this->texture[4].clear(glm::u8vec1(55));
+      this->texture[4].clear(glm::u8vec1(0));
       this->texture[5].clear(glm::u8vec1(0));
       this->texture[6].clear(glm::u8vec1(0));
       this->texture[7].clear(glm::u8vec1(0));
       this->texture[8].clear(glm::u8vec1(0));
-      this->texture[9].clear(glm::u8vec1(0));
+
+      for (int lod = 0; lod < 2; lod++) {
+        size_t size = full_size >> lod;
+        glm::u8vec1* data = reinterpret_cast<glm::u8vec1*>(this->texture[lod].data());
+        for (int i = 0; i < size; i++) {
+          for (int j = 0; j < size; j++) {
+            for (int k = 0; k < size; k++) {
+              int value = (((i & 0x8) == 0) ^ ((j & 0x8) == 0) ^ ((k & 0x8) == 0)) * 255;
+              data[i + j * size + k * size * size] = glm::u8vec1(value);
+            }
+          }
+        }
+      }
+
+      //for (int lod = 1; lod < 3; lod++) {
+      //  std::string filename("sparse3d/blob");
+      //  filename += std::to_string(lod) + ".dat";
+
+      //  std::ifstream input(filename, std::ios::in | std::ios::binary);
+      //  std::vector<char> signed_data(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
+
+      //  std::vector<glm::u8vec1> unsigned_data(signed_data.size());
+      //  for (size_t i = 0; i < signed_data.size(); i++) {
+      //    unsigned_data[i] = glm::u8vec1(int(signed_data[i]) + 127);
+      //  }
+
+      //  std::copy(unsigned_data.begin(), unsigned_data.end(), reinterpret_cast<glm::u8vec1*>(this->texture[lod].data()));
+      //}
   }
 
   virtual ~DebugTextureImage() = default;
