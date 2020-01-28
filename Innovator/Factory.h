@@ -3,6 +3,8 @@
 #include <Innovator/Defines.h>
 #include <vulkan/vulkan.h>
 
+#include <boost/iostreams/device/mapped_file.hpp>
+
 #include <memory>
 #include <fstream>
 #include <functional>
@@ -139,55 +141,40 @@ public:
   gli::texture2d texture;
 };
 
+#include <cmath>
+#include <fstream>
+#include <filesystem>
+
 class DebugTextureImage : public VulkanTextureImage {
 public:
   NO_COPY_OR_ASSIGNMENT(DebugTextureImage)
 
-  explicit DebugTextureImage(const std::string& filename)
+  explicit DebugTextureImage(const std::string&)
   {
-    size_t full_size = 256;
+    this->lod0_size = 4096;
+    this->num_lods = log2(lod0_size) + 1;
 
-    this->texture = gli::texture3d(
-      gli::texture::format_type::FORMAT_R8_UNORM_PACK8,
-      gli::extent3d(full_size, full_size, full_size));
+    std::string filename = "sparse3d/checkerboard" + std::to_string(lod0_size) + ".bin";
 
-      this->texture[0].clear(glm::u8vec1(0));
-      this->texture[1].clear(glm::u8vec1(0));
-      this->texture[2].clear(glm::u8vec1(0));
-      this->texture[3].clear(glm::u8vec1(0));
-      this->texture[4].clear(glm::u8vec1(0));
-      this->texture[5].clear(glm::u8vec1(0));
-      this->texture[6].clear(glm::u8vec1(0));
-      this->texture[7].clear(glm::u8vec1(0));
-      this->texture[8].clear(glm::u8vec1(0));
-
-      for (int lod = 0; lod < 2; lod++) {
-        size_t size = full_size >> lod;
-        glm::u8vec1* data = reinterpret_cast<glm::u8vec1*>(this->texture[lod].data());
-        for (int i = 0; i < size; i++) {
-          for (int j = 0; j < size; j++) {
-            for (int k = 0; k < size; k++) {
-              int value = (((i & 0x8) == 0) ^ ((j & 0x8) == 0) ^ ((k & 0x8) == 0)) * 255;
-              data[i + j * size + k * size * size] = glm::u8vec1(value);
+    if (!std::filesystem::exists(filename)) {
+      std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
+      for (size_t lod = 0; lod < num_lods; lod++) {
+        size_t lod_size = lod0_size >> lod;
+        glm::u8vec1* data = new glm::u8vec1[lod_size * lod_size * lod_size];
+        for (size_t i = 0; i < lod_size; i++) {
+          std::cout << "i = " << i << std::endl;
+          for (size_t j = 0; j < lod_size; j++) {
+            for (size_t k = 0; k < lod_size; k++) {
+              int value = (((i & 64) == 0) ^ ((j & 32) == 0) ^ ((k & 32) == 0)) * 255;
+              data[((i * lod_size) + j) * lod_size + k] = glm::u8vec1(value);
             }
           }
         }
+        out.write(reinterpret_cast<char*>(data), lod_size* lod_size* lod_size);
       }
+    }
 
-      //for (int lod = 1; lod < 3; lod++) {
-      //  std::string filename("sparse3d/blob");
-      //  filename += std::to_string(lod) + ".dat";
-
-      //  std::ifstream input(filename, std::ios::in | std::ios::binary);
-      //  std::vector<char> signed_data(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
-
-      //  std::vector<glm::u8vec1> unsigned_data(signed_data.size());
-      //  for (size_t i = 0; i < signed_data.size(); i++) {
-      //    unsigned_data[i] = glm::u8vec1(int(signed_data[i]) + 127);
-      //  }
-
-      //  std::copy(unsigned_data.begin(), unsigned_data.end(), reinterpret_cast<glm::u8vec1*>(this->texture[lod].data()));
-      //}
+    this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
   }
 
   virtual ~DebugTextureImage() = default;
@@ -195,9 +182,9 @@ public:
   VkExtent3D extent(size_t level) const override
   {
     return {
-      static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().x)),
-      static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().y)),
-      static_cast<uint32_t>(static_cast<uint32_t>(this->texture[level].extent().z)),
+      static_cast<uint32_t>(this->lod0_size >> level),
+      static_cast<uint32_t>(this->lod0_size >> level),
+      static_cast<uint32_t>(this->lod0_size >> level),
     };
   }
 
@@ -208,37 +195,39 @@ public:
 
   uint32_t base_level() const override
   {
-    return static_cast<uint32_t>(this->texture.base_level());
+    return 0;
   }
 
   uint32_t levels() const override
   {
-    return static_cast<uint32_t>(this->texture.levels());
+    return static_cast<uint32_t>(this->num_lods);
   }
 
   uint32_t base_layer() const override
   {
-    return static_cast<uint32_t>(this->texture.base_layer());
+    return 0;
   }
 
   uint32_t layers() const override
   {
-    return static_cast<uint32_t>(this->texture.layers());
+    return 1;
   }
 
   size_t size() const override
   {
-    return this->texture.size();
+    return this->mapped_file.size();
   }
 
   size_t size(size_t level) const override
   {
-    return this->texture.size(level);
+    size_t extent = this->lod0_size >> level;
+    size_t num_pixels = extent * extent * extent;
+    return num_pixels * this->element_size();
   }
 
   const unsigned char* data() const override
   {
-    return reinterpret_cast<const unsigned char*>(this->texture.data());
+    return reinterpret_cast<const unsigned char*>(this->mapped_file.const_data());
   }
 
   VkFormat format() const override
@@ -267,5 +256,8 @@ public:
     };
   }
 
-  gli::texture3d texture;
+  boost::iostreams::mapped_file mapped_file;
+
+  size_t lod0_size;
+  size_t num_lods;
 };

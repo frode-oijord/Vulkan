@@ -118,7 +118,7 @@ EventVisitor::visit(class TextureOffset* node, class Context* context)
 	//	glm::dvec2 dx = (this->press->pos - move->pos) * .01;
 	//	dx[1] = -dx[1];
 	//	switch (this->press->button) {
-	//	case 0: node->offset += dx[1] * 0.05f; break;
+	//	case 0: node->offset += dx[1] * 0.01f; break;
 	//	default: break;
 	//	}
 	//	this->press->pos = move->pos;

@@ -14,6 +14,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <map>
+#include <queue>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -2234,12 +2236,16 @@ public:
       uint8_t m = data[p + 3];
 
       if (i != 0 || j != 0 || k != 0 || m != 0) {
-        tiles.insert((i >> 0) << 24 | (j >> 0) << 16 | (k >> 0) << 8 | m + 0);
-        tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m + 1);
+        uint32_t key = (i >> 0) << 24 | (j >> 0) << 16 | (k >> 0) << 8 | m + 0;
+        if (tiles.find(key) == tiles.end()) {
+          tiles.insert(key);
+          tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m + 1);
+        }
       }
 		}
 
 		this->memory->unmap();
+
     return tiles;
 	}
 
@@ -2263,86 +2269,174 @@ private:
 
 class MemoryPage {
 public:
-  MemoryPage(VulkanTextureImage* texture,
-             VkExtent3D imageExtent,
+  struct SharedInfo {
+    SharedInfo(std::shared_ptr<VulkanDevice> device,
+               std::shared_ptr<VulkanImage> image,
+               uint32_t numPages,
+               VulkanTextureImage * texture) :
+      numPages(numPages),
+      texture(texture)
+    {
+      VkMemoryRequirements memory_requirements;
+      vkGetImageMemoryRequirements(
+        device->device,
+        image->image,
+        &memory_requirements);
+
+      this->pageSize = memory_requirements.alignment;
+
+      uint32_t memory_type_index = device->physical_device.getMemoryTypeIndex(
+        memory_requirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      uint32_t sparse_memory_requirements_count;
+      vkGetImageSparseMemoryRequirements(
+        device->device,
+        image->image,
+        &sparse_memory_requirements_count,
+        nullptr);
+
+      std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
+      vkGetImageSparseMemoryRequirements(
+        device->device,
+        image->image,
+        &sparse_memory_requirements_count,
+        sparse_memory_requirements.data());
+
+      VkSparseImageMemoryRequirements sparse_memory_requirement = [&]() {
+        for (auto requirements : sparse_memory_requirements) {
+          if (requirements.formatProperties.aspectMask & texture->subresource_range().aspectMask) {
+            return requirements;
+          }
+        }
+        throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
+      }();
+
+      this->imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
+
+      this->image_memory = std::make_shared<VulkanMemory>(
+        device,
+        this->numPages * this->pageSize,
+        memory_type_index);
+
+      this->image_buffer = std::make_shared<VulkanBuffer>(
+        device,
+        0,
+        this->numPages * this->pageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_SHARING_MODE_EXCLUSIVE);
+
+      {
+        VkMemoryRequirements memory_requirements = this->image_buffer->getMemoryRequirements();
+
+        uint32_t memory_type_index = device->physical_device.getMemoryTypeIndex(
+          memory_requirements.memoryTypeBits,
+          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+        this->image_buffer_memory = std::make_shared<VulkanMemory>(
+          device,
+          this->numPages * this->pageSize,
+          memory_type_index);
+
+        device->bindBufferMemory(
+          this->image_buffer->buffer,
+          this->image_buffer_memory->memory,
+          0);
+      }
+
+      this->buffer_memory_map = std::make_shared<MemoryMap>(this->image_buffer_memory.get(), VK_WHOLE_SIZE, 0);
+    }
+
+    VkDeviceSize pageSize;
+    uint32_t numPages;
+    VkExtent3D imageExtent;
+    VulkanTextureImage* texture;
+    std::shared_ptr<VulkanBuffer> image_buffer;
+    std::shared_ptr<VulkanMemory> image_buffer_memory;
+    std::shared_ptr<VulkanMemory> image_memory;
+    std::shared_ptr<MemoryMap> buffer_memory_map;
+  };
+
+  MemoryPage(uint32_t key,
+             SharedInfo * shared,
              VkDeviceSize memoryOffset) :
-             texture(texture),
-             imageExtent(imageExtent),
-             memoryOffset(memoryOffset),
-             key(0)
+    memoryOffset(memoryOffset),
+    key(key)
   {
-    this->image_memory_bind.memory = nullptr;
-  }
+    uint32_t i = this->key >> 24 & 0xFF;
+    uint32_t j = this->key >> 16 & 0xFF;
+    uint32_t k = this->key >> 8 & 0xFF;
+    uint32_t mipLevel = this->key & 0xFF;
 
-  void bind(uint32_t key, VkDeviceMemory memory)
-  {
-    this->key = key;
-
-    uint32_t i = key >> 24 & 0xFF;
-    uint32_t j = key >> 16 & 0xFF;
-    uint32_t k = key >> 8 & 0xFF;
-    uint32_t mipLevel = key & 0xFF;
+    if (mipLevel >= shared->texture->levels()) {
+      throw std::runtime_error("invalid mip level");
+    }
 
     VkOffset3D imageOffset = {
-      int32_t(i * this->imageExtent.width),
-      int32_t(j * this->imageExtent.height),
-      int32_t(k * this->imageExtent.depth)
+      int32_t(i * shared->imageExtent.width),
+      int32_t(j * shared->imageExtent.height),
+      int32_t(k * shared->imageExtent.depth)
     };
 
     const VkImageSubresource subresource{
-      this->texture->subresource_range().aspectMask,
+      shared->texture->subresource_range().aspectMask,
       mipLevel,
       0
     };
 
     this->image_memory_bind = {
-      subresource,                                // subresource
-      imageOffset,                                // offset
-      this->imageExtent,                          // extent
-      memory,                                     // memory
-      memoryOffset,                               // memoryOffset
-      0                                           // flags
+      subresource,                                            // subresource
+      imageOffset,                                            // offset
+      shared->imageExtent,                                    // extent
+      shared->image_memory->memory,                           // memory
+      this->memoryOffset,                                     // memoryOffset
+      0                                                       // flags
     };
 
-    if (mipLevel >= texture->levels()) {
-      throw std::runtime_error("invalid mip level");
+    VkExtent3D extent = shared->texture->extent(mipLevel);
+
+    const VkImageSubresourceLayers imageSubresource{
+      shared->texture->subresource_range().aspectMask,        // aspectMask
+      mipLevel,                                               // mipLevel
+      shared->texture->subresource_range().baseArrayLayer,    // baseArrayLayer
+      shared->texture->subresource_range().layerCount,        // layerCount
+    };
+
+    this->buffer_image_copy = {
+      this->memoryOffset,                                     // bufferOffset 
+      0,                                                      // bufferRowLength
+      0,                                                      // bufferImageHeight
+      imageSubresource,                                       // imageSubresource
+      imageOffset,                                            // imageOffset
+      shared->imageExtent,                                    // imageExtent
+    };
+
+    VkDeviceSize mipOffset = 0;
+    for (uint32_t m = 0; m < mipLevel; m++) {
+      mipOffset += shared->texture->size(m);
     }
 
     VkDeviceSize x = imageOffset.x;
     VkDeviceSize y = imageOffset.y;
     VkDeviceSize z = imageOffset.z;
-
-    VkDeviceSize mipOffset = 0;
-    for (uint32_t m = 0; m < mipLevel; m++) {
-      mipOffset += texture->size(m);
-    }
-
-    VkExtent3D extent = texture->extent(mipLevel);
     VkDeviceSize width = extent.width;
     VkDeviceSize height = extent.height;
-    VkDeviceSize elementSize = texture->element_size();
+    VkDeviceSize elementSize = shared->texture->element_size();
     VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
 
-    const VkImageSubresourceLayers imageSubresource{
-      texture->subresource_range().aspectMask,               // aspectMask
-      mipLevel,                                              // mipLevel
-      texture->subresource_range().baseArrayLayer,           // baseArrayLayer
-      texture->subresource_range().layerCount,               // layerCount
-    };
+    auto first = shared->texture->data() + bufferOffset;
+    auto last = first + shared->pageSize;
+    auto dest = shared->buffer_memory_map->mem + this->memoryOffset;
 
-    this->buffer_image_copy = {
-      bufferOffset,                               // bufferOffset 
-      extent.width,                               // bufferRowLength
-      extent.height,                              // bufferImageHeight
-      imageSubresource,                           // imageSubresource
-      imageOffset,                                // imageOffset
-      imageExtent,                                // imageExtent
-    };
+    std::copy(first, last, dest);
+  }
+
+  void unbind()
+  {
+    this->image_memory_bind.memory = nullptr;
   }
 
   uint32_t key;
-  VkExtent3D imageExtent;
-  VulkanTextureImage* texture;
   VkDeviceSize memoryOffset;
   VkSparseImageMemoryBind image_memory_bind;
   VkBufferImageCopy buffer_image_copy;
@@ -2357,113 +2451,53 @@ public:
     this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
     this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->device);
 
-    VkMemoryRequirements memory_requirements;
-    vkGetImageMemoryRequirements(
-      context->device->device,
-      this->image->image,
-      &memory_requirements);
-
-    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
-      memory_requirements.memoryTypeBits,
-      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-    uint32_t sparse_memory_requirements_count;
-    vkGetImageSparseMemoryRequirements(
-      context->device->device, 
-      this->image->image, 
-      &sparse_memory_requirements_count, 
-      nullptr);
-
-    std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
-    vkGetImageSparseMemoryRequirements(
-      context->device->device, 
-      this->image->image, 
-      &sparse_memory_requirements_count, 
-      sparse_memory_requirements.data());
-
-    VkSparseImageMemoryRequirements sparse_memory_requirement;
-    sparse_memory_requirement = [&]() {
-      for (auto requirements : sparse_memory_requirements) {
-        if (requirements.formatProperties.aspectMask & context->state.texture->subresource_range().aspectMask) {
-          return requirements;
-        }
-      }
-      throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
-    }();
-
-    uint32_t numTiles = 1000;
-
-    this->image_memory = std::make_shared<VulkanMemory>(
+    this->memory_page_info = std::make_shared<MemoryPage::SharedInfo>(
       context->device,
-      numTiles * memory_requirements.alignment,
-      memory_type_index);
+      this->image,
+      10000,
+      context->state.texture);
 
-    VkDeviceSize memoryOffset = 0;
-    VkExtent3D imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
-
-    for (uint32_t i = 0; i < numTiles; i++) {
-      MemoryPage page(
-        context->state.texture,
-        imageExtent,
-        memoryOffset);
-
-      this->image_memory_pages.push_back(page);
-      memoryOffset += memory_requirements.alignment;
+    for (uint32_t i = 0; i < memory_page_info->numPages; i++) {
+      this->free_memory_offsets.push(i * this->memory_page_info->pageSize);
     }
   }
 
   void updateBindings(Context* context)
   {
-    std::set<uint32_t> tiles = context->image->getTiles(context);
-    std::set<uint32_t> memory_pages_bind;
-
-    std::set_difference(
-      tiles.begin(), tiles.end(),
-      this->bound_memory_pages.begin(), this->bound_memory_pages.end(),
-      std::inserter(memory_pages_bind, memory_pages_bind.begin()));
-
-    std::set<uint32_t> memory_pages_free;
-
-    std::set_difference(
-      this->bound_memory_pages.begin(), this->bound_memory_pages.end(),
-      tiles.begin(), tiles.end(),
-      std::inserter(memory_pages_free, memory_pages_free.begin()));
-
-    this->bound_memory_pages = tiles;
-
-    std::vector<VkBufferImageCopy> regions;
     std::vector<VkSparseImageMemoryBind> image_memory_binds;
+    std::vector<VkBufferImageCopy> regions;
 
-    for (auto& key : memory_pages_bind) {
-      // find free page
-      size_t i = [this]() {
-        for (size_t i = 0; i < this->image_memory_pages.size(); i++) {
-          if (this->image_memory_pages[i].image_memory_bind.memory == nullptr) {
-            return i;
-          }
-        }
-        throw std::runtime_error("no free pages");
-      }();
+    std::set<uint32_t> tiles = context->image->getTiles(context);
 
-      this->image_memory_pages[i].bind(key, this->image_memory->memory);
-
-      image_memory_binds.push_back(this->image_memory_pages[i].image_memory_bind);
-      regions.push_back(this->image_memory_pages[i].buffer_image_copy);
+    // try to free some pages
+    std::vector<uint32_t> erase_these_keys;
+    for (auto & [key, page] : this->bound_memory_pages) {
+      if (tiles.find(key) == tiles.end()) { // we can free this page
+        image_memory_binds.push_back(page.image_memory_bind);
+        this->free_memory_offsets.push(page.memoryOffset);
+        page.unbind();
+        erase_these_keys.push_back(key);
+      }
     }
 
-    for (auto& key : memory_pages_free) {
-      // find page with key
-      size_t i = [this](uint32_t key) {
-        for (size_t i = 0; i < this->image_memory_pages.size(); i++) {
-          if (this->image_memory_pages[i].key == key) {
-            return i;
-          }
-        }
-        throw std::runtime_error("no page with given key");
-      }(key);
+    for (auto key : erase_these_keys) {
+      this->bound_memory_pages.erase(key);
+    }
 
-      this->image_memory_pages[i].image_memory_bind.memory = nullptr;
-      image_memory_binds.push_back(this->image_memory_pages[i].image_memory_bind);
+    for (uint32_t key : tiles) {
+      if (this->bound_memory_pages.find(key) == this->bound_memory_pages.end()) {
+        if (this->free_memory_offsets.empty()) {
+          throw std::runtime_error("no free memory pages");
+        }
+        VkDeviceSize memoryOffset = this->free_memory_offsets.front();
+        this->free_memory_offsets.pop();
+
+        MemoryPage page(key, this->memory_page_info.get(), memoryOffset);
+        this->bound_memory_pages.insert({ key, page });
+
+        image_memory_binds.push_back(page.image_memory_bind);
+        regions.push_back(page.buffer_image_copy);
+      }
     }
 
     if (image_memory_binds.empty()) {
@@ -2509,7 +2543,7 @@ public:
       this->copy_sparse_command->pipelineBarrier(
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-        { 
+        {
           VulkanImage::MemoryBarrier(
             this->image->image,
             0,
@@ -2521,7 +2555,7 @@ public:
 
       vkCmdCopyBufferToImage(
         this->copy_sparse_command->buffer(),
-        context->state.buffer,
+        this->memory_page_info->image_buffer->buffer,
         this->image->image,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         static_cast<uint32_t>(regions.size()),
@@ -2557,9 +2591,9 @@ public:
   }
 
   std::shared_ptr<VulkanImage> image;
-  std::shared_ptr<VulkanMemory> image_memory;
-  std::vector<MemoryPage> image_memory_pages;
-  std::set<uint32_t> bound_memory_pages;
+  std::shared_ptr<MemoryPage::SharedInfo> memory_page_info;
+  std::queue<VkDeviceSize> free_memory_offsets;
+  std::map<uint32_t, MemoryPage> bound_memory_pages;
 
   std::unique_ptr<VulkanSemaphore> bind_sparse_finished;
   std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
