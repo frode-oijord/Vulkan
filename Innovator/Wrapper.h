@@ -1100,7 +1100,7 @@ class MemoryMap {
 public:
   NO_COPY_OR_ASSIGNMENT(MemoryMap)
 
-  MemoryMap(VulkanMemory * memory, VkDeviceSize size, VkDeviceSize offset)
+  MemoryMap(VulkanMemory * memory, VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0)
     : memory(memory)
   {
     this->mem = this->memory->map(size, offset);

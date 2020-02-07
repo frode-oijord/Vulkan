@@ -368,7 +368,7 @@ public:
       this->memory->memory,
       0);
 
-    MemoryMap memmap(this->memory.get(), context->state.bufferdata->size(), 0);
+    MemoryMap memmap(this->memory.get());
     context->state.bufferdata->copy(memmap.mem);
 
     context->state.buffer = this->buffer->buffer;
@@ -460,8 +460,7 @@ public:
   virtual ~TextureOffset() = default;
 
   TextureOffset()
-    : size(sizeof(float)),
-      offset(0.0f)
+    : offset(0.0f)
   {
     REGISTER_VISITOR_CALLBACK(allocvisitor, TextureOffset, alloc);
     REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureOffset, pipeline);
@@ -473,7 +472,7 @@ public:
     this->buffer = std::make_shared<VulkanBuffer>(
       context->device,
       0,
-      this->size,
+      sizeof(float),
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
       VK_SHARING_MODE_EXCLUSIVE);
 
@@ -505,14 +504,13 @@ public:
       this->offset
     };
 
-    MemoryMap map(this->memory.get(), this->size, 0);
+    MemoryMap map(this->memory.get());
     std::copy(data.begin(), data.end(), reinterpret_cast<float*>(map.mem));
   }
 
   float offset;
 
 private:
-  size_t size;
   std::shared_ptr<VulkanBuffer> buffer;
   std::shared_ptr<VulkanMemory> memory;
 };
@@ -525,7 +523,6 @@ public:
   virtual ~TransformBuffer() = default;
 
   TransformBuffer()
-    : size(sizeof(glm::mat4) * 2)
   {
 		REGISTER_VISITOR_CALLBACK(allocvisitor, TransformBuffer, alloc);
 		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TransformBuffer, pipeline);
@@ -537,7 +534,7 @@ public:
     this->buffer = std::make_shared<VulkanBuffer>(
       context->device,
       0,
-      this->size,
+      sizeof(glm::mat4) * 2,
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
       VK_SHARING_MODE_EXCLUSIVE);
 
@@ -570,12 +567,11 @@ public:
       glm::mat4(context->state.ProjMatrix)
     };
 
-    MemoryMap map(this->memory.get(), this->size, 0);
+    MemoryMap map(this->memory.get());
     std::copy(data.begin(), data.end(), reinterpret_cast<glm::mat4*>(map.mem));
   }
 
 private:
-  size_t size;
   std::shared_ptr<VulkanBuffer> buffer;
   std::shared_ptr<VulkanMemory> memory;
 };
@@ -2344,7 +2340,7 @@ public:
           0);
       }
 
-      this->buffer_memory_map = std::make_shared<MemoryMap>(this->image_buffer_memory.get(), VK_WHOLE_SIZE, 0);
+      this->buffer_memory_map = std::make_shared<MemoryMap>(this->image_buffer_memory.get());
     }
 
     VkDeviceSize pageSize;
