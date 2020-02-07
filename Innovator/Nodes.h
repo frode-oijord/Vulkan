@@ -55,7 +55,6 @@ public:
 	{}
 };
 
-
 class ViewMatrix : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -127,11 +126,11 @@ public:
 
   void render(Context* context)
   {
-    context->state.ProjMatrix = this->mat;
+    context->state.ProjectionMatrix = this->mat;
   }
 
 private:
-  glm::dmat4 mat;
+  glm::dmat4 mat{ 1.0 };
 
   double farplane;
   double nearplane;
@@ -139,31 +138,65 @@ private:
   double fieldofview;
 };
 
-
-class Transform : public Node {
+class ModelMatrix : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(Transform)
-  Transform() = default;
-  virtual ~Transform() = default;
+  IMPLEMENT_VISITABLE_INLINE
+  NO_COPY_OR_ASSIGNMENT(ModelMatrix)
+  ModelMatrix() = default;
+  virtual ~ModelMatrix() = default;
 
-  explicit Transform(const glm::dvec3 & t,
-                     const glm::dvec3 & s)
+  ModelMatrix(const glm::dvec3& t, const glm::dvec3& s)
   {
-		REGISTER_VISITOR_CALLBACK(rendervisitor, Transform, render);
+    REGISTER_VISITOR_CALLBACK(rendervisitor, ModelMatrix, render);
 
     this->matrix = glm::scale(this->matrix, s);
     this->matrix = glm::translate(this->matrix, t);
   }
 
-  void render(Context* context)
+  ModelMatrix(double t0, double t1, double t2,
+              double s0, double s1, double s2)
+    : ModelMatrix(glm::dvec3(t0, t1, t2), glm::dvec3(s0, s1, s2))
+  {}
+
+  virtual void render(Context* context)
   {
     context->state.ModelMatrix *= this->matrix;
   }
 
-private:
+public:
   glm::dmat4 matrix{ 1.0 };
 };
+
+
+class TextureMatrix : public Node {
+public:
+  IMPLEMENT_VISITABLE_INLINE
+  NO_COPY_OR_ASSIGNMENT(TextureMatrix)
+  TextureMatrix() = default;
+  virtual ~TextureMatrix() = default;
+
+  TextureMatrix(const glm::dvec3& t, const glm::dvec3& s)
+  {
+    REGISTER_VISITOR_CALLBACK(rendervisitor, TextureMatrix, render);
+
+    this->matrix = glm::scale(this->matrix, s);
+    this->matrix = glm::translate(this->matrix, t);
+  }
+
+  TextureMatrix(double t0, double t1, double t2,
+                double s0, double s1, double s2)
+    : TextureMatrix(glm::dvec3(t0, t1, t2), glm::dvec3(s0, s1, s2))
+  {}
+
+  virtual void render(Context* context)
+  {
+    context->state.TextureMatrix *= this->matrix;
+  }
+
+public:
+  glm::dmat4 matrix{ 1.0 };
+};
+
 
 class BufferData : public Node {
 public:
@@ -453,68 +486,6 @@ private:
   std::shared_ptr<VulkanMemory> memory;
 };
 
-class TextureOffset : public Node {
-public:
-  IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(TextureOffset)
-  virtual ~TextureOffset() = default;
-
-  TextureOffset()
-    : offset(0.0f)
-  {
-    REGISTER_VISITOR_CALLBACK(allocvisitor, TextureOffset, alloc);
-    REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureOffset, pipeline);
-    REGISTER_VISITOR_CALLBACK(rendervisitor, TextureOffset, render);
-  }
-
-  void alloc(Context* context)
-  {
-    this->buffer = std::make_shared<VulkanBuffer>(
-      context->device,
-      0,
-      sizeof(float),
-      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-      VK_SHARING_MODE_EXCLUSIVE);
-
-    VkMemoryRequirements memory_requirements = this->buffer->getMemoryRequirements();
-
-    uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
-      memory_requirements.memoryTypeBits,
-      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-    this->memory = std::make_shared<VulkanMemory>(
-      context->device,
-      memory_requirements.size,
-      memory_type_index);
-
-    context->device->bindBufferMemory(
-      this->buffer->buffer,
-      this->memory->memory,
-      0);
-  }
-
-  void pipeline(Context* creator)
-  {
-    creator->state.buffer = this->buffer->buffer;
-  }
-
-  void render(Context* context)
-  {
-    std::array<float, 1> data = {
-      this->offset
-    };
-
-    MemoryMap map(this->memory.get());
-    std::copy(data.begin(), data.end(), reinterpret_cast<float*>(map.mem));
-  }
-
-  float offset;
-
-private:
-  std::shared_ptr<VulkanBuffer> buffer;
-  std::shared_ptr<VulkanMemory> memory;
-};
-
 
 class TransformBuffer : public Node {
 public:
@@ -534,7 +505,7 @@ public:
     this->buffer = std::make_shared<VulkanBuffer>(
       context->device,
       0,
-      sizeof(glm::mat4) * 2,
+      sizeof(glm::mat4) * 3,
       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
       VK_SHARING_MODE_EXCLUSIVE);
 
@@ -562,9 +533,10 @@ public:
 
   void render(Context* context)
   {
-    std::array<glm::mat4, 2> data = {
+    std::array<glm::mat4, 3> data = {
       glm::mat4(context->state.ViewMatrix * context->state.ModelMatrix),
-      glm::mat4(context->state.ProjMatrix)
+      glm::mat4(context->state.ProjectionMatrix),
+      glm::mat4(context->state.TextureMatrix)
     };
 
     MemoryMap map(this->memory.get());

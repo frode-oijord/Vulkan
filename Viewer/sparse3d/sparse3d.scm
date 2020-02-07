@@ -77,7 +77,7 @@
    (define slice (z) 
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float 0 0 z  1 0 z  1 1 0.5  0 1 z)))
+         (bufferdata-float 0 0 z  1 0 z  1 1 z  0 1 z)))
 
    (define lod-color-attachment 
       (framebuffer-attachment 
@@ -97,7 +97,7 @@
             VK_IMAGE_USAGE_SAMPLED_BIT)
          (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
 
-   (define make-renderpass (format attachment scene)
+   (define framebuffer-object (format attachment scene)
       (renderpass
          (renderpass-description
             (renderpass-attachment
@@ -134,7 +134,7 @@
                
          scene))
 
-   (define lod-renderpass (make-renderpass
+   (define lod-renderpass (framebuffer-object
       VK_FORMAT_R8G8B8A8_UINT
       lod-color-attachment
       (group
@@ -167,12 +167,11 @@
             }
          ]])
 
-         (slice 0.5)
-            
+         (slice 0.0)
          (offscreen-image lod-color-attachment))))
 
 
-   (define main-renderpass (make-renderpass
+   (define main-renderpass (framebuffer-object
       VK_FORMAT_B8G8R8A8_UNORM
       main-color-attachment
       (group
@@ -183,38 +182,26 @@
             layout(location = 0) in vec3 texCoord;
             layout(location = 0) out vec4 FragColor;
 
-            layout(std140, binding = 2) uniform Test {
-               float textureOffset;
-            };
-
             void main() {
-               vec3 tc = texCoord;
-               tc.z += textureOffset;
-               tc.z += 0.01;
-               float r = texture(Texture, tc).r;
+               float r = texture(Texture, texCoord).r;
                FragColor = vec4(r, r, r, 1.0);
             }
-            
          ]])
 
-         (sparse-texture "world/world.ktx")
-
-         (textureoffset)
-         (descriptorsetlayoutbinding 
-            (uint32 2) 
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER 
-            VK_SHADER_STAGE_FRAGMENT_BIT)
-
-         (slice 0.5))))
+         (sparse-texture "")
+         (slice 0.0))))
 
    (define scene 
       (group
          (viewmatrix 
             .5 .5 2 
-            0 0 0 
+            .2 .2 0 
             0 1 0)
 
          (projmatrix 1000 0.001 1.0 0.7)
+
+         (texturematrix 0 0 0 1 1 1)
+         (modelmatrix 0 0 0 1 1 1)
 
          (shader VK_SHADER_STAGE_VERTEX_BIT [[
             #version 450
@@ -222,6 +209,7 @@
             layout(std140, binding = 0) uniform Transform {
                mat4 ModelViewMatrix;
                mat4 ProjectionMatrix;
+               mat4 TextureMatrix;
             };
 
             layout(location = 0) in vec3 Position;
@@ -233,7 +221,7 @@
 
             void main() 
             {
-               texCoord = Position;
+               texCoord = vec3(TextureMatrix * vec4(Position, 1.0));
                gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
             }
          ]])

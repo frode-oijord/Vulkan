@@ -67,7 +67,8 @@ struct State {
   std::vector<VkBuffer> vertex_attribute_buffers;
   std::vector<VkDeviceSize> vertex_attribute_buffer_offsets;
 
-  glm::dmat4 ModelMatrix{ 1.0 };
   glm::dmat4 ViewMatrix{ 1.0 };
-  glm::dmat4 ProjMatrix{ 1.0 };
+  glm::dmat4 ModelMatrix{ 1.0 };
+  glm::dmat4 TextureMatrix{ 1.0 };
+  glm::dmat4 ProjectionMatrix{ 1.0 };
 };

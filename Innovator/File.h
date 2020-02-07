@@ -114,6 +114,8 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "renderpass", fun_ptr(shared_from_node_list<Renderpass, std::shared_ptr<Node>>) });
   env->outer->inner.insert({ "viewmatrix", fun_ptr(node<ViewMatrix, Number, Number, Number, Number, Number, Number, Number, Number, Number> ) });
   env->outer->inner.insert({ "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) });
+  env->outer->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, Number, Number, Number, Number, Number, Number>) });
+  env->outer->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, Number, Number, Number, Number, Number, Number>) });
   env->outer->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
   env->outer->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) });
   env->outer->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });
@@ -133,7 +135,6 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "cpumemorybuffer", fun_ptr(node<CpuMemoryBuffer, VkBufferUsageFlags>) });
   env->outer->inner.insert({ "gpumemorybuffer", fun_ptr(node<GpuMemoryBuffer, VkBufferUsageFlags>) });
   env->outer->inner.insert({ "transformbuffer", fun_ptr(node<TransformBuffer>) });
-  env->outer->inner.insert({ "textureoffset", fun_ptr(node<TextureOffset>) });
   env->outer->inner.insert({ "indexeddrawcommand", fun_ptr(node<IndexedDrawCommand, uint32_t, uint32_t, uint32_t, int32_t, uint32_t, VkPrimitiveTopology>) });
   env->outer->inner.insert({ "indexbufferdescription", fun_ptr(node<IndexBufferDescription, VkIndexType>) });
   env->outer->inner.insert({ "descriptorsetlayoutbinding", fun_ptr(node<DescriptorSetLayoutBinding, uint32_t, VkDescriptorType, VkShaderStageFlagBits>) });
