@@ -810,6 +810,26 @@ public:
     return memory_requirements;
   }
 
+
+  std::vector<VkSparseImageMemoryRequirements> getSparseMemoryRequirements()
+  {
+    uint32_t sparse_memory_requirements_count;
+    vkGetImageSparseMemoryRequirements(
+      this->device->device,
+      this->image,
+      &sparse_memory_requirements_count,
+      nullptr);
+
+    std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
+    vkGetImageSparseMemoryRequirements(
+      this->device->device,
+      this->image,
+      &sparse_memory_requirements_count,
+      sparse_memory_requirements.data());
+
+    return sparse_memory_requirements;
+  }
+
   static VkImageMemoryBarrier MemoryBarrier(
     VkImage image,
     VkAccessFlags srcAccessMask,

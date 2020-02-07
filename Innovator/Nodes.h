@@ -2245,34 +2245,15 @@ public:
       numPages(numPages),
       texture(texture)
     {
-      VkMemoryRequirements memory_requirements;
-      vkGetImageMemoryRequirements(
-        device->device,
-        image->image,
-        &memory_requirements);
-
+      VkMemoryRequirements memory_requirements = image->getMemoryRequirements();
       this->pageSize = memory_requirements.alignment;
 
       uint32_t memory_type_index = device->physical_device.getMemoryTypeIndex(
         memory_requirements.memoryTypeBits,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-      uint32_t sparse_memory_requirements_count;
-      vkGetImageSparseMemoryRequirements(
-        device->device,
-        image->image,
-        &sparse_memory_requirements_count,
-        nullptr);
-
-      std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
-      vkGetImageSparseMemoryRequirements(
-        device->device,
-        image->image,
-        &sparse_memory_requirements_count,
-        sparse_memory_requirements.data());
-
       VkSparseImageMemoryRequirements sparse_memory_requirement = [&]() {
-        for (auto requirements : sparse_memory_requirements) {
+        for (auto requirements : image->getSparseMemoryRequirements()) {
           if (requirements.formatProperties.aspectMask & texture->subresource_range().aspectMask) {
             return requirements;
           }
@@ -2325,30 +2306,43 @@ public:
     std::shared_ptr<MemoryMap> buffer_memory_map;
   };
 
+  class Key {
+  public:
+    Key(uint32_t key)
+      : key(key)
+    {}
+
+    Key(uint8_t i, uint8_t j, uint8_t k, uint8_t m)
+      : key(i << 24 | j << 16 | k << 8 | m)
+    {}
+
+    uint32_t i() { return this->key >> 24 & 0xFF; }
+    uint32_t j() { return this->key >> 16 & 0xFF; }
+    uint32_t k() { return this->key >> 8 & 0xFF; }
+    uint32_t m() { return this->key & 0xFF; }
+
+    uint32_t key;
+  };
+
   MemoryPage(uint32_t key,
              SharedInfo * shared,
              VkDeviceSize memoryOffset) :
     memoryOffset(memoryOffset),
     key(key)
   {
-    uint32_t i = this->key >> 24 & 0xFF;
-    uint32_t j = this->key >> 16 & 0xFF;
-    uint32_t k = this->key >> 8 & 0xFF;
-    uint32_t mipLevel = this->key & 0xFF;
-
-    if (mipLevel >= shared->texture->levels()) {
+    if (this->key.m() >= shared->texture->levels()) {
       throw std::runtime_error("invalid mip level");
     }
 
     VkOffset3D imageOffset = {
-      int32_t(i * shared->imageExtent.width),
-      int32_t(j * shared->imageExtent.height),
-      int32_t(k * shared->imageExtent.depth)
+      int32_t(this->key.i() * shared->imageExtent.width),
+      int32_t(this->key.j() * shared->imageExtent.height),
+      int32_t(this->key.k() * shared->imageExtent.depth)
     };
 
     const VkImageSubresource subresource{
       shared->texture->subresource_range().aspectMask,
-      mipLevel,
+      this->key.m(),
       0
     };
 
@@ -2361,11 +2355,11 @@ public:
       0                                                       // flags
     };
 
-    VkExtent3D extent = shared->texture->extent(mipLevel);
+    VkExtent3D extent = shared->texture->extent(this->key.m());
 
     const VkImageSubresourceLayers imageSubresource{
       shared->texture->subresource_range().aspectMask,        // aspectMask
-      mipLevel,                                               // mipLevel
+      this->key.m(),                                          // mipLevel
       shared->texture->subresource_range().baseArrayLayer,    // baseArrayLayer
       shared->texture->subresource_range().layerCount,        // layerCount
     };
@@ -2380,7 +2374,7 @@ public:
     };
 
     VkDeviceSize mipOffset = 0;
-    for (uint32_t m = 0; m < mipLevel; m++) {
+    for (uint32_t m = 0; m < this->key.m(); m++) {
       mipOffset += shared->texture->size(m);
     }
 
@@ -2404,7 +2398,7 @@ public:
     this->image_memory_bind.memory = nullptr;
   }
 
-  uint32_t key;
+  Key key;
   VkDeviceSize memoryOffset;
   VkSparseImageMemoryBind image_memory_bind;
   VkBufferImageCopy buffer_image_copy;
@@ -2441,9 +2435,9 @@ public:
     std::vector<uint32_t> erase_these_keys;
     for (auto & [key, page] : this->bound_memory_pages) {
       if (tiles.find(key) == tiles.end()) { // we can free this page
+        page.unbind();
         image_memory_binds.push_back(page.image_memory_bind);
         this->free_memory_offsets.push(page.memoryOffset);
-        page.unbind();
         erase_these_keys.push_back(key);
       }
     }
