@@ -79,14 +79,6 @@
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 z  1 0 z  1 1 z  0 1 z)))
 
-   (define lod-color-attachment 
-      (framebuffer-attachment 
-         VK_FORMAT_R8G8B8A8_UINT
-         (imageusageflags 
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
-            VK_IMAGE_USAGE_SAMPLED_BIT)
-         (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
 
    (define main-color-attachment 
       (framebuffer-attachment 
@@ -97,11 +89,11 @@
             VK_IMAGE_USAGE_SAMPLED_BIT)
          (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
 
-   (define framebuffer-object (format attachment scene)
+   (define framebuffer-object (attachment scene)
       (renderpass
          (renderpass-description
             (renderpass-attachment
-               format
+               (format attachment)
                VK_SAMPLE_COUNT_1_BIT
                VK_ATTACHMENT_LOAD_OP_CLEAR
                VK_ATTACHMENT_STORE_OP_STORE
@@ -135,8 +127,14 @@
          scene))
 
    (define lod-renderpass (framebuffer-object
-      VK_FORMAT_R8G8B8A8_UINT
-      lod-color-attachment
+      (define lod-color-attachment 
+         (framebuffer-attachment 
+            VK_FORMAT_R8G8B8A8_UINT
+            (imageusageflags 
+               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
+               VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
+               VK_IMAGE_USAGE_SAMPLED_BIT)
+            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
       (group
          (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
             #version 450
@@ -172,7 +170,6 @@
 
 
    (define main-renderpass (framebuffer-object
-      VK_FORMAT_B8G8R8A8_UNORM
       main-color-attachment
       (group
          (shader VK_SHADER_STAGE_FRAGMENT_BIT [[

@@ -63,6 +63,16 @@ uint32_t count(const List & list)
   return static_cast<uint32_t>(bufferdata->count());
 }
 
+VkFormat format(const List& list)
+{
+  auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
+  auto attachment = std::dynamic_pointer_cast<FramebufferAttachment>(node);
+  if (!attachment) {
+    throw std::invalid_argument("format only works on FramebufferAttachment nodes!");
+  }
+  return static_cast<VkFormat>(attachment->format);
+}
+
 template <typename Flags, typename FlagBits>
 Flags flags(const List& lst) {
   if (lst.empty()) {
@@ -102,6 +112,7 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "uint32", fun_ptr(make_object<uint32_t, Number>) });
   env->outer->inner.insert({ "float", fun_ptr(make_object<float, Number>) });
   env->outer->inner.insert({ "count", fun_ptr(count) });
+  env->outer->inner.insert({ "format", fun_ptr(format) });
 	env->outer->inner.insert({ "window", fun_ptr(window) });
 	env->outer->inner.insert({ "extent", fun_ptr(node<Extent, uint32_t, uint32_t>) });
 	env->outer->inner.insert({ "offscreen-image", fun_ptr(offscreen) });
