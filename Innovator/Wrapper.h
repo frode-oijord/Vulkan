@@ -499,6 +499,7 @@ static VkBool32 DebugCallback(VkFlags flags,
   return VK_FALSE;
 }
 
+
 class VulkanDebugCallback {
 public:
   NO_COPY_OR_ASSIGNMENT(VulkanDebugCallback)
@@ -759,18 +760,18 @@ public:
     VulkanImage() = delete;
 
   VulkanImage(std::shared_ptr<VulkanDevice> device,
-    VkImageType image_type,
-    VkFormat format,
-    VkExtent3D extent,
-    uint32_t mip_levels,
-    uint32_t array_layers,
-    VkSampleCountFlagBits samples,
-    VkImageTiling tiling,
-    VkImageUsageFlags usage,
-    VkSharingMode sharing_mode,
-    VkImageCreateFlags flags = 0,
-    std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>(),
-    VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) :
+              VkImageType image_type,
+              VkFormat format,
+              VkExtent3D extent,
+              uint32_t mip_levels,
+              uint32_t array_layers,
+              VkSampleCountFlagBits samples,
+              VkImageTiling tiling,
+              VkImageUsageFlags usage,
+              VkSharingMode sharing_mode,
+              VkImageCreateFlags flags = 0,
+              std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>(),
+              VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) :
     device(std::move(device))
   {
     VkImageCreateInfo create_info{
@@ -810,6 +811,17 @@ public:
     return memory_requirements;
   }
 
+  VkSubresourceLayout getSubresourceLayout(VkImageSubresource& image_subresource)
+  {
+    VkSubresourceLayout subresource_layout;
+    vkGetImageSubresourceLayout(
+      this->device->device,
+      this->image,
+      &image_subresource,
+      &subresource_layout);
+
+    return subresource_layout;
+  }
 
   std::vector<VkSparseImageMemoryRequirements> getSparseMemoryRequirements()
   {
@@ -828,6 +840,16 @@ public:
       sparse_memory_requirements.data());
 
     return sparse_memory_requirements;
+  }
+
+  VkSparseImageMemoryRequirements getSparseMemoryRequirements(VkImageAspectFlags aspectMask)
+  {
+    for (auto requirements : this->getSparseMemoryRequirements()) {
+      if (requirements.formatProperties.aspectMask & aspectMask) {
+        return requirements;
+      }
+    }
+    throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
   }
 
   static VkImageMemoryBarrier MemoryBarrier(
@@ -917,6 +939,98 @@ public:
 
   std::shared_ptr<VulkanDevice> device;
   VkBuffer buffer{ nullptr };
+};
+
+
+class VulkanBufferObject {
+public:
+  VulkanBufferObject(std::shared_ptr<VulkanDevice> device,
+                     VkBufferCreateFlags createFlags,
+                     VkDeviceSize size,
+                     VkBufferUsageFlags usage,
+                     VkSharingMode sharingMode,
+                     VkMemoryPropertyFlags memoryFlags)
+  {
+    this->buffer = std::make_shared<VulkanBuffer>(
+      device,
+      createFlags,
+      size,
+      usage,
+      sharingMode);
+
+    VkMemoryRequirements memory_requirements = this->buffer->getMemoryRequirements();
+
+    uint32_t memory_type_index = device->physical_device.getMemoryTypeIndex(
+      memory_requirements.memoryTypeBits,
+      memoryFlags);
+
+    this->memory = std::make_shared<VulkanMemory>(
+      device,
+      memory_requirements.size,
+      memory_type_index);
+
+    device->bindBufferMemory(
+      this->buffer->buffer,
+      this->memory->memory,
+      0);
+  }
+
+  ~VulkanBufferObject() = default;
+
+  std::shared_ptr<VulkanBuffer> buffer;
+  std::shared_ptr<VulkanMemory> memory;
+};
+
+
+class VulkanImageObject {
+public:
+  VulkanImageObject(std::shared_ptr<VulkanDevice> device,
+                    VkImageType image_type,
+                    VkFormat format,
+                    VkExtent3D extent,
+                    uint32_t levels,
+                    uint32_t layers,
+                    VkSampleCountFlagBits samples,
+                    VkImageTiling tiling,
+                    VkImageUsageFlags usage,
+                    VkSharingMode mode,
+                    VkImageCreateFlags flags,
+                    VkMemoryPropertyFlags memoryFlags)
+  {
+    this->image = std::make_shared<VulkanImage>(
+      device,
+      image_type,
+      format,
+      extent,
+      levels,
+      layers,
+      samples,
+      tiling,
+      usage,
+      mode,
+      flags);
+
+    this->memory_requirements = this->image->getMemoryRequirements();
+
+    uint32_t memory_type_index = device->physical_device.getMemoryTypeIndex(
+      this->memory_requirements.memoryTypeBits,
+      memoryFlags);
+
+    this->memory = std::make_shared<VulkanMemory>(
+      device,
+      this->memory_requirements.size,
+      memory_type_index);
+
+    device->bindImageMemory(
+      this->image->image,
+      this->memory->memory,
+      0);
+  }
+
+
+  std::shared_ptr<VulkanImage> image;
+  std::shared_ptr<VulkanMemory> memory;
+  VkMemoryRequirements memory_requirements;
 };
 
 

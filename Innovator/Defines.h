@@ -25,10 +25,10 @@
 
 #define REGISTER_VISITOR_CALLBACK(__visitor__, __nodetype__, __method__)										\
 {																																														\
-	static bool dummy	= []() {																																\
+	static bool once = []() { 																																\
 		__visitor__.register_callback<__nodetype__>([](__nodetype__* self, Context* context) {	\
 			self->__method__(context);																														\
-			});																																										\
+		}); 																																										\
 		return true;																																						\
 	}();																																											\
 }																																														\

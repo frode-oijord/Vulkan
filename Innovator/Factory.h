@@ -165,7 +165,7 @@ public:
           std::cout << "i = " << i << std::endl;
           for (size_t j = 0; j < lod_size; j++) {
             for (size_t k = 0; k < lod_size; k++) {
-              int value = (((i & 64) == 0) ^ ((j & 32) == 0) ^ ((k & 32) == 0)) * 255;
+              int value = (((i & 64) == 0) ^ ((j & 32) == 0) ^ ((k & 32) == 0)) * 254 + 1;
               data[((i * lod_size) + j) * lod_size + k] = glm::u8vec1(value);
             }
           }
