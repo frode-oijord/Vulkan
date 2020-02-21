@@ -230,21 +230,14 @@ public:
   explicit InlineBufferData(std::vector<T> values) :
     values(std::move(values))
   {
-    REGISTER_VISITOR_CALLBACK(allocvisitor, InlineBufferData<float>, update);
-    REGISTER_VISITOR_CALLBACK(allocvisitor, InlineBufferData<uint32_t>, update);
-
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<float>, update);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<uint32_t>, update);
-
-		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<float>, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<uint32_t>, update);
+    REGISTER_VISITOR_CALLBACK(allocvisitor, InlineBufferData<T>, update);
+    REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<T>, update);
+    REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<T>, update);
 	}
 
   void copy(char * dst) const override
   {
-    std::copy(this->values.begin(),
-              this->values.end(),
-              reinterpret_cast<T*>(dst));
+    std::copy(this->values.begin(), this->values.end(), reinterpret_cast<T*>(dst));
   }
 
   size_t size() const override
@@ -264,8 +257,8 @@ public:
 class TextureImage : public BufferData {
 public:
   IMPLEMENT_VISITABLE_INLINE
-    NO_COPY_OR_ASSIGNMENT(TextureImage)
-    TextureImage() = delete;
+  NO_COPY_OR_ASSIGNMENT(TextureImage)
+  TextureImage() = delete;
   virtual ~TextureImage() = default;
 
   explicit TextureImage(const std::string& filename) :
@@ -289,7 +282,7 @@ public:
 
   size_t stride() const override
   {
-    return 0;
+    return this->texture->element_size();
   }
 
   void update(Context* context)
@@ -300,62 +293,6 @@ public:
 
 private:
   std::shared_ptr<VulkanTextureImage> texture;
-};
-
-
-class STLBufferData : public BufferData {
-public:
-	IMPLEMENT_VISITABLE_INLINE
-  NO_COPY_OR_ASSIGNMENT(STLBufferData)
-  STLBufferData() = delete;
-  virtual ~STLBufferData() = default;
-
-  explicit STLBufferData(std::string filename) :
-    filename(std::move(filename))
-  {
-    std::uintmax_t file_size = fs::file_size(fs::current_path() / this->filename);
-    std::cout << "std::file_size reported size of: " << file_size << std::endl;
-
-    size_t num_triangles = (file_size - 84) / 50;
-    std::cout << "num triangles should be " << num_triangles << std::endl;
-
-    this->values_size = num_triangles * 36;
-  }
-
-  void copy(char * dst) const override
-  {
-    std::ifstream input(this->filename, std::ios::binary);
-    // header is first 80 bytes
-    char header[80];
-    input.read(header, 80);
-    std::cout << "header: " << std::string(header) << std::endl;
-
-    // num triangles is next 4 bytes after header
-    uint32_t num_triangles;
-    input.read(reinterpret_cast<char*>(&num_triangles), 4);
-    std::cout << "num triangles: " << num_triangles << std::endl;
-
-    char normal[12];
-    char attrib[2];
-    for (size_t i = 0; i < num_triangles; i++) {
-      input.read(normal, 12); // skip normal
-      input.read(dst + i * 36, 36);
-      input.read(attrib, 2);  // skip attribute
-    }
-  }
-
-  std::string filename;
-  size_t values_size;
-
-  size_t size() const override
-  {
-    return this->values_size;
-  }
-
-  size_t stride() const override
-  {
-    return sizeof(float);
-  }
 };
 
 
@@ -403,6 +340,7 @@ private:
   VkBufferCreateFlags create_flags;
   std::shared_ptr<VulkanBufferObject> bufferobject;
 };
+
 
 class GpuMemoryBuffer : public Node {
 public:
@@ -2291,14 +2229,13 @@ public:
         };
 
         this->bound_memory_pages.insert({ key, image_memory_bind });
-
         image_memory_binds.push_back(image_memory_bind);
 
         const VkImageSubresourceLayers imageSubresource{
-          subresource_range.aspectMask,                // aspectMask
-          mipLevel,                                    // mipLevel
-          subresource_range.baseArrayLayer,            // baseArrayLayer
-          subresource_range.layerCount,                // layerCount
+          subresource_range.aspectMask,                           // aspectMask
+          mipLevel,                                               // mipLevel
+          subresource_range.baseArrayLayer,                       // baseArrayLayer
+          subresource_range.layerCount,                           // layerCount
         };
 
         regions.push_back({
@@ -2317,13 +2254,10 @@ public:
           mipOffset += texture->size(m);
         }
 
-        VkDeviceSize x = imageOffset.x;
-        VkDeviceSize y = imageOffset.y;
-        VkDeviceSize z = imageOffset.z;
-        VkDeviceSize width = extent.width;
-        VkDeviceSize height = extent.height;
-        VkDeviceSize elementSize = texture->element_size();
-        VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
+        uint32_t test = ((imageOffset.z * extent.height) + imageOffset.y) * extent.width + imageOffset.x;
+
+        VkDeviceSize bufferOffset = mipOffset + 
+          static_cast<VkDeviceSize>(((imageOffset.z * extent.height) + imageOffset.y) * extent.width + imageOffset.x) * texture->element_size();
 
         auto first = texture->data() + bufferOffset;
         auto last = first + pageSize;
@@ -2351,18 +2285,18 @@ public:
     std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
 
     VkBindSparseInfo bind_sparse_info = {
-      VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                           // sType
-      nullptr,                                                      // pNext
-      static_cast<uint32_t>(wait_semaphores.size()),                // waitSemaphoreCount
-      wait_semaphores.data(),                                       // pWaitSemaphores
-      static_cast<uint32_t>(buffer_memory_bind_infos.size()),       // bufferBindCount
-      buffer_memory_bind_infos.data(),                              // pBufferBinds
-      static_cast<uint32_t>(image_opaque_memory_bind_infos.size()), // imageOpaqueBindCount
-      image_opaque_memory_bind_infos.data(),                        // pImageOpaqueBinds
-      static_cast<uint32_t>(image_memory_bind_info.size()),         // imageBindCount
-      image_memory_bind_info.data(),                                // pImageBinds
-      static_cast<uint32_t>(signal_semaphores.size()),              // signalSemaphoreCount
-      signal_semaphores.data(),                                     // pSignalSemaphores
+      VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                                   // sType
+      nullptr,                                                              // pNext
+      static_cast<uint32_t>(wait_semaphores.size()),                        // waitSemaphoreCount
+      wait_semaphores.data(),                                               // pWaitSemaphores
+      static_cast<uint32_t>(buffer_memory_bind_infos.size()),               // bufferBindCount
+      buffer_memory_bind_infos.data(),                                      // pBufferBinds
+      static_cast<uint32_t>(image_opaque_memory_bind_infos.size()),         // imageOpaqueBindCount
+      image_opaque_memory_bind_infos.data(),                                // pImageOpaqueBinds
+      static_cast<uint32_t>(image_memory_bind_info.size()),                 // imageBindCount
+      image_memory_bind_info.data(),                                        // pImageBinds
+      static_cast<uint32_t>(signal_semaphores.size()),                      // signalSemaphoreCount
+      signal_semaphores.data(),                                             // pSignalSemaphores
     };
 
     vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
