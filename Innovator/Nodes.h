@@ -23,12 +23,14 @@
 #include <filesystem>
 namespace fs = std::filesystem;
 
+
 class Node {
 public:
 	Node() = default;
 	virtual ~Node() = default;
 	virtual void visit(Visitor* visitor, Context* context) = 0;
 };
+
 
 class Group : public Node {
 public:
@@ -43,6 +45,7 @@ public:
 	std::vector<std::shared_ptr<Node>> children;
 };
 
+
 class Separator : public Group {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -54,6 +57,7 @@ public:
 		: Group(std::move(children))
 	{}
 };
+
 
 class ViewMatrix : public Node {
 public:
@@ -138,6 +142,7 @@ private:
   double fieldofview;
 };
 
+
 class ModelMatrix : public Node {
 public:
   IMPLEMENT_VISITABLE_INLINE
@@ -168,19 +173,15 @@ public:
 };
 
 
-class TextureMatrix : public Node {
+class TextureMatrix : public ModelMatrix {
 public:
   IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(TextureMatrix)
-  TextureMatrix() = default;
-  virtual ~TextureMatrix() = default;
 
   TextureMatrix(const glm::dvec3& t, const glm::dvec3& s)
+    : ModelMatrix(t, s)
   {
     REGISTER_VISITOR_CALLBACK(rendervisitor, TextureMatrix, render);
-
-    this->matrix = glm::scale(this->matrix, s);
-    this->matrix = glm::translate(this->matrix, t);
   }
 
   TextureMatrix(double t0, double t1, double t2,
@@ -218,6 +219,7 @@ public:
     context->state.bufferdata = this;
   }
 };
+
 
 template <typename T>
 class InlineBufferData : public BufferData {
@@ -464,6 +466,7 @@ private:
   VkIndexType type;
 };
 
+
 class VertexInputAttributeDescription : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -498,6 +501,7 @@ private:
   VkVertexInputAttributeDescription vertex_input_attribute_description;
 };
 
+
 class VertexInputBindingDescription : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -529,6 +533,7 @@ private:
   uint32_t stride;
   VkVertexInputRate inputRate;
 };
+
 
 class DescriptorSetLayoutBinding : public Node {
 public:
@@ -595,6 +600,7 @@ private:
   VkDescriptorImageInfo descriptor_image_info{};
   VkDescriptorBufferInfo descriptor_buffer_info{};
 };
+
 
 class Shader : public Node {
 public:
@@ -665,6 +671,7 @@ protected:
   VkShaderStageFlagBits stage;
   std::unique_ptr<VulkanShaderModule> shader;
 };
+
 
 class Sampler : public Node {
 public:
@@ -963,6 +970,7 @@ private:
   VkCullModeFlags cullmode;
 };
 
+
 class ComputeCommand : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -1042,6 +1050,7 @@ private:
   std::shared_ptr<VulkanPipelineLayout> pipeline_layout;
   std::shared_ptr<VulkanDescriptorPool> descriptor_pool;
 };
+
 
 class DrawCommandBase : public Node {
 public:
@@ -1182,6 +1191,7 @@ private:
   std::shared_ptr<VulkanPipelineLayout> pipeline_layout;
 };
 
+
 class DrawCommand : public DrawCommandBase {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -1266,6 +1276,7 @@ private:
   uint32_t firstinstance;
   VkDeviceSize offset;
 };
+
 
 class FramebufferAttachment : public Node {
 public:
@@ -1375,6 +1386,7 @@ public:
   std::shared_ptr<VulkanFramebuffer> framebuffer;
 };
 
+
 class InputAttachment : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -1436,6 +1448,7 @@ private:
   VkAttachmentReference attachment;
 };
 
+
 class DepthStencilAttachment : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -1475,6 +1488,7 @@ public:
 private:
   uint32_t attachment;
 };
+
 
 class PipelineBindpoint : public Node {
 public:
@@ -1529,6 +1543,7 @@ public:
   }
 };
 
+
 class RenderpassAttachment: public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -1567,6 +1582,7 @@ public:
 private:
   VkAttachmentDescription description;
 };
+
 
 class Renderpass : public Group {
 public:
@@ -1637,6 +1653,7 @@ public:
   std::shared_ptr<VulkanFramebuffer> framebuffer;
 };
 
+
 class RenderpassDescription : public Group {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -1682,6 +1699,7 @@ public:
 public:
   std::shared_ptr<VulkanRenderpass> renderpass;
 };
+
 
 class SwapchainObject : public Node {
 public:

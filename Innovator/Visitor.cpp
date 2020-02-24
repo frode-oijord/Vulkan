@@ -84,6 +84,7 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
 	if (press) {
 		this->press = press;
+		this->prevpos = this->press->pos;
 	}
 
 	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
@@ -92,14 +93,14 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 
 	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
 	if (move && this->press) {
-		glm::dvec2 dx = (this->press->pos - move->pos) * .01;
+		glm::dvec2 dx = (this->prevpos - move->pos) * .01;
 		dx[1] = -dx[1];
 		switch (this->press->button) {
 		case 1: node->pan(dx * 0.1); break;
 		case 2: node->zoom(dx[1] * 0.5); break;
 		default: break;
 		}
-		this->press->pos = move->pos;
+		this->prevpos = move->pos;
 	}
 }
 
@@ -107,29 +108,29 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 void 
 EventVisitor::visit(class TextureMatrix* node, class Context* context)
 {
-	//auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-	//if (press) {
-	//	this->press = press;
-	//}
+	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
+	if (press) {
+		this->press = press;
+	}
 
-	//if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-	//	this->press.reset();
-	//}
+	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
+		this->press.reset();
+	}
 
-	//auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-	//if (move && this->press) {
-	//	glm::dvec2 dx = (this->press->pos - move->pos) * .01;	
-	//	dx[1] = -dx[1];
-	//	switch (this->press->button) {
-	//	case 0: {
-	//		node->matrix[3][2] += dx[1] * 0.2f;
-	//		node->matrix[3][2] = std::clamp(node->matrix[3][2], 0.0, 1.0);
-	//		break;
-	//	}
-	//	default: break;
-	//	}
-	//	this->press->pos = move->pos;
-	//}
+	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
+	if (move && this->press) {
+		glm::dvec2 dx = (this->press->pos - move->pos) * .01;	
+		dx[1] = -dx[1];
+		switch (this->press->button) {
+		case 0: {
+			node->matrix[3][2] += dx[1] * 0.2f;
+			node->matrix[3][2] = std::clamp(node->matrix[3][2], 0.0, 1.0);
+			break;
+		}
+		default: break;
+		}
+		this->press->pos = move->pos;
+	}
 }
 
 

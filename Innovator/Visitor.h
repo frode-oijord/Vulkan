@@ -2,6 +2,8 @@
 
 #include <Innovator/State.h>
 
+#include <glm/glm.hpp>
+
 #include <any>
 #include <typeindex>
 #include <functional>
@@ -71,6 +73,7 @@ public:
 	void visit(class TextureMatrix* node, class Context* context);
 
 private:
+	glm::dvec2 prevpos;
 	std::shared_ptr<class MousePressEvent> press{ nullptr };
 };
 

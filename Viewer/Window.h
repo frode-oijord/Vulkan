@@ -251,18 +251,21 @@ public:
   {
     this->context->event = std::make_shared<MousePressEvent>(x, y, button);
 		this->root->visit(&eventvisitor, this->context.get());
+    this->context->event.reset();
   }
 
   void mouseReleased() override
   {
     this->context->event = std::make_shared<MouseReleaseEvent>();
 		this->root->visit(&eventvisitor, this->context.get());
+    this->context->event.reset();
 	}
 
   void mouseMoved(int x, int y)
   {
     this->context->event = std::make_shared<MouseMoveEvent>(x, y);
 		this->root->visit(&eventvisitor, this->context.get());
+    this->context->event.reset();
 
     if (this->context->redraw) {
 			this->redraw();
