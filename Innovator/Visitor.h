@@ -8,24 +8,6 @@
 #include <typeindex>
 #include <functional>
 
-class StateScope {
-public:
-	StateScope() = delete;
-
-	explicit StateScope(State* state) :
-		stateptr(state),
-		statecpy(*state)
-	{}
-
-	~StateScope()
-	{
-		*stateptr = this->statecpy;
-	}
-
-	State* stateptr;
-	State statecpy;
-};
-
 
 class Context;
 
@@ -54,14 +36,6 @@ public:
 	void visit_separator(class Separator* node, class Context* context);
 
 	std::unordered_map<std::type_index, std::any> callbacks;
-};
-
-
-class RenderVisitor : public Visitor {
-public:
-	RenderVisitor() = default;
-
-	void visit(class Node* node, class Context* context);
 };
 
 

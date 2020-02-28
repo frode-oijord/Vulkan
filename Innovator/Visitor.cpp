@@ -2,6 +2,27 @@
 #include <Innovator/Visitor.h>
 #include <Innovator/Nodes.h>
 
+
+class StateScope {
+public:
+	StateScope() = delete;
+
+	explicit StateScope(State* state) :
+		stateptr(state),
+		statecpy(*state)
+	{}
+
+	~StateScope()
+	{
+		*stateptr = this->statecpy;
+	}
+
+	State* stateptr;
+	State statecpy;
+};
+
+
+
 Visitor::Visitor()
 {
 	auto visit_group = [this](Group* node, Context* context) {
@@ -53,15 +74,6 @@ Visitor::visit(Node* node, Context* context)
 		context->wait_semaphores);
 
 	context->fence->wait();
-}
-
-
-void 
-RenderVisitor::visit(class Node* node, class Context* context)
-{
-	context->begin();
-	node->visit(this, context);
-	context->end();
 }
 
 
