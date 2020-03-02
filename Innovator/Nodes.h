@@ -2245,10 +2245,8 @@ public:
           mipOffset += texture->size(m);
         }
 
-        uint32_t test = ((imageOffset.z * extent.height) + imageOffset.y) * extent.width + imageOffset.x;
-
         VkDeviceSize bufferOffset = mipOffset + 
-          static_cast<VkDeviceSize>(((imageOffset.z * extent.height) + imageOffset.y) * extent.width + imageOffset.x) * texture->element_size();
+          (((static_cast<VkDeviceSize>(imageOffset.z) * extent.height) + imageOffset.y) * extent.width + imageOffset.x) * texture->element_size();
 
         auto first = texture->data() + bufferOffset;
         auto last = first + pageSize;
