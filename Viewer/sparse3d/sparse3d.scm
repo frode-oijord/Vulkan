@@ -191,14 +191,13 @@
    (define scene 
       (group
          (viewmatrix 
-            .5 .5 2 
-            .2 .2 0 
-            0 1 0)
+            (dvec3 .5 .5  2)
+            (dvec3 .2 .2  0)
+            (dvec3  0  1  0))
 
          (projmatrix 1000 0.001 1.0 0.7)
-
-         (texturematrix 0 0 0 1 1 1)
-         (modelmatrix 0 0 0 1 1 1)
+         (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
+         (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
 
          (shader VK_SHADER_STAGE_VERTEX_BIT [[
             #version 450

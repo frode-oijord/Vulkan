@@ -108,8 +108,8 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 		glm::dvec2 dx = (this->prevpos - move->pos) * .01;
 		dx[1] = -dx[1];
 		switch (this->press->button) {
-		case 1: node->pan(dx * 0.1); break;
-		case 2: node->zoom(dx[1] * 0.5); break;
+		case 1: node->mat = glm::translate(node->mat, glm::dvec3(dx * 0.1, 0.0)); break;
+		case 2: node->mat = glm::translate(node->mat, glm::dvec3(0.0, 0.0, dx[1] * 0.5)); break;
 		default: break;
 		}
 		this->prevpos = move->pos;
@@ -135,8 +135,8 @@ EventVisitor::visit(class TextureMatrix* node, class Context* context)
 		dx[1] = -dx[1];
 		switch (this->press->button) {
 		case 0: {
-			node->matrix[3][2] += dx[1] * 0.2f;
-			node->matrix[3][2] = std::clamp(node->matrix[3][2], 0.0, 1.0);
+			node->mat[3][2] += dx[1] * 0.2f;
+			node->mat[3][2] = std::clamp(node->mat[3][2], 0.0, 1.0);
 			break;
 		}
 		default: break;

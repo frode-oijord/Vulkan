@@ -55,6 +55,9 @@ std::shared_ptr<Node> bufferdata(const List & lst)
 
 uint32_t count(const List & list)
 {
+  if (list.empty()) {
+    throw std::runtime_error("count needs at least 1 argument");
+  }
   auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
   auto bufferdata = std::dynamic_pointer_cast<BufferData>(node);
   if (!bufferdata) {
@@ -111,6 +114,7 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "int32", fun_ptr(make_object<int32_t, Number>) });
   env->outer->inner.insert({ "uint32", fun_ptr(make_object<uint32_t, Number>) });
   env->outer->inner.insert({ "float", fun_ptr(make_object<float, Number>) });
+  env->outer->inner.insert({ "dvec3", fun_ptr(make_object<glm::dvec3, Number, Number, Number>) });
   env->outer->inner.insert({ "count", fun_ptr(count) });
   env->outer->inner.insert({ "format", fun_ptr(format) });
 	env->outer->inner.insert({ "window", fun_ptr(window) });
@@ -123,10 +127,10 @@ std::any eval_file(const std::string & filename)
   env->outer->inner.insert({ "renderpass-attachment", fun_ptr(node<RenderpassAttachment, VkFormat, VkSampleCountFlagBits, VkAttachmentLoadOp, VkAttachmentStoreOp, VkAttachmentLoadOp, VkAttachmentStoreOp, VkImageLayout, VkImageLayout>) });
   env->outer->inner.insert({ "renderpass-description", fun_ptr(shared_from_node_list<RenderpassDescription, std::shared_ptr<Node>>) });
   env->outer->inner.insert({ "renderpass", fun_ptr(shared_from_node_list<Renderpass, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "viewmatrix", fun_ptr(node<ViewMatrix, Number, Number, Number, Number, Number, Number, Number, Number, Number> ) });
+  env->outer->inner.insert({ "viewmatrix", fun_ptr(node<ViewMatrix, glm::dvec3, glm::dvec3, glm::dvec3> ) });
   env->outer->inner.insert({ "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) });
-  env->outer->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, Number, Number, Number, Number, Number, Number>) });
-  env->outer->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, Number, Number, Number, Number, Number, Number>) });
+  env->outer->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, glm::dvec3, glm::dvec3>) });
+  env->outer->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, glm::dvec3, glm::dvec3>) });
   env->outer->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
   env->outer->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) });
   env->outer->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });

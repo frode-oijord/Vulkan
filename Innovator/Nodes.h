@@ -59,47 +59,6 @@ public:
 };
 
 
-class ViewMatrix : public Node {
-public:
-	IMPLEMENT_VISITABLE_INLINE
-	NO_COPY_OR_ASSIGNMENT(ViewMatrix)
-	ViewMatrix() = delete;
-	virtual ~ViewMatrix() = default;
-
-	ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
-		: mat(glm::lookAt(eye, target, up))
-	{
-		REGISTER_VISITOR_CALLBACK(rendervisitor, ViewMatrix, render);
-	}
-
-	ViewMatrix(double m0, double m1, double m2,
-						 double m3, double m4, double m5,
-						 double m6, double m7, double m8)
-		: ViewMatrix(glm::dvec3(m0, m1, m2),
-								 glm::dvec3(m3, m4, m5),
-								 glm::dvec3(m6, m7, m8))
-	{}
-
-	void zoom(double dy)
-	{
-		this->mat = glm::translate(this->mat, glm::dvec3(0.0, 0.0, dy));
-	}
-
-	void pan(const glm::dvec2& dx)
-	{
-		this->mat = glm::translate(this->mat, glm::dvec3(dx, 0.0));
-	}
-
-	void render(Context* context)
-	{
-		context->state.ViewMatrix = this->mat;
-	}
-
-private:
-	glm::dmat4 mat{ 1.0 };
-};
-
-
 class ProjMatrix : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
@@ -143,6 +102,28 @@ private:
 };
 
 
+class ViewMatrix : public Node {
+public:
+  IMPLEMENT_VISITABLE_INLINE
+  NO_COPY_OR_ASSIGNMENT(ViewMatrix)
+  ViewMatrix() = delete;
+  virtual ~ViewMatrix() = default;
+
+  ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
+    : mat(glm::lookAt(eye, target, up))
+  {
+    REGISTER_VISITOR_CALLBACK(rendervisitor, ViewMatrix, render);
+  }
+
+  void render(Context* context)
+  {
+    context->state.ViewMatrix = this->mat;
+  }
+
+  glm::dmat4 mat{ 1.0 };
+};
+
+
 class ModelMatrix : public Node {
 public:
   IMPLEMENT_VISITABLE_INLINE
@@ -154,48 +135,40 @@ public:
   {
     REGISTER_VISITOR_CALLBACK(rendervisitor, ModelMatrix, render);
 
-    this->matrix = glm::scale(this->matrix, s);
-    this->matrix = glm::translate(this->matrix, t);
+    this->mat = glm::scale(this->mat, s);
+    this->mat = glm::translate(this->mat, t);
   }
 
-  ModelMatrix(double t0, double t1, double t2,
-              double s0, double s1, double s2)
-    : ModelMatrix(glm::dvec3(t0, t1, t2), glm::dvec3(s0, s1, s2))
-  {}
-
-  virtual void render(Context* context)
+  void render(Context* context)
   {
-    context->state.ModelMatrix *= this->matrix;
+    context->state.ModelMatrix *= this->mat;
   }
 
-public:
-  glm::dmat4 matrix{ 1.0 };
+  glm::dmat4 mat{ 1.0 };
 };
 
 
-class TextureMatrix : public ModelMatrix {
+class TextureMatrix : public Node {
 public:
   IMPLEMENT_VISITABLE_INLINE
   NO_COPY_OR_ASSIGNMENT(TextureMatrix)
+  TextureMatrix() = default;
+  virtual ~TextureMatrix() = default;
 
   TextureMatrix(const glm::dvec3& t, const glm::dvec3& s)
-    : ModelMatrix(t, s)
   {
     REGISTER_VISITOR_CALLBACK(rendervisitor, TextureMatrix, render);
+
+    this->mat = glm::scale(this->mat, s);
+    this->mat = glm::translate(this->mat, t);
   }
 
-  TextureMatrix(double t0, double t1, double t2,
-                double s0, double s1, double s2)
-    : TextureMatrix(glm::dvec3(t0, t1, t2), glm::dvec3(s0, s1, s2))
-  {}
-
-  virtual void render(Context* context)
+  void render(Context* context)
   {
-    context->state.TextureMatrix *= this->matrix;
+    context->state.TextureMatrix *= this->mat;
   }
 
-public:
-  glm::dmat4 matrix{ 1.0 };
+  glm::dmat4 mat{ 1.0 };
 };
 
 
