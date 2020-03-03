@@ -33,11 +33,7 @@ Visitor::Visitor()
 	};
 
 	this->register_callback<Group>(visit_group);
-	this->register_callback<Renderpass>(visit_group);
 	this->register_callback<Separator>(visit_separator);
-	this->register_callback<Framebuffer>(visit_group);
-	this->register_callback<SubpassDescription>(visit_group);
-	this->register_callback<RenderpassDescription>(visit_group);
 }
 
 

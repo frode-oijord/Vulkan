@@ -1569,9 +1569,21 @@ public:
 		REGISTER_VISITOR_CALLBACK(allocvisitor, Renderpass, alloc);
 		REGISTER_VISITOR_CALLBACK(resizevisitor, Renderpass, resize);
 		REGISTER_VISITOR_CALLBACK(rendervisitor, Renderpass, render);
+    REGISTER_VISITOR_CALLBACK(pipelinevisitor, Renderpass, pipeline);
+    REGISTER_VISITOR_CALLBACK(recordvisitor, Renderpass, record);
 	}
 
-  void alloc(Context* context) 
+  void pipeline(Context* context)
+  {
+    pipelinevisitor.visit_group(this, context);
+  }
+
+  void record(Context* context)
+  {
+    recordvisitor.visit_group(this, context);
+  }
+
+  void alloc(Context* context)
   {
 		allocvisitor.visit_group(this, context);
 
