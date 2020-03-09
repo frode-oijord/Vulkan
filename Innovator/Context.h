@@ -2,7 +2,6 @@
 
 #include <Innovator/Defines.h>
 #include <Innovator/State.h>
-#include <Innovator/Events.h>
 
 #include <set>
 #include <memory>
@@ -58,7 +57,6 @@ public:
   VkQueue queue{ nullptr };
 
   State state;
-  std::shared_ptr<Event> event;
   bool redraw;
 
   std::shared_ptr<VulkanFence> fence;

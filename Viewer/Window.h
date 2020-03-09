@@ -2,6 +2,7 @@
 
 #include <Innovator/Nodes.h>
 #include <Innovator/Context.h>
+#include <Innovator/Events.h>
 #include <Innovator/Defines.h>
 #include <Innovator/VulkanSurface.h>
 
@@ -39,7 +40,7 @@ public:
 
     this->hWnd = CreateWindow(
       szWindowClass,
-      _T("Windows Desktop Guided Tour Application"),
+      _T("Vulkan 3D Window App"),
       WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT,
       1920, 1080,
@@ -249,23 +250,27 @@ public:
 
   void mousePressed(int x, int y, int button)
   {
-    this->context->event = std::make_shared<MousePressEvent>(x, y, button);
+    eventvisitor.press = true;
+    eventvisitor.button = button;
+    eventvisitor.currpos = glm::dvec2(x, y);
 		this->root->visit(&eventvisitor, this->context.get());
-    this->context->event.reset();
+    eventvisitor.prevpos = eventvisitor.currpos;
   }
 
   void mouseReleased() override
   {
-    this->context->event = std::make_shared<MouseReleaseEvent>();
+    eventvisitor.press = false;
 		this->root->visit(&eventvisitor, this->context.get());
-    this->context->event.reset();
+    eventvisitor.prevpos = eventvisitor.currpos;
 	}
 
   void mouseMoved(int x, int y)
   {
-    this->context->event = std::make_shared<MouseMoveEvent>(x, y);
+    eventvisitor.move = true;
+    eventvisitor.currpos = glm::dvec2(x, y);
 		this->root->visit(&eventvisitor, this->context.get());
-    this->context->event.reset();
+    eventvisitor.prevpos = eventvisitor.currpos;
+    eventvisitor.move = false;
 
     if (this->context->redraw) {
 			this->redraw();

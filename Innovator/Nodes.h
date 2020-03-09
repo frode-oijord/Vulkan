@@ -109,18 +109,55 @@ public:
   ViewMatrix() = delete;
   virtual ~ViewMatrix() = default;
 
-  ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up)
-    : mat(glm::lookAt(eye, target, up))
+  ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up) :
+    eye(eye), target(target)
   {
     REGISTER_VISITOR_CALLBACK(rendervisitor, ViewMatrix, render);
+
+    this->rot[1] = up;
+    this->updateOrientation();
+  }
+
+  void orbit(glm::dvec2 dx)
+  {
+    glm::dvec3 eye = this->eye + this->rot[0] * dx.x + this->rot[1] * dx.y;
+    glm::dvec3 newdir = eye - this->target;
+    this->eye = this->target + glm::normalize(newdir) * glm::length(this->eye - this->target);
+    this->updateOrientation();
+  }
+
+  void pan(glm::dvec2 dx)
+  {
+    glm::dvec3 offset = this->rot[0] * dx.x + this->rot[1] * dx.y;
+    this->eye += offset;
+    this->target += offset;
+    this->updateOrientation();
+  }
+
+  void zoom(double dz)
+  {
+    double focaldist = glm::length(this->eye - this->target);
+    this->eye += this->rot[2] * dz * focaldist;
+    this->updateOrientation();
   }
 
   void render(Context* context)
   {
-    context->state.ViewMatrix = this->mat;
+    context->state.ViewMatrix = glm::dmat4(glm::transpose(this->rot));
+    context->state.ViewMatrix = glm::translate(context->state.ViewMatrix, -this->eye);
   }
 
-  glm::dmat4 mat{ 1.0 };
+  void updateOrientation()
+  {
+    this->rot[2] = glm::normalize(this->target - this->eye);
+    this->rot[0] = glm::normalize(glm::cross(this->rot[1], this->rot[2]));
+    this->rot[1] = glm::normalize(glm::cross(this->rot[2], this->rot[0]));
+  }
+
+
+  glm::dmat3 rot;
+  glm::dvec3 eye;
+  glm::dvec3 target;
 };
 
 

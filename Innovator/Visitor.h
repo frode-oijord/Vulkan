@@ -8,7 +8,6 @@
 #include <typeindex>
 #include <functional>
 
-
 class Context;
 
 class Visitor {
@@ -46,9 +45,11 @@ public:
 	void visit(class ModelMatrix* node, class Context* context);
 	void visit(class TextureMatrix* node, class Context* context);
 
-private:
+	bool press;
+	bool move;
+	int button;
+	glm::dvec2 currpos;
 	glm::dvec2 prevpos;
-	std::shared_ptr<class MousePressEvent> press{ nullptr };
 };
 
 inline static EventVisitor eventvisitor;

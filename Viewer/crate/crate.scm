@@ -119,9 +119,13 @@
             (imageaspectflags VK_IMAGE_ASPECT_DEPTH_BIT)))
 
       (viewmatrix 
-         0 2 6 
-         0 0 0 
-         0 1 0)
+         (dvec3 10 2 6) 
+         (dvec3 10 0 0) 
+         (dvec3  0 1 0))
+
+      (modelmatrix 
+         (dvec3 10 0 0) 
+         (dvec3 1 1 1))
 
       (projmatrix 1000 0.1 1.0 0.7)
 
@@ -132,6 +136,7 @@
          layout(std140, binding = 0) uniform Transform {
             mat4 ModelViewMatrix;
             mat4 ProjectionMatrix;
+            mat4 TextureMatrix;
          };
 
          layout(location = 0) in vec3 Position;

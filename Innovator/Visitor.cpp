@@ -33,6 +33,7 @@ Visitor::Visitor()
 	};
 
 	this->register_callback<Group>(visit_group);
+	this->register_callback<Renderpass>(visit_group);
 	this->register_callback<Separator>(visit_separator);
 }
 
@@ -89,26 +90,17 @@ EventVisitor::EventVisitor()
 void
 EventVisitor::visit(ViewMatrix* node, Context* context)
 {
-	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-	if (press) {
-		this->press = press;
-		this->prevpos = this->press->pos;
-	}
-
-	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-		this->press.reset();
-	}
-
-	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-	if (move && this->press) {
-		glm::dvec2 dx = (this->prevpos - move->pos) * .01;
-		dx[1] = -dx[1];
-		switch (this->press->button) {
-		case 1: node->mat = glm::translate(node->mat, glm::dvec3(dx * 0.1, 0.0)); break;
-		case 2: node->mat = glm::translate(node->mat, glm::dvec3(0.0, 0.0, dx[1] * 0.5)); break;
+	if (this->move && this->press) {
+		glm::dvec2 dx = this->prevpos - this->currpos;
+		dx[0] /= context->state.extent.width;
+		dx[1] /= context->state.extent.height;
+		dx *= 2.0;
+		switch (this->button) {
+			case 0: node->orbit(dx); break;
+			case 1: node->pan(dx); break;
+			case 2: node->zoom(dx[1]); break;
 		default: break;
 		}
-		this->prevpos = move->pos;
 	}
 }
 
@@ -116,29 +108,29 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 void 
 EventVisitor::visit(class TextureMatrix* node, class Context* context)
 {
-	auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-	if (press) {
-		this->press = press;
-	}
+	//auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
+	//if (press) {
+	//	this->press = press;
+	//}
 
-	if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-		this->press.reset();
-	}
+	//if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
+	//	this->press.reset();
+	//}
 
-	auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-	if (move && this->press) {
-		glm::dvec2 dx = (this->press->pos - move->pos) * .01;	
-		dx[1] = -dx[1];
-		switch (this->press->button) {
-		case 0: {
-			node->mat[3][2] += dx[1] * 0.2f;
-			node->mat[3][2] = std::clamp(node->mat[3][2], 0.0, 1.0);
-			break;
-		}
-		default: break;
-		}
-		this->press->pos = move->pos;
-	}
+	//auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
+	//if (move && this->press) {
+	//	glm::dvec2 dx = (this->press->pos - move->pos) * .01;	
+	//	dx[1] = -dx[1];
+	//	switch (this->press->button) {
+	//	case 0: {
+	//		node->mat[3][2] += dx[1] * 0.2f;
+	//		node->mat[3][2] = std::clamp(node->mat[3][2], 0.0, 1.0);
+	//		break;
+	//	}
+	//	default: break;
+	//	}
+	//	this->press->pos = move->pos;
+	//}
 }
 
 
