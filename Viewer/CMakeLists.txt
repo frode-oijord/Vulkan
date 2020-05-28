@@ -5,9 +5,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGLM_FORCE_DEPTH_ZERO_TO_ONE")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGLM_FORCE_LEFT_HANDED")
 
 if(WIN32)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_WIN32_KHR")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_WIN32_KHR")
 else()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_XCB_KHR")
 endif(WIN32)
 
 include_directories(${PROJECT_SOURCE_DIR}/../../glm)
@@ -23,19 +23,20 @@ find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-add_executable(Viewer 
-  main.cpp 
-  Window.h
+add_executable(
+	Viewer 
+	main.cpp 
+	Window.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Context.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/Defines.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/Factory.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/File.h
+	${PROJECT_SOURCE_DIR}/../Innovator/Defines.h
+	${PROJECT_SOURCE_DIR}/../Innovator/Factory.h
+	${PROJECT_SOURCE_DIR}/../Innovator/File.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Nodes.h
 	${PROJECT_SOURCE_DIR}/../Innovator/State.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/Timer.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/Visitor.cpp
-  ${PROJECT_SOURCE_DIR}/../Innovator/Visitor.h
-  ${PROJECT_SOURCE_DIR}/../Innovator/VulkanSurface.h
+	${PROJECT_SOURCE_DIR}/../Innovator/Timer.h
+	${PROJECT_SOURCE_DIR}/../Innovator/Visitor.cpp
+	${PROJECT_SOURCE_DIR}/../Innovator/Visitor.h
+	${PROJECT_SOURCE_DIR}/../Innovator/VulkanSurface.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Wrapper.h)
 
 set_property(TARGET Viewer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

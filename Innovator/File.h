@@ -36,57 +36,57 @@ Type make_object(const List& lst)
 }
 
 template <typename NodeType, typename... Arg>
-std::shared_ptr<Node> node(const List & lst)
+std::shared_ptr<Node> node(const List& lst)
 {
-  return make_shared_object<Node, NodeType, Arg...>(lst);
+	return make_shared_object<Node, NodeType, Arg...>(lst);
 }
 
 template <typename Type, typename ItemType>
 std::shared_ptr<Node> shared_from_node_list(const List& lst)
 {
-  return std::make_shared<Type>(scm::any_cast<ItemType>(lst));
+	return std::make_shared<Type>(scm::any_cast<ItemType>(lst));
 }
 
 template <typename T>
-std::shared_ptr<Node> bufferdata(const List & lst)
+std::shared_ptr<Node> bufferdata(const List& lst)
 {
-  return std::make_shared<InlineBufferData<T>>(scm::num_cast<T>(lst));
+	return std::make_shared<InlineBufferData<T>>(scm::num_cast<T>(lst));
 }
 
-uint32_t count(const List & list)
+uint32_t count(const List& list)
 {
-  if (list.empty()) {
-    throw std::runtime_error("count needs at least 1 argument");
-  }
-  auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
-  auto bufferdata = std::dynamic_pointer_cast<BufferData>(node);
-  if (!bufferdata) {
-    throw std::invalid_argument("count only works on BufferData nodes!");
-  }
-  return static_cast<uint32_t>(bufferdata->count());
+	if (list.empty()) {
+		throw std::runtime_error("count needs at least 1 argument");
+	}
+	auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
+	auto bufferdata = std::dynamic_pointer_cast<BufferData>(node);
+	if (!bufferdata) {
+		throw std::invalid_argument("count only works on BufferData nodes!");
+	}
+	return static_cast<uint32_t>(bufferdata->count());
 }
 
 VkFormat format(const List& list)
 {
-  auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
-  auto attachment = std::dynamic_pointer_cast<FramebufferAttachment>(node);
-  if (!attachment) {
-    throw std::invalid_argument("format only works on FramebufferAttachment nodes!");
-  }
-  return static_cast<VkFormat>(attachment->format);
+	auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
+	auto attachment = std::dynamic_pointer_cast<FramebufferAttachment>(node);
+	if (!attachment) {
+		throw std::invalid_argument("format only works on FramebufferAttachment nodes!");
+	}
+	return static_cast<VkFormat>(attachment->format);
 }
 
 template <typename Flags, typename FlagBits>
 Flags flags(const List& lst) {
-  if (lst.empty()) {
-    return 0;
-  }
-  std::vector<FlagBits> flagbits = any_cast<FlagBits>(lst);
-  Flags flags = 0;
-  for (auto bit : flagbits) {
-    flags |= bit;
-  }
-  return flags;
+	if (lst.empty()) {
+		return 0;
+	}
+	std::vector<FlagBits> flagbits = any_cast<FlagBits>(lst);
+	Flags flags = 0;
+	for (auto bit : flagbits) {
+		flags |= bit;
+	}
+	return flags;
 }
 
 
@@ -106,54 +106,54 @@ std::shared_ptr<Node> offscreen(const List& lst)
 }
 
 
-std::any eval_file(const std::string & filename)
+std::any eval_file(const std::string& filename)
 {
-  env_ptr env = scm::global_env();
+	env_ptr env = scm::global_env();
 	env->outer = std::make_shared<Env>();
-  
-  env->outer->inner.insert({ "int32", fun_ptr(make_object<int32_t, Number>) });
-  env->outer->inner.insert({ "uint32", fun_ptr(make_object<uint32_t, Number>) });
-  env->outer->inner.insert({ "float", fun_ptr(make_object<float, Number>) });
-  env->outer->inner.insert({ "dvec3", fun_ptr(make_object<glm::dvec3, Number, Number, Number>) });
-  env->outer->inner.insert({ "count", fun_ptr(count) });
-  env->outer->inner.insert({ "format", fun_ptr(format) });
+
+	env->outer->inner.insert({ "int32", fun_ptr(make_object<int32_t, Number>) });
+	env->outer->inner.insert({ "uint32", fun_ptr(make_object<uint32_t, Number>) });
+	env->outer->inner.insert({ "float", fun_ptr(make_object<float, Number>) });
+	env->outer->inner.insert({ "dvec3", fun_ptr(make_object<glm::dvec3, Number, Number, Number>) });
+	env->outer->inner.insert({ "count", fun_ptr(count) });
+	env->outer->inner.insert({ "format", fun_ptr(format) });
 	env->outer->inner.insert({ "window", fun_ptr(window) });
 	env->outer->inner.insert({ "extent", fun_ptr(node<Extent, uint32_t, uint32_t>) });
 	env->outer->inner.insert({ "offscreen-image", fun_ptr(offscreen) });
-  env->outer->inner.insert({ "pipeline-bindpoint", fun_ptr(node<PipelineBindpoint, VkPipelineBindPoint> ) });
-  env->outer->inner.insert({ "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) });
-  env->outer->inner.insert({ "depth-attachment", fun_ptr(node<DepthStencilAttachment, uint32_t, VkImageLayout>) });
-  env->outer->inner.insert({ "subpass", fun_ptr(shared_from_node_list<SubpassDescription, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "renderpass-attachment", fun_ptr(node<RenderpassAttachment, VkFormat, VkSampleCountFlagBits, VkAttachmentLoadOp, VkAttachmentStoreOp, VkAttachmentLoadOp, VkAttachmentStoreOp, VkImageLayout, VkImageLayout>) });
-  env->outer->inner.insert({ "renderpass-description", fun_ptr(shared_from_node_list<RenderpassDescription, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "renderpass", fun_ptr(shared_from_node_list<Renderpass, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "viewmatrix", fun_ptr(node<ViewMatrix, glm::dvec3, glm::dvec3, glm::dvec3> ) });
-  env->outer->inner.insert({ "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) });
-  env->outer->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, glm::dvec3, glm::dvec3>) });
-  env->outer->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, glm::dvec3, glm::dvec3>) });
-  env->outer->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) });
-  env->outer->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });
-  env->outer->inner.insert({ "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode, float, uint32_t, float, uint32_t, VkCompareOp, float, float, VkBorderColor, uint32_t>) });
-  env->outer->inner.insert({ "textureimage", fun_ptr(node<TextureImage, std::string>) });
-  env->outer->inner.insert({ "image", fun_ptr(node<Image, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
-  env->outer->inner.insert({ "sparse-image", fun_ptr(node<SparseImage, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
-  env->outer->inner.insert({ "imageview", fun_ptr(node<ImageView, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle>) });
-  env->outer->inner.insert({ "group", fun_ptr(shared_from_node_list<Group, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "separator", fun_ptr(shared_from_node_list<Separator, std::shared_ptr<Node>>) });
-  env->outer->inner.insert({ "bufferdata-float", fun_ptr(bufferdata<float>) });
-  env->outer->inner.insert({ "bufferdata-uint32", fun_ptr(bufferdata<uint32_t>) });
-  env->outer->inner.insert({ "bufferusageflags", fun_ptr(flags<VkBufferUsageFlags, VkBufferUsageFlagBits>) });
-  env->outer->inner.insert({ "imageusageflags", fun_ptr(flags<VkImageUsageFlags, VkImageUsageFlagBits>) });
-  env->outer->inner.insert({ "imageaspectflags", fun_ptr(flags<VkImageAspectFlags, VkImageAspectFlagBits>) });
-  env->outer->inner.insert({ "imagecreateflags", fun_ptr(flags<VkImageCreateFlags, VkImageCreateFlagBits>) });
-  env->outer->inner.insert({ "cpumemorybuffer", fun_ptr(node<CpuMemoryBuffer, VkBufferUsageFlags>) });
-  env->outer->inner.insert({ "gpumemorybuffer", fun_ptr(node<GpuMemoryBuffer, VkBufferUsageFlags>) });
-  env->outer->inner.insert({ "transformbuffer", fun_ptr(node<TransformBuffer>) });
-  env->outer->inner.insert({ "indexeddrawcommand", fun_ptr(node<IndexedDrawCommand, uint32_t, uint32_t, uint32_t, int32_t, uint32_t, VkPrimitiveTopology>) });
-  env->outer->inner.insert({ "indexbufferdescription", fun_ptr(node<IndexBufferDescription, VkIndexType>) });
-  env->outer->inner.insert({ "descriptorsetlayoutbinding", fun_ptr(node<DescriptorSetLayoutBinding, uint32_t, VkDescriptorType, VkShaderStageFlagBits>) });
-  env->outer->inner.insert({ "vertexinputbindingdescription", fun_ptr(node<VertexInputBindingDescription, uint32_t, uint32_t, VkVertexInputRate>) });
+	env->outer->inner.insert({ "pipeline-bindpoint", fun_ptr(node<PipelineBindpoint, VkPipelineBindPoint>) });
+	env->outer->inner.insert({ "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) });
+	env->outer->inner.insert({ "depth-attachment", fun_ptr(node<DepthStencilAttachment, uint32_t, VkImageLayout>) });
+	env->outer->inner.insert({ "subpass", fun_ptr(shared_from_node_list<SubpassDescription, std::shared_ptr<Node>>) });
+	env->outer->inner.insert({ "renderpass-attachment", fun_ptr(node<RenderpassAttachment, VkFormat, VkSampleCountFlagBits, VkAttachmentLoadOp, VkAttachmentStoreOp, VkAttachmentLoadOp, VkAttachmentStoreOp, VkImageLayout, VkImageLayout>) });
+	env->outer->inner.insert({ "renderpass-description", fun_ptr(shared_from_node_list<RenderpassDescription, std::shared_ptr<Node>>) });
+	env->outer->inner.insert({ "renderpass", fun_ptr(shared_from_node_list<Renderpass, std::shared_ptr<Node>>) });
+	env->outer->inner.insert({ "viewmatrix", fun_ptr(node<ViewMatrix, glm::dvec3, glm::dvec3, glm::dvec3>) });
+	env->outer->inner.insert({ "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) });
+	env->outer->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, glm::dvec3, glm::dvec3>) });
+	env->outer->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, glm::dvec3, glm::dvec3>) });
+	env->outer->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
+	env->outer->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) });
+	env->outer->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });
+	env->outer->inner.insert({ "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode, float, uint32_t, float, uint32_t, VkCompareOp, float, float, VkBorderColor, uint32_t>) });
+	env->outer->inner.insert({ "textureimage", fun_ptr(node<TextureImage, std::string>) });
+	env->outer->inner.insert({ "image", fun_ptr(node<Image, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
+	env->outer->inner.insert({ "sparse-image", fun_ptr(node<SparseImage, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
+	env->outer->inner.insert({ "imageview", fun_ptr(node<ImageView, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle, VkComponentSwizzle>) });
+	env->outer->inner.insert({ "group", fun_ptr(shared_from_node_list<Group, std::shared_ptr<Node>>) });
+	env->outer->inner.insert({ "separator", fun_ptr(shared_from_node_list<Separator, std::shared_ptr<Node>>) });
+	env->outer->inner.insert({ "bufferdata-float", fun_ptr(bufferdata<float>) });
+	env->outer->inner.insert({ "bufferdata-uint32", fun_ptr(bufferdata<uint32_t>) });
+	env->outer->inner.insert({ "bufferusageflags", fun_ptr(flags<VkBufferUsageFlags, VkBufferUsageFlagBits>) });
+	env->outer->inner.insert({ "imageusageflags", fun_ptr(flags<VkImageUsageFlags, VkImageUsageFlagBits>) });
+	env->outer->inner.insert({ "imageaspectflags", fun_ptr(flags<VkImageAspectFlags, VkImageAspectFlagBits>) });
+	env->outer->inner.insert({ "imagecreateflags", fun_ptr(flags<VkImageCreateFlags, VkImageCreateFlagBits>) });
+	env->outer->inner.insert({ "cpumemorybuffer", fun_ptr(node<CpuMemoryBuffer, VkBufferUsageFlags>) });
+	env->outer->inner.insert({ "gpumemorybuffer", fun_ptr(node<GpuMemoryBuffer, VkBufferUsageFlags>) });
+	env->outer->inner.insert({ "transformbuffer", fun_ptr(node<TransformBuffer>) });
+	env->outer->inner.insert({ "indexeddrawcommand", fun_ptr(node<IndexedDrawCommand, uint32_t, uint32_t, uint32_t, int32_t, uint32_t, VkPrimitiveTopology>) });
+	env->outer->inner.insert({ "indexbufferdescription", fun_ptr(node<IndexBufferDescription, VkIndexType>) });
+	env->outer->inner.insert({ "descriptorsetlayoutbinding", fun_ptr(node<DescriptorSetLayoutBinding, uint32_t, VkDescriptorType, VkShaderStageFlagBits>) });
+	env->outer->inner.insert({ "vertexinputbindingdescription", fun_ptr(node<VertexInputBindingDescription, uint32_t, uint32_t, VkVertexInputRate>) });
 	env->outer->inner.insert({ "vertexinputattributedescription", fun_ptr(node<VertexInputAttributeDescription, uint32_t, uint32_t, VkFormat, uint32_t>) });
 
 	env->outer->inner.insert({ "VK_IMAGE_CREATE_SPARSE_BINDING_BIT", VK_IMAGE_CREATE_SPARSE_BINDING_BIT });
@@ -169,7 +169,7 @@ std::any eval_file(const std::string & filename)
 	env->outer->inner.insert({ "VK_COMPARE_OP_EQUAL", VK_COMPARE_OP_EQUAL });
 	env->outer->inner.insert({ "VK_COMPARE_OP_LESS_OR_EQUAL", VK_COMPARE_OP_LESS_OR_EQUAL });
 	env->outer->inner.insert({ "VK_COMPARE_OP_GREATER", VK_COMPARE_OP_GREATER });
-  
+
 	env->outer->inner.insert({ "VK_COMPARE_OP_NOT_EQUAL", VK_COMPARE_OP_NOT_EQUAL });
 	env->outer->inner.insert({ "VK_COMPARE_OP_GREATER_OR_EQUAL", VK_COMPARE_OP_GREATER_OR_EQUAL });
 	env->outer->inner.insert({ "VK_COMPARE_OP_ALWAYS", VK_COMPARE_OP_ALWAYS });
@@ -244,7 +244,7 @@ std::any eval_file(const std::string & filename)
 
 	env->outer->inner.insert({ "VK_IMAGE_USAGE_TRANSFER_SRC_BIT", VK_IMAGE_USAGE_TRANSFER_SRC_BIT });
 	env->outer->inner.insert({ "VK_IMAGE_USAGE_TRANSFER_DST_BIT", VK_IMAGE_USAGE_TRANSFER_DST_BIT });
-  env->outer->inner.insert({ "VK_IMAGE_USAGE_SAMPLED_BIT", VK_IMAGE_USAGE_SAMPLED_BIT });
+	env->outer->inner.insert({ "VK_IMAGE_USAGE_SAMPLED_BIT", VK_IMAGE_USAGE_SAMPLED_BIT });
 	env->outer->inner.insert({ "VK_IMAGE_USAGE_STORAGE_BIT", VK_IMAGE_USAGE_STORAGE_BIT });
 	env->outer->inner.insert({ "VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT", VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT });
 	env->outer->inner.insert({ "VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT", VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT });
@@ -255,79 +255,79 @@ std::any eval_file(const std::string & filename)
 	env->outer->inner.insert({ "VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT", VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT });
 	env->outer->inner.insert({ "VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT", VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT });
 	env->outer->inner.insert({ "VK_SHADER_STAGE_GEOMETRY_BIT", VK_SHADER_STAGE_GEOMETRY_BIT });
-  env->outer->inner.insert({ "VK_SHADER_STAGE_FRAGMENT_BIT", VK_SHADER_STAGE_FRAGMENT_BIT });
-  env->outer->inner.insert({ "VK_SHADER_STAGE_COMPUTE_BIT", VK_SHADER_STAGE_COMPUTE_BIT });
+	env->outer->inner.insert({ "VK_SHADER_STAGE_FRAGMENT_BIT", VK_SHADER_STAGE_FRAGMENT_BIT });
+	env->outer->inner.insert({ "VK_SHADER_STAGE_COMPUTE_BIT", VK_SHADER_STAGE_COMPUTE_BIT });
 
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_TRANSFER_SRC_BIT", VK_BUFFER_USAGE_TRANSFER_SRC_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_TRANSFER_DST_BIT", VK_BUFFER_USAGE_TRANSFER_DST_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT", VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT", VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT", VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_STORAGE_BUFFER_BIT", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_INDEX_BUFFER_BIT", VK_BUFFER_USAGE_INDEX_BUFFER_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_VERTEX_BUFFER_BIT", VK_BUFFER_USAGE_VERTEX_BUFFER_BIT });
-  env->outer->inner.insert({ "VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT", VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_TRANSFER_SRC_BIT", VK_BUFFER_USAGE_TRANSFER_SRC_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_TRANSFER_DST_BIT", VK_BUFFER_USAGE_TRANSFER_DST_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT", VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT", VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT", VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_STORAGE_BUFFER_BIT", VK_BUFFER_USAGE_STORAGE_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_INDEX_BUFFER_BIT", VK_BUFFER_USAGE_INDEX_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_VERTEX_BUFFER_BIT", VK_BUFFER_USAGE_VERTEX_BUFFER_BIT });
+	env->outer->inner.insert({ "VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT", VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT });
 
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_SAMPLER", VK_DESCRIPTOR_TYPE_SAMPLER });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER", VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE", VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_IMAGE", VK_DESCRIPTOR_TYPE_STORAGE_IMAGE });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER", VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER", VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC });
-  env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT", VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_SAMPLER", VK_DESCRIPTOR_TYPE_SAMPLER });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER", VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE", VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_IMAGE", VK_DESCRIPTOR_TYPE_STORAGE_IMAGE });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER", VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER", VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC });
+	env->outer->inner.insert({ "VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT", VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT });
 
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_POINT_LIST", VK_PRIMITIVE_TOPOLOGY_POINT_LIST });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_LIST", VK_PRIMITIVE_TOPOLOGY_LINE_LIST });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP", VK_PRIMITIVE_TOPOLOGY_LINE_STRIP });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY });
-  env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_PATCH_LIST", VK_PRIMITIVE_TOPOLOGY_PATCH_LIST });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_POINT_LIST", VK_PRIMITIVE_TOPOLOGY_POINT_LIST });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_LIST", VK_PRIMITIVE_TOPOLOGY_LINE_LIST });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP", VK_PRIMITIVE_TOPOLOGY_LINE_STRIP });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY });
+	env->outer->inner.insert({ "VK_PRIMITIVE_TOPOLOGY_PATCH_LIST", VK_PRIMITIVE_TOPOLOGY_PATCH_LIST });
 
-  env->outer->inner.insert({ "VK_PIPELINE_BIND_POINT_GRAPHICS", VK_PIPELINE_BIND_POINT_GRAPHICS });
-  env->outer->inner.insert({ "VK_PIPELINE_BIND_POINT_COMPUTE", VK_PIPELINE_BIND_POINT_COMPUTE });
+	env->outer->inner.insert({ "VK_PIPELINE_BIND_POINT_GRAPHICS", VK_PIPELINE_BIND_POINT_GRAPHICS });
+	env->outer->inner.insert({ "VK_PIPELINE_BIND_POINT_COMPUTE", VK_PIPELINE_BIND_POINT_COMPUTE });
 
-  env->outer->inner.insert({ "VK_INDEX_TYPE_UINT16", VK_INDEX_TYPE_UINT16 });
-  env->outer->inner.insert({ "VK_INDEX_TYPE_UINT32", VK_INDEX_TYPE_UINT32 });
+	env->outer->inner.insert({ "VK_INDEX_TYPE_UINT16", VK_INDEX_TYPE_UINT16 });
+	env->outer->inner.insert({ "VK_INDEX_TYPE_UINT32", VK_INDEX_TYPE_UINT32 });
 
-  env->outer->inner.insert({ "VK_VERTEX_INPUT_RATE_VERTEX", VK_VERTEX_INPUT_RATE_VERTEX });
-  env->outer->inner.insert({ "VK_VERTEX_INPUT_RATE_INSTANCE", VK_VERTEX_INPUT_RATE_INSTANCE });
+	env->outer->inner.insert({ "VK_VERTEX_INPUT_RATE_VERTEX", VK_VERTEX_INPUT_RATE_VERTEX });
+	env->outer->inner.insert({ "VK_VERTEX_INPUT_RATE_INSTANCE", VK_VERTEX_INPUT_RATE_INSTANCE });
 
-  env->outer->inner.insert({ "VK_FORMAT_R32_UINT", VK_FORMAT_R32_UINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32_SINT", VK_FORMAT_R32_SINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32_SFLOAT", VK_FORMAT_R32_SFLOAT });
-  env->outer->inner.insert({ "VK_FORMAT_D32_SFLOAT", VK_FORMAT_D32_SFLOAT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32_UINT", VK_FORMAT_R32G32_UINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32_SINT", VK_FORMAT_R32G32_SINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT });
-  env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM });
-	env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UINT", VK_FORMAT_B8G8R8A8_UINT});
+	env->outer->inner.insert({ "VK_FORMAT_R32_UINT", VK_FORMAT_R32_UINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32_SINT", VK_FORMAT_R32_SINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32_SFLOAT", VK_FORMAT_R32_SFLOAT });
+	env->outer->inner.insert({ "VK_FORMAT_D32_SFLOAT", VK_FORMAT_D32_SFLOAT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32_UINT", VK_FORMAT_R32G32_UINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32_SINT", VK_FORMAT_R32G32_SINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT });
+	env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM });
+	env->outer->inner.insert({ "VK_FORMAT_B8G8R8A8_UINT", VK_FORMAT_B8G8R8A8_UINT });
 	env->outer->inner.insert({ "VK_FORMAT_A8B8G8R8_UINT_PACK32", VK_FORMAT_A8B8G8R8_UINT_PACK32 });
-  env->outer->inner.insert({ "VK_FORMAT_R8G8B8A8_UINT", VK_FORMAT_R8G8B8A8_UINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SINT", VK_FORMAT_R32G32B32_SINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT });
-  env->outer->inner.insert({ "VK_FORMAT_R16G16B16A16_UINT", VK_FORMAT_R16G16B16A16_UINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_UINT", VK_FORMAT_R32G32B32A32_UINT });
-  env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_SINT", VK_FORMAT_R32G32B32A32_SINT });
+	env->outer->inner.insert({ "VK_FORMAT_R8G8B8A8_UINT", VK_FORMAT_R8G8B8A8_UINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SINT", VK_FORMAT_R32G32B32_SINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT });
+	env->outer->inner.insert({ "VK_FORMAT_R16G16B16A16_UINT", VK_FORMAT_R16G16B16A16_UINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_UINT", VK_FORMAT_R32G32B32A32_UINT });
+	env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_SINT", VK_FORMAT_R32G32B32A32_SINT });
 	env->outer->inner.insert({ "VK_FORMAT_R32G32B32A32_SFLOAT", VK_FORMAT_R32G32B32A32_SFLOAT });
 
 
-  std::ifstream input(filename, std::ios::in);
-  
-  const std::string code{ 
-    std::istreambuf_iterator<char>(input), 
-    std::istreambuf_iterator<char>() 
-  };
+	std::ifstream input(filename, std::ios::in);
 
-  std::any exp = scm::read(code.begin(), code.end());
-  std::any sep = scm::eval(exp, env);
+	const std::string code{
+	  std::istreambuf_iterator<char>(input),
+	  std::istreambuf_iterator<char>()
+	};
+
+	std::any exp = scm::read(code.begin(), code.end());
+	std::any sep = scm::eval(exp, env);
 	return sep;
 }

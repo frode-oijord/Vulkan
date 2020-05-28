@@ -6,69 +6,69 @@
 #include <vector>
 
 struct VulkanIndexBufferDescription {
-  VkIndexType type;
-  VkBuffer buffer{ nullptr };
+	VkIndexType type;
+	VkBuffer buffer{ nullptr };
 };
 
 struct State {
-  VkDescriptorBufferInfo descriptor_buffer_info{
-    nullptr, 0, 0
-  };
-  VkBuffer buffer{ nullptr };
-  class BufferData * bufferdata{ nullptr };
-  class VulkanTextureImage* texture{ nullptr };
-  std::shared_ptr<VulkanRenderpass> renderpass{ nullptr };
-  std::shared_ptr<VulkanFramebuffer> framebuffer{ nullptr };
+	VkDescriptorBufferInfo descriptor_buffer_info{
+	  nullptr, 0, 0
+	};
+	VkBuffer buffer{ nullptr };
+	class BufferData* bufferdata{ nullptr };
+	class VulkanTextureImage* texture{ nullptr };
+	std::shared_ptr<VulkanRenderpass> renderpass{ nullptr };
+	std::shared_ptr<VulkanFramebuffer> framebuffer{ nullptr };
 
-  VkExtent2D extent{ 0, 0 };
+	VkExtent2D extent{ 0, 0 };
 
-  VkPipelineRasterizationStateCreateInfo rasterization_state{
-    VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, // sType
-    nullptr,                                                    // pNext
-    0,                                                          // flags;
-    VK_FALSE,                                                   // depthClampEnable
-    VK_FALSE,                                                   // rasterizerDiscardEnable
-    VK_POLYGON_MODE_FILL,                                       // polygonMode
-    VK_CULL_MODE_BACK_BIT,                                      // cullMode
-    VK_FRONT_FACE_COUNTER_CLOCKWISE,                            // frontFace
-    VK_FALSE,                                                   // depthBiasEnable
-    0.0f,                                                       // depthBiasConstantFactor
-    0.0f,                                                       // depthBiasClamp
-    0.0f,                                                       // depthBiasSlopeFactor
-    1.0f,                                                       // lineWidth
-  };
+	VkPipelineRasterizationStateCreateInfo rasterization_state{
+	  VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,	// sType
+	  nullptr,														// pNext
+	  0,															// flags;
+	  VK_FALSE,														// depthClampEnable
+	  VK_FALSE,														// rasterizerDiscardEnable
+	  VK_POLYGON_MODE_FILL,											// polygonMode
+	  VK_CULL_MODE_BACK_BIT,										// cullMode
+	  VK_FRONT_FACE_COUNTER_CLOCKWISE,								// frontFace
+	  VK_FALSE,														// depthBiasEnable
+	  0.0f,															// depthBiasConstantFactor
+	  0.0f,															// depthBiasClamp
+	  0.0f,															// depthBiasSlopeFactor
+	  1.0f,															// lineWidth
+	};
 
-  VkImage image{ nullptr };
-  VkImageView imageView { nullptr };
-  VkImageLayout imageLayout { VK_IMAGE_LAYOUT_UNDEFINED };
-  VkSampler sampler{ nullptr };
-  VulkanCommandBuffers* command{ nullptr };
+	VkImage image{ nullptr };
+	VkImageView imageView{ nullptr };
+	VkImageLayout imageLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
+	VkSampler sampler{ nullptr };
+	VulkanCommandBuffers* command{ nullptr };
 
-  std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
-  std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
-  std::vector<VkWriteDescriptorSet> write_descriptor_sets;
-  std::vector<VkDescriptorSetLayoutBinding> descriptor_set_layout_bindings;
-  std::vector<VkPushConstantRange> push_constant_ranges;
-  std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
-  std::vector<VkVertexInputAttributeDescription> vertex_attributes;
+	std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
+	std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
+	std::vector<VkWriteDescriptorSet> write_descriptor_sets;
+	std::vector<VkDescriptorSetLayoutBinding> descriptor_set_layout_bindings;
+	std::vector<VkPushConstantRange> push_constant_ranges;
+	std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
+	std::vector<VkVertexInputAttributeDescription> vertex_attributes;
 
-  std::vector<VkAttachmentReference> input_attachments;
-  std::vector<VkAttachmentReference> color_attachments;
-  std::vector<VkAttachmentReference> resolve_attachments;
-  VkAttachmentReference depth_stencil_attachment;
-  std::vector<uint32_t> preserve_attachments;
-  VkPipelineBindPoint bind_point;
+	std::vector<VkAttachmentReference> input_attachments;
+	std::vector<VkAttachmentReference> color_attachments;
+	std::vector<VkAttachmentReference> resolve_attachments;
+	VkAttachmentReference depth_stencil_attachment;
+	std::vector<uint32_t> preserve_attachments;
+	VkPipelineBindPoint bind_point;
 
-  std::vector<VkImageView> framebuffer_attachments;
-  std::vector<VkSubpassDescription> subpass_descriptions;
-  std::vector<VkAttachmentDescription> attachment_descriptions;
+	std::vector<VkImageView> framebuffer_attachments;
+	std::vector<VkSubpassDescription> subpass_descriptions;
+	std::vector<VkAttachmentDescription> attachment_descriptions;
 
-  VulkanIndexBufferDescription index_buffer_description;
-  std::vector<VkBuffer> vertex_attribute_buffers;
-  std::vector<VkDeviceSize> vertex_attribute_buffer_offsets;
+	VulkanIndexBufferDescription index_buffer_description;
+	std::vector<VkBuffer> vertex_attribute_buffers;
+	std::vector<VkDeviceSize> vertex_attribute_buffer_offsets;
 
-  glm::dmat4 ViewMatrix{ 1.0 };
-  glm::dmat4 ModelMatrix{ 1.0 };
-  glm::dmat4 TextureMatrix{ 1.0 };
-  glm::dmat4 ProjectionMatrix{ 1.0 };
+	glm::dmat4 ViewMatrix{ 1.0 };
+	glm::dmat4 ModelMatrix{ 1.0 };
+	glm::dmat4 TextureMatrix{ 1.0 };
+	glm::dmat4 ProjectionMatrix{ 1.0 };
 };
