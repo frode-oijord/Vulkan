@@ -14,6 +14,11 @@
 
 #include <cstring>
 
+class VulkanObject {
+public:
+	virtual std::string toString() = 0;
+};
+
 class VulkanPhysicalDevice {
 public:
 	VulkanPhysicalDevice(VulkanPhysicalDevice&& self) = default;
@@ -192,14 +197,14 @@ public:
 	std::vector<VkLayerProperties> layer_properties;
 };
 
-class VulkanInstance {
+class VulkanInstance : public VulkanObject {
 public:
 	NO_COPY_OR_ASSIGNMENT(VulkanInstance)
-	VulkanInstance() = delete;
 
-	explicit VulkanInstance(const std::string& application_name,
-		const std::vector<const char*>& required_layers,
-		const std::vector<const char*>& required_extensions)
+	explicit VulkanInstance(
+		const std::string& application_name = "",
+		const std::vector<const char*>& required_layers = {},
+		const std::vector<const char*>& required_extensions = {})
 	{
 		uint32_t layer_count;
 		THROW_ON_ERROR(vkEnumerateInstanceLayerProperties(&layer_count, nullptr));
@@ -267,10 +272,8 @@ public:
 		this->vkGetPhysicalDeviceSurfaceFormats = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>("vkGetPhysicalDeviceSurfaceFormatsKHR");
 		this->vkGetPhysicalDeviceSurfaceCapabilities = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>("vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
 		this->vkGetPhysicalDeviceSurfacePresentModes = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>("vkGetPhysicalDeviceSurfacePresentModesKHR");
-#ifdef DEBUG
 		this->vkCreateDebugReportCallback = this->getProcAddress<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
 		this->vkDestroyDebugReportCallback = this->getProcAddress<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
-#endif
 	}
 
 	~VulkanInstance()
@@ -278,13 +281,23 @@ public:
 		vkDestroyInstance(this->instance, nullptr);
 	}
 
+	std::string toString() override
+	{
+		std::string s;
+		for (auto device : this->physical_devices)
+		{
+			s += std::string(device.properties.deviceName) + '\n';
+			for (auto extension : device.extension_properties)
+			{
+				s += std::string(extension.extensionName) + '\n';
+			}
+		}
+		return s;
+	}
+
 	template <typename T>
 	T getProcAddress(const std::string& name) {
-		auto address = reinterpret_cast<T>(vkGetInstanceProcAddr(this->instance, name.c_str()));
-		if (!address) {
-			throw std::runtime_error("vkGetInstanceProcAddr failed for " + name);
-		}
-		return address;
+		return reinterpret_cast<T>(vkGetInstanceProcAddr(this->instance, name.c_str()));
 	};
 
 	VulkanPhysicalDevice selectPhysicalDevice(const VkPhysicalDeviceFeatures& required_features)
@@ -349,8 +362,8 @@ public:
 
 	VulkanDevice(std::shared_ptr<VulkanInstance> vulkan,
 		const VkPhysicalDeviceFeatures& device_features,
-		const std::vector<const char*>& required_layers,
-		const std::vector<const char*>& required_extensions) :
+		const std::vector<const char*>& required_layers = {},
+		const std::vector<const char*>& required_extensions = {}) :
 		vulkan(std::move(vulkan)),
 		physical_device(this->vulkan->selectPhysicalDevice(device_features))
 	{

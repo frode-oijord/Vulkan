@@ -30,7 +30,7 @@ add_executable(
 	${PROJECT_SOURCE_DIR}/../Innovator/Context.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Defines.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Factory.h
-	${PROJECT_SOURCE_DIR}/../Innovator/File.h
+	${PROJECT_SOURCE_DIR}/../Innovator/ScmEnv.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Nodes.h
 	${PROJECT_SOURCE_DIR}/../Innovator/State.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Timer.h
