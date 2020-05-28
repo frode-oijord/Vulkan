@@ -3,10 +3,10 @@
 #include <stdexcept>
 
 #define NO_COPY_OR_ASSIGNMENT(Class)															\
-  Class(Class&&) = delete;																		\
-  Class(const Class&) = delete;																	\
-  Class & operator=(Class&&) = delete;															\
-  Class & operator=(const Class&) = delete;														\
+Class(Class&&) = delete;																		\
+Class(const Class&) = delete;																	\
+Class & operator=(Class&&) = delete;															\
+Class & operator=(const Class&) = delete;														\
 
 #define DECLARE_VISITABLE																		\
 	void visit(Visitor* visitor, Context* context) override;									\
