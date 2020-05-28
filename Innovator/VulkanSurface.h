@@ -11,20 +11,21 @@
 class VulkanSurface {
 public:
 	NO_COPY_OR_ASSIGNMENT(VulkanSurface)
-		VulkanSurface() = delete;
+	VulkanSurface() = delete;
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
-	VulkanSurface(std::shared_ptr<VulkanInstance> vulkan,
+	VulkanSurface(
+		std::shared_ptr<VulkanInstance> vulkan,
 		HWND window,
 		HINSTANCE hinstance) :
-		vulkan(std::move(vulkan))
+			vulkan(std::move(vulkan))
 	{
 		VkWin32SurfaceCreateInfoKHR create_info{
-		  VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,	// sType 
-		  nullptr,											// pNext
-		  0,												// flags (reserved for future use)
-		  hinstance,										// hinstance 
-		  window,											// hwnd
+			VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,	// sType 
+			nullptr,											// pNext
+			0,													// flags (reserved for future use)
+			hinstance,											// hinstance 
+			window,												// hwnd
 		};
 
 		THROW_ON_ERROR(vkCreateWin32SurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
@@ -34,14 +35,14 @@ public:
 	VulkanSurface(std::shared_ptr<VulkanInstance> vulkan,
 		xcb_window_t window,
 		xcb_connection_t* connection) :
-		vulkan(std::move(vulkan))
+			vulkan(std::move(vulkan))
 	{
 		VkXcbSurfaceCreateInfoKHR create_info{
-		  VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,	// sType 
-		  nullptr,											// pNext
-		  0,												// flags (reserved for future use)
-		  connection,										// connection
-		  window,											// window
+			VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,		// sType 
+			nullptr,											// pNext
+			0,													// flags (reserved for future use)
+			connection,											// connection
+			window,												// window
 		};
 
 		THROW_ON_ERROR(vkCreateXcbSurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));

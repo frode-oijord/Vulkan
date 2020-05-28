@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma warning(disable : 26812)
+#include <vulkan/vulkan.h>
 #include <stdexcept>
 
 #define NO_COPY_OR_ASSIGNMENT(Class)															\

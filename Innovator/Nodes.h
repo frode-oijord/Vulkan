@@ -8,6 +8,7 @@
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
 
+#pragma warning(disable : 26812)
 #include <vulkan/vulkan.h>
 #include <shaderc/shaderc.hpp>
 

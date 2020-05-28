@@ -139,7 +139,7 @@ protected:
 class VulkanWindow : public Window {
 public:
 	NO_COPY_OR_ASSIGNMENT(VulkanWindow)
-		virtual ~VulkanWindow() = default;
+	virtual ~VulkanWindow() = default;
 
 	VulkanWindow(std::shared_ptr<Node> scene, std::shared_ptr<FramebufferAttachment> color_attachment)
 	{
