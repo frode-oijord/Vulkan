@@ -87,6 +87,7 @@ EventVisitor::EventVisitor()
 	});
 }
 
+
 void
 EventVisitor::visit(ViewMatrix* node, Context* context)
 {
@@ -94,7 +95,7 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		dx[0] /= context->state.extent.width;
 		dx[1] /= context->state.extent.height;
-		dx *= 2.0;
+		dx *= 20.0;
 		switch (this->button) {
 			case 0: node->orbit(dx); break;
 			case 1: node->pan(dx); break;

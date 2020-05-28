@@ -148,7 +148,7 @@
 
          void main() 
          {
-            texCoord = Position.xy;
+            texCoord = Position.xy * 0.5 + 0.5;
             gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
          }
       ]])
@@ -165,7 +165,7 @@
       ]])
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float 0 0 0.5  1 0 0.5  1 1 0.5  0 1 0.5))))
+         (bufferdata-float -1 -1 0  1 -1 0  1 1 0  -1 1 0))))
 
    (define vulkan-window (window main-renderpass main-color-attachment))
       vulkan-window)
