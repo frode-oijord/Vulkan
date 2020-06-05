@@ -10,15 +10,6 @@ Class(const Class&) = delete;																	\
 Class & operator=(Class&&) = delete;															\
 Class & operator=(const Class&) = delete;														\
 
-#define DECLARE_VISITABLE																		\
-	void visit(Visitor* visitor, Context* context) override;									\
-
-#define IMPLEMENT_VISITABLE(Class)																\
-	void Class::visit(Visitor* visitor, Context* context)										\
-	{																							\
-		visitor->apply(this, context);															\
-	}																							\
-
 #define IMPLEMENT_VISITABLE_INLINE																\
 	void visit(Visitor* visitor, Context* context) override										\
 	{																							\

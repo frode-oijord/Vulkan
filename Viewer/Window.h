@@ -145,7 +145,7 @@ public:
 	{
 		std::vector<const char*> instance_layers{
 	#ifdef DEBUG
-		  "VK_LAYER_LUNARG_standard_validation",
+		  "VK_LAYER_KHRONOS_validation",
 	#endif
 		};
 
@@ -173,7 +173,7 @@ public:
 
 		std::vector<const char*> device_layers{
 	  #ifdef DEBUG
-			"VK_LAYER_LUNARG_standard_validation",
+			"VK_LAYER_KHRONOS_validation",
 	  #endif
 		};
 
@@ -181,15 +181,12 @@ public:
 		  VK_KHR_SWAPCHAIN_EXTENSION_NAME
 		};
 
-		VkPhysicalDeviceFeatures device_features;
-		::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
-		device_features.sparseBinding = VK_TRUE;
-		device_features.sparseResidencyImage2D = VK_TRUE;
-		device_features.sparseResidencyImage3D = VK_TRUE;
+		this->context = std::make_shared<Context>();
+		devicevisitor.visit(scene.get(), this->context.get());
 
 		auto device = std::make_shared<VulkanDevice>(
 			vulkan,
-			device_features,
+			devicevisitor.device_features,
 			device_layers,
 			device_extensions);
 
@@ -206,10 +203,7 @@ public:
 			surface_format,
 			present_mode);
 
-		this->context = std::make_shared<Context>(
-			vulkan,
-			device,
-			surface_capabilities.currentExtent);
+		this->context->init(vulkan,	device,	surface_capabilities.currentExtent);
 
 		this->root = std::make_shared<Separator>();
 		this->root->children = {
@@ -271,9 +265,7 @@ public:
 		eventvisitor.prevpos = eventvisitor.currpos;
 		eventvisitor.move = false;
 
-		if (this->context->redraw) {
-			this->redraw();
-		}
+		this->redraw();
 	}
 
 	std::shared_ptr<Group> root;

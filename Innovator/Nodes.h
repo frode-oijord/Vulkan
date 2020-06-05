@@ -8,8 +8,6 @@
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
 
-#pragma warning(disable : 26812)
-#include <vulkan/vulkan.h>
 #include <shaderc/shaderc.hpp>
 
 #include <glm/glm.hpp>
@@ -35,13 +33,20 @@ public:
 
 class Group : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
 	NO_COPY_OR_ASSIGNMENT(Group)
 	Group() = default;
 	virtual ~Group() = default;
 
-	explicit Group(std::vector<std::shared_ptr<Node>> children)
-		: children(std::move(children)) {}
+	explicit Group(std::vector<std::shared_ptr<Node>> children) :
+		children(std::move(children)) 
+	{}
+
+	void visit(Visitor* visitor, Context* context) override
+	{
+		for (auto child : this->children) {
+			child->visit(visitor, context);
+		}
+	}
 
 	std::vector<std::shared_ptr<Node>> children;
 };
@@ -49,14 +54,19 @@ public:
 
 class Separator : public Group {
 public:
-	IMPLEMENT_VISITABLE_INLINE
-		NO_COPY_OR_ASSIGNMENT(Separator)
-		Separator() = default;
+	NO_COPY_OR_ASSIGNMENT(Separator)
+	Separator() = default;
 	virtual ~Separator() = default;
 
-	explicit Separator(std::vector<std::shared_ptr<Node>> children)
-		: Group(std::move(children))
+	explicit Separator(std::vector<std::shared_ptr<Node>> children) :
+		Group(std::move(children))
 	{}
+
+	void visit(Visitor* visitor, Context* context) override
+	{
+		StateScope scope(&context->state);
+		Group::visit(visitor, context);
+	}
 };
 
 
@@ -568,34 +578,34 @@ public:
 		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
 	}
 
-	void pipeline(Context* creator)
+	void pipeline(Context* context)
 	{
-		creator->state.descriptor_pool_sizes.push_back({
+		context->state.descriptor_pool_sizes.push_back({
 		  this->descriptorType,											// type 
 		  1,															// descriptorCount
-			});
+		});
 
-		creator->state.descriptor_set_layout_bindings.push_back({
+		context->state.descriptor_set_layout_bindings.push_back({
 		  this->binding,
 		  this->descriptorType,
 		  1,
 		  this->stageFlags,
 		  nullptr,
-			});
+		});
 
 		this->descriptor_image_info = {
-		  creator->state.sampler,
-		  creator->state.imageView,
-		  creator->state.imageLayout
+		  context->state.sampler,
+		  context->state.imageView,
+		  context->state.imageLayout
 		};
 
 		this->descriptor_buffer_info = {
-		  creator->state.buffer,										// buffer
+		  context->state.buffer,										// buffer
 		  0,															// offset
 		  VK_WHOLE_SIZE													// range
 		};
 
-		creator->state.write_descriptor_sets.push_back({
+		context->state.write_descriptor_sets.push_back({
 		  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,						// sType
 		  nullptr,														// pNext
 		  nullptr,														// dstSet
@@ -672,17 +682,17 @@ public:
 	void pipeline(Context* context)
 	{
 		context->state.shader_stage_infos.push_back({
-			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// sType 
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// sType
 			nullptr,												// pNext
 			0,														// flags (reserved for future use)
 			this->stage,											// stage
-			this->shader->module,									// module 
-			"main",													// pName 
+			this->shader->module,									// module
+			"main",													// pName
 			nullptr,												// pSpecializationInfo
 		});
 	}
 
-protected:
+public:
 	std::vector<uint32_t> spv;
 	VkShaderStageFlagBits stage;
 	std::unique_ptr<VulkanShaderModule> shader;
@@ -1393,13 +1403,13 @@ public:
 
 	void alloc(Context* context)
 	{
-		allocvisitor.visit_group(this, context);
+		Group::visit(&allocvisitor, context);
 		this->do_alloc(context);
 	}
 
 	void resize(Context* context)
 	{
-		resizevisitor.visit_group(this, context);
+		Group::visit(&allocvisitor, context);
 		this->do_alloc(context);
 	}
 
@@ -1547,7 +1557,7 @@ public:
 
 	void alloc(Context* context)
 	{
-		allocvisitor.visit_group(this, context);
+		Group::visit(&allocvisitor, context);
 
 		context->state.subpass_descriptions.push_back({
 			0,																	// flags
@@ -1615,6 +1625,8 @@ public:
 	Renderpass(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
+		REGISTER_VISITOR_CALLBACK(eventvisitor, Renderpass, events);
+		REGISTER_VISITOR_CALLBACK(devicevisitor, Renderpass, device);
 		REGISTER_VISITOR_CALLBACK(allocvisitor, Renderpass, alloc);
 		REGISTER_VISITOR_CALLBACK(resizevisitor, Renderpass, resize);
 		REGISTER_VISITOR_CALLBACK(rendervisitor, Renderpass, render);
@@ -1622,19 +1634,29 @@ public:
 		REGISTER_VISITOR_CALLBACK(recordvisitor, Renderpass, record);
 	}
 
+	void events(Context* context)
+	{
+		Group::visit(&eventvisitor, context);
+	}
+
+	void device(Context* context)
+	{
+		Group::visit(&devicevisitor, context);
+	}
+
 	void pipeline(Context* context)
 	{
-		pipelinevisitor.visit_group(this, context);
+		Group::visit(&pipelinevisitor, context);
 	}
 
 	void record(Context* context)
 	{
-		recordvisitor.visit_group(this, context);
+		Group::visit(&recordvisitor, context);
 	}
 
 	void alloc(Context* context)
 	{
-		allocvisitor.visit_group(this, context);
+		Group::visit(&allocvisitor, context);
 
 		this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
 		this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
@@ -1645,7 +1667,7 @@ public:
 
 	void resize(Context* context)
 	{
-		resizevisitor.visit_group(this, context);
+		Group::visit(&resizevisitor, context);
 		this->framebuffer = context->state.framebuffer;
 	}
 
@@ -1671,7 +1693,8 @@ public:
 				this->render_command->buffer());
 
 			context->state.command = this->render_command.get();
-			rendervisitor.visit_group(this, context);
+
+			Group::visit(&rendervisitor, context);
 		}
 		this->render_command->end();
 
@@ -1704,7 +1727,7 @@ public:
 
 	void alloc(Context* context)
 	{
-		allocvisitor.visit_group(this, context);
+		Group::visit(&allocvisitor, context);
 
 		this->renderpass = std::make_shared<VulkanRenderpass>(
 			context->device,
@@ -1716,19 +1739,19 @@ public:
 
 	void resize(Context* context)
 	{
-		resizevisitor.visit_group(this, context);
+		Group::visit(&allocvisitor, context);
 		context->state.renderpass = this->renderpass;
 	}
 
 	void pipeline(Context* context)
 	{
-		pipelinevisitor.visit_group(this, context);
+		Group::visit(&pipelinevisitor, context);
 		context->state.renderpass = this->renderpass;
 	}
 
 	void record(Context* context)
 	{
-		recordvisitor.visit_group(this, context);
+		Group::visit(&recordvisitor, context);
 		context->state.renderpass = this->renderpass;
 	}
 
@@ -2135,6 +2158,7 @@ class SparseImage : public Node {
 public:
 	IMPLEMENT_VISITABLE_INLINE
 	NO_COPY_OR_ASSIGNMENT(SparseImage)
+	SparseImage() = delete;
 	virtual ~SparseImage() = default;
 	SparseImage(
 		VkSampleCountFlagBits sample_count,

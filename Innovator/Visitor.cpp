@@ -3,64 +3,27 @@
 #include <Innovator/Nodes.h>
 
 
-class StateScope {
-public:
-	StateScope() = delete;
-
-	explicit StateScope(State* state) :
-		stateptr(state),
-		statecpy(*state)
-	{}
-
-	~StateScope()
-	{
-		*stateptr = this->statecpy;
-	}
-
-	State* stateptr;
-	State statecpy;
-};
-
-
-
-Visitor::Visitor()
-{
-	auto visit_group = [this](Group* node, Context* context) {
-		this->visit_group(node, context);
-	};
-	auto visit_separator = [this](Separator* node, Context* context) {
-		this->visit_separator(node, context);
-	};
-
-	this->register_callback<Group>(visit_group);
-	this->register_callback<Renderpass>(visit_group);
-	this->register_callback<Separator>(visit_separator);
-}
-
-
-void 
-Visitor::visit_group(Group* node, Context* context)
-{
-	for (auto child : node->children) {
-		child->visit(this, context);
-	}
-}
-
-void
-Visitor::visit_separator(Separator* node, Context* context)
-{
-	StateScope scope(&context->state);
-	this->visit_group(node, context);
-}
-
 void
 Visitor::visit(Node* node, Context* context)
 {
-	context->command->begin();
-
-	context->begin();
 	node->visit(this, context);
-	context->end();
+}
+
+
+CommandVisitor::CommandVisitor()
+{
+
+}
+
+void
+CommandVisitor::visit(Node* node, Context* context)
+{
+	context->command->begin();
+	context->wait_semaphores.clear();
+	context->state = State();
+	context->state.extent = context->extent;
+
+	node->visit(this, context);
 
 	context->fence->reset();
 	context->command->end();
@@ -100,7 +63,7 @@ EventVisitor::visit(ViewMatrix* node, Context* context)
 			case 0: node->orbit(dx); break;
 			case 1: node->pan(dx); break;
 			case 2: node->zoom(dx[1]); break;
-		default: break;
+			default: break;
 		}
 	}
 }
@@ -157,4 +120,38 @@ EventVisitor::visit(class ModelMatrix* node, class Context* context)
 	//	}
 	//	this->press->pos = move->pos;
 	//}
+}
+
+
+DeviceVisitor::DeviceVisitor()
+{
+	::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
+
+	this->register_callback<SparseImage>([this](SparseImage* node, Context* context) {
+		this->device_features.sparseBinding = VK_TRUE;
+		this->device_features.sparseResidencyImage2D = VK_TRUE;
+		this->device_features.sparseResidencyImage3D = VK_TRUE;
+	});
+
+	this->register_callback<Shader>([this](Shader* node, Context* context) {
+		switch (node->stage) {
+		case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
+			this->device_features.tessellationShader = VK_TRUE;
+			break;
+		case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
+			this->device_features.tessellationShader = VK_TRUE;
+			break;
+		case VK_SHADER_STAGE_GEOMETRY_BIT:
+			this->device_features.geometryShader = VK_TRUE;
+			break;
+		default: break;
+		}
+	});
+}
+
+void
+DeviceVisitor::visit(class Node* node, class Context* context)
+{
+	::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
+	node->visit(this, context);
 }

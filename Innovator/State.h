@@ -72,3 +72,22 @@ struct State {
 	glm::dmat4 TextureMatrix{ 1.0 };
 	glm::dmat4 ProjectionMatrix{ 1.0 };
 };
+
+
+class StateScope {
+public:
+	StateScope() = delete;
+
+	explicit StateScope(State* state) :
+		stateptr(state),
+		statecpy(*state)
+	{}
+
+	~StateScope()
+	{
+		*stateptr = this->statecpy;
+	}
+
+	State* stateptr;
+	State statecpy;
+};

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <Innovator/Defines.h>
-#pragma warning(disable : 26812)
-#include <vulkan/vulkan.h>
 
 #include <boost/iostreams/device/mapped_file.hpp>
 

@@ -7,33 +7,26 @@
 #include <memory>
 #include <vector>
 #include <iostream>
+#include <functional>
 
 
 class Context {
 public:
-	Context(
+	Context()
+	{}
+
+	void init(
 		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
-		VkExtent2D extent) :
-		vulkan(std::move(vulkan)),
-		device(std::move(device)),
-		extent(extent),
-		redraw(false),
-		fence(std::make_unique<VulkanFence>(this->device)),
-		command(std::make_unique<VulkanCommandBuffers>(this->device)),
-		pipelinecache(std::make_shared<VulkanPipelineCache>(this->device))
+		VkExtent2D extent)
 	{
+		this->vulkan = std::move(vulkan);
+		this->device = std::move(device);
+		this->extent = extent;
+		this->fence = std::make_unique<VulkanFence>(this->device);
+		this->command = std::make_unique<VulkanCommandBuffers>(this->device);
+		this->pipelinecache = std::make_shared<VulkanPipelineCache>(this->device);
 		this->queue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT);
-	}
-
-	virtual ~Context()
-	{
-		try {
-			THROW_ON_ERROR(vkDeviceWaitIdle(this->device->device));
-		}
-		catch (std::exception & e) {
-			std::cerr << e.what() << std::endl;
-		}
 	}
 
 	void resize(VkExtent2D extent)
@@ -41,32 +34,38 @@ public:
 		this->extent = extent;
 	}
 
-	void begin()
+	void record(std::function<void()> callback)
 	{
+		this->command->begin();
 		this->wait_semaphores.clear();
-		this->redraw = false;
 		this->state = State();
 		this->state.extent = this->extent;
+
+		callback();
+
+		this->fence->reset();
+		this->command->end();
+		this->command->submit(
+			this->queue,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			this->fence->fence,
+			this->wait_semaphores);
+
+		this->fence->wait();
 	}
 
-	void end()
-	{
-	}
-
-	std::shared_ptr<VulkanInstance> vulkan;
-	std::shared_ptr<VulkanDevice> device;
+	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
+	std::shared_ptr<VulkanDevice> device{ nullptr };
 	VkQueue queue{ nullptr };
 
 	State state;
-	bool redraw;
 
-	std::shared_ptr<VulkanFence> fence;
+	std::shared_ptr<VulkanFence> fence{ nullptr };
 	std::vector<VkSemaphore> wait_semaphores;
-	std::unique_ptr<VulkanCommandBuffers> command;
-	std::shared_ptr<VulkanPipelineCache> pipelinecache;
+	std::unique_ptr<VulkanCommandBuffers> command{ nullptr };
+	std::shared_ptr<VulkanPipelineCache> pipelinecache{ nullptr };
 
-	class OffscreenImage* image;
+	class OffscreenImage* image{ nullptr };
 
-private:
-	VkExtent2D extent;
+	VkExtent2D extent{ 0, 0 };
 };
