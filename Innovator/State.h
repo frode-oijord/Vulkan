@@ -5,11 +5,6 @@
 #include <glm/glm.hpp>
 #include <vector>
 
-struct VulkanIndexBufferDescription {
-	VkIndexType type;
-	VkBuffer buffer{ nullptr };
-};
-
 struct State {
 	VkDescriptorBufferInfo descriptor_buffer_info{
 	  nullptr, 0, 0
@@ -39,6 +34,8 @@ struct State {
 	};
 
 	VkImage image{ nullptr };
+	VkImage swapchain_src{ nullptr };
+	VkFormat swapchain_fmt{ VK_FORMAT_UNDEFINED };
 	VkImageView imageView{ nullptr };
 	VkImageLayout imageLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 	VkSampler sampler{ nullptr };
@@ -51,7 +48,7 @@ struct State {
 	std::vector<VkPushConstantRange> push_constant_ranges;
 	std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
 	std::vector<VkVertexInputAttributeDescription> vertex_attributes;
-
+	
 	std::vector<VkAttachmentReference> input_attachments;
 	std::vector<VkAttachmentReference> color_attachments;
 	std::vector<VkAttachmentReference> resolve_attachments;
@@ -63,9 +60,13 @@ struct State {
 	std::vector<VkSubpassDescription> subpass_descriptions;
 	std::vector<VkAttachmentDescription> attachment_descriptions;
 
-	VulkanIndexBufferDescription index_buffer_description;
+	VkIndexType index_buffer_type;
+	VkBuffer index_buffer{ nullptr };
+	uint32_t index_count;
+
 	std::vector<VkBuffer> vertex_attribute_buffers;
 	std::vector<VkDeviceSize> vertex_attribute_buffer_offsets;
+	std::vector<uint32_t> vertex_counts;
 
 	glm::dmat4 ViewMatrix{ 1.0 };
 	glm::dmat4 ModelMatrix{ 1.0 };

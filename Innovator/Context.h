@@ -34,26 +34,6 @@ public:
 		this->extent = extent;
 	}
 
-	void record(std::function<void()> callback)
-	{
-		this->command->begin();
-		this->wait_semaphores.clear();
-		this->state = State();
-		this->state.extent = this->extent;
-
-		callback();
-
-		this->fence->reset();
-		this->command->end();
-		this->command->submit(
-			this->queue,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-			this->fence->fence,
-			this->wait_semaphores);
-
-		this->fence->wait();
-	}
-
 	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
 	std::shared_ptr<VulkanDevice> device{ nullptr };
 	VkQueue queue{ nullptr };

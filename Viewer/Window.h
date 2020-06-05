@@ -48,7 +48,7 @@ public:
 			hInstance,
 			this);
 
-		if (!hWnd) {
+		if (!this->hWnd) {
 			throw std::runtime_error("Call to CreateWindow failed!");
 		}
 	}
@@ -141,26 +141,25 @@ public:
 	NO_COPY_OR_ASSIGNMENT(VulkanWindow)
 	virtual ~VulkanWindow() = default;
 
-	VulkanWindow(std::shared_ptr<Node> scene, std::shared_ptr<FramebufferAttachment> color_attachment)
+	VulkanWindow(std::shared_ptr<Node> scene)
 	{
-		std::vector<const char*> instance_layers{
-	#ifdef DEBUG
-		  "VK_LAYER_KHRONOS_validation",
-	#endif
-		};
+		devicevisitor.visit(scene.get());
 
-		std::vector<const char*> instance_extensions{
-		  VK_KHR_SURFACE_EXTENSION_NAME,
-		  VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-	#ifdef DEBUG
-		  VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-	#endif
-		};
+		devicevisitor.instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+		devicevisitor.instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+		devicevisitor.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+#ifdef DEBUG
+		devicevisitor.device_layers.push_back("VK_LAYER_KHRONOS_validation");
+		devicevisitor.instance_layers.push_back("VK_LAYER_KHRONOS_validation");
+		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
 
 		auto vulkan = std::make_shared<VulkanInstance>(
 			"Innovator",
-			instance_layers,
-			instance_extensions);
+			devicevisitor.instance_layers,
+			devicevisitor.instance_extensions);
 
 #ifdef DEBUG
 		auto debugcb = std::make_unique<VulkanDebugCallback>(
@@ -171,39 +170,30 @@ public:
 			VK_DEBUG_REPORT_DEBUG_BIT_EXT);
 #endif
 
-		std::vector<const char*> device_layers{
-	  #ifdef DEBUG
-			"VK_LAYER_KHRONOS_validation",
-	  #endif
-		};
-
-		std::vector<const char*> device_extensions{
-		  VK_KHR_SWAPCHAIN_EXTENSION_NAME
-		};
-
-		this->context = std::make_shared<Context>();
-		devicevisitor.visit(scene.get(), this->context.get());
-
 		auto device = std::make_shared<VulkanDevice>(
 			vulkan,
-			devicevisitor.device_features,
-			device_layers,
-			device_extensions);
+			devicevisitor.device_features2,
+			devicevisitor.device_layers,
+			devicevisitor.device_extensions);
 
-		auto surface = std::make_shared<::VulkanSurface>(vulkan, this->hWnd, this->hInstance);
-		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
-		VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-
-		surface->checkPresentModeSupport(device, present_mode);
-		VkSurfaceFormatKHR surface_format = surface->getSupportedSurfaceFormat(device, color_attachment->format);
+		auto surface = std::make_shared<VulkanSurface>(
+			vulkan,
+			this->hWnd,
+			this->hInstance);
 
 		auto swapchain = std::make_shared<SwapchainObject>(
-			color_attachment,
 			surface,
-			surface_format,
-			present_mode);
+			VK_PRESENT_MODE_FIFO_KHR);
 
-		this->context->init(vulkan,	device,	surface_capabilities.currentExtent);
+		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
+		VkExtent2D extent = surface_capabilities.currentExtent;
+
+		allocvisitor.init(vulkan, device, extent);
+		resizevisitor.init(vulkan, device, extent);
+		rendervisitor.init(vulkan, device, extent);
+		pipelinevisitor.init(vulkan, device, extent);
+		recordvisitor.init(vulkan, device, extent);
+		presentvisitor.init(vulkan, device, extent);
 
 		this->root = std::make_shared<Separator>();
 		this->root->children = {
@@ -211,19 +201,20 @@ public:
 		  swapchain
 		};
 
-		allocvisitor.visit(this->root.get(), this->context.get());
-		pipelinevisitor.visit(this->root.get(), this->context.get());
-		recordvisitor.visit(this->root.get(), this->context.get());
+		allocvisitor.visit(this->root.get());
+		pipelinevisitor.visit(this->root.get());
+		recordvisitor.visit(this->root.get());
 	}
 
 
 	void redraw() override
 	{
 		try {
-			rendervisitor.visit(this->root.get(), this->context.get());
-			presentvisitor.visit(this->root.get(), this->context.get());
+			rendervisitor.visit(this->root.get());
+			presentvisitor.visit(this->root.get());
 		}
-		catch (VkException&) {
+		catch (VkException& e) {
+			std::cerr << e.what() << std::endl;
 			// recreate swapchain, try again next frame
 		}
 	}
@@ -234,10 +225,17 @@ public:
 		  static_cast<uint32_t>(width),
 		  static_cast<uint32_t>(height)
 		};
-		this->context->resize(extent);
 
-		resizevisitor.visit(this->root.get(), this->context.get());
-		recordvisitor.visit(this->root.get(), this->context.get());
+		allocvisitor.resize(extent);
+		resizevisitor.resize(extent);
+		rendervisitor.resize(extent);
+		pipelinevisitor.resize(extent);
+		recordvisitor.resize(extent);
+		presentvisitor.resize(extent);
+		eventvisitor.resize(extent);
+
+		resizevisitor.visit(this->root.get());
+		recordvisitor.visit(this->root.get());
 		this->redraw();
 	}
 
@@ -246,14 +244,14 @@ public:
 		eventvisitor.press = true;
 		eventvisitor.button = button;
 		eventvisitor.currpos = glm::dvec2(x, y);
-		this->root->visit(&eventvisitor, this->context.get());
+		this->root->visit(&eventvisitor);
 		eventvisitor.prevpos = eventvisitor.currpos;
 	}
 
 	void mouseReleased() override
 	{
 		eventvisitor.press = false;
-		this->root->visit(&eventvisitor, this->context.get());
+		this->root->visit(&eventvisitor);
 		eventvisitor.prevpos = eventvisitor.currpos;
 	}
 
@@ -261,7 +259,7 @@ public:
 	{
 		eventvisitor.move = true;
 		eventvisitor.currpos = glm::dvec2(x, y);
-		this->root->visit(&eventvisitor, this->context.get());
+		this->root->visit(&eventvisitor);
 		eventvisitor.prevpos = eventvisitor.currpos;
 		eventvisitor.move = false;
 
@@ -269,5 +267,4 @@ public:
 	}
 
 	std::shared_ptr<Group> root;
-	std::shared_ptr<Context> context;
 };

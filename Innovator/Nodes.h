@@ -27,7 +27,7 @@ class Node {
 public:
 	Node() = default;
 	virtual ~Node() = default;
-	virtual void visit(Visitor* visitor, Context* context) = 0;
+	virtual void visit(Visitor* visitor) = 0;
 };
 
 
@@ -41,10 +41,10 @@ public:
 		children(std::move(children)) 
 	{}
 
-	void visit(Visitor* visitor, Context* context) override
+	void visit(Visitor* visitor) override
 	{
 		for (auto child : this->children) {
-			child->visit(visitor, context);
+			child->visit(visitor);
 		}
 	}
 
@@ -62,17 +62,17 @@ public:
 		Group(std::move(children))
 	{}
 
-	void visit(Visitor* visitor, Context* context) override
+	void visit(Visitor* visitor) override
 	{
-		StateScope scope(&context->state);
-		Group::visit(visitor, context);
+		StateScope scope(&visitor->state);
+		Group::visit(visitor);
 	}
 };
 
 
 class ProjMatrix : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ProjMatrix)
 	ProjMatrix() = delete;
 	virtual ~ProjMatrix() = default;
@@ -83,11 +83,11 @@ public:
 		aspectratio(aspectratio),
 		fieldofview(fieldofview)
 	{
-		REGISTER_VISITOR_CALLBACK(resizevisitor, ProjMatrix, resize);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, ProjMatrix, render);
+		REGISTER_VISITOR(resizevisitor, ProjMatrix, resize);
+		REGISTER_VISITOR(rendervisitor, ProjMatrix, render);
 	}
 
-	void resize(Context* context)
+	void resize(CommandVisitor* context)
 	{
 		this->aspectratio = 
 			static_cast<double>(context->state.extent.width) /
@@ -100,7 +100,7 @@ public:
 			this->farplane);
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		context->state.ProjectionMatrix = this->mat;
 	}
@@ -117,7 +117,7 @@ private:
 
 class ViewMatrix : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ViewMatrix)
 	ViewMatrix() = delete;
 	virtual ~ViewMatrix() = default;
@@ -125,7 +125,7 @@ public:
 	ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up) :
 		eye(eye), target(target)
 	{
-		REGISTER_VISITOR_CALLBACK(rendervisitor, ViewMatrix, render);
+		REGISTER_VISITOR(rendervisitor, ViewMatrix, render);
 
 		this->rot[1] = up;
 		this->updateOrientation();
@@ -154,7 +154,7 @@ public:
 		this->updateOrientation();
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		context->state.ViewMatrix = glm::dmat4(glm::transpose(this->rot));
 		context->state.ViewMatrix = glm::translate(context->state.ViewMatrix, -this->eye);
@@ -176,20 +176,20 @@ public:
 
 class ModelMatrix : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ModelMatrix)
 	ModelMatrix() = default;
 	virtual ~ModelMatrix() = default;
 
 	ModelMatrix(const glm::dvec3& t, const glm::dvec3& s)
 	{
-		REGISTER_VISITOR_CALLBACK(rendervisitor, ModelMatrix, render);
+		REGISTER_VISITOR(rendervisitor, ModelMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
 		this->mat = glm::translate(this->mat, t);
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		context->state.ModelMatrix *= this->mat;
 	}
@@ -200,20 +200,20 @@ public:
 
 class TextureMatrix : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(TextureMatrix)
 	TextureMatrix() = default;
 	virtual ~TextureMatrix() = default;
 
 	TextureMatrix(const glm::dvec3& t, const glm::dvec3& s)
 	{
-		REGISTER_VISITOR_CALLBACK(rendervisitor, TextureMatrix, render);
+		REGISTER_VISITOR(rendervisitor, TextureMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
 		this->mat = glm::translate(this->mat, t);
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		context->state.TextureMatrix *= this->mat;
 	}
@@ -224,7 +224,7 @@ public:
 
 class BufferData : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(BufferData)
 	BufferData() = default;
 	virtual ~BufferData() = default;
@@ -237,7 +237,7 @@ public:
 		return this->size() / this->stride();
 	}
 
-	void update(Context* context)
+	void update(Visitor* context)
 	{
 		context->state.bufferdata = this;
 	}
@@ -247,7 +247,7 @@ public:
 template <typename T>
 class InlineBufferData : public BufferData {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(InlineBufferData)
 	InlineBufferData() = default;
 	virtual ~InlineBufferData() = default;
@@ -255,9 +255,9 @@ public:
 	explicit InlineBufferData(std::vector<T> values) :
 		values(std::move(values))
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, InlineBufferData<T>, update);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, InlineBufferData<T>, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(allocvisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(pipelinevisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(recordvisitor, InlineBufferData<T>, update);
 	}
 
 	void copy(char* dst) const override
@@ -281,7 +281,7 @@ public:
 
 class TextureImage : public BufferData {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(TextureImage)
 	TextureImage() = delete;
 	virtual ~TextureImage() = default;
@@ -289,10 +289,10 @@ public:
 	explicit TextureImage(const std::string& filename) :
 		texture(VulkanImageFactory::Create(filename))
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, TextureImage, update);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, TextureImage, update);
+		REGISTER_VISITOR(allocvisitor, TextureImage, update);
+		REGISTER_VISITOR(pipelinevisitor, TextureImage, update);
+		REGISTER_VISITOR(recordvisitor, TextureImage, update);
+		REGISTER_VISITOR(rendervisitor, TextureImage, update);
 	}
 
 	void copy(char* dst) const override
@@ -310,7 +310,13 @@ public:
 		return this->texture->element_size();
 	}
 
-	void update(Context* context)
+	void update(Visitor* context)
+	{
+		context->state.bufferdata = this;
+		context->state.texture = this->texture.get();
+	}
+
+	void update(CommandVisitor* context)
 	{
 		context->state.bufferdata = this;
 		context->state.texture = this->texture.get();
@@ -323,23 +329,24 @@ private:
 
 class CpuMemoryBuffer : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(CpuMemoryBuffer)
 	CpuMemoryBuffer() = delete;
 	virtual ~CpuMemoryBuffer() = default;
 
-	explicit CpuMemoryBuffer(VkBufferUsageFlags usage_flags,
+	explicit CpuMemoryBuffer(
+		VkBufferUsageFlags usage_flags,
 		VkBufferCreateFlags create_flags = 0) :
-		usage_flags(usage_flags),
-		create_flags(create_flags)
+			usage_flags(usage_flags),
+			create_flags(create_flags)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, CpuMemoryBuffer, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CpuMemoryBuffer, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, CpuMemoryBuffer, update);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(allocvisitor, CpuMemoryBuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(recordvisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(rendervisitor, CpuMemoryBuffer, update);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
 			context->device,
@@ -355,7 +362,7 @@ public:
 		context->state.buffer = this->bufferobject->buffer->buffer;
 	}
 
-	void update(Context* context)
+	void update(Visitor* context)
 	{
 		context->state.buffer = this->bufferobject->buffer->buffer;
 	}
@@ -369,7 +376,7 @@ private:
 
 class GpuMemoryBuffer : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(GpuMemoryBuffer)
 	GpuMemoryBuffer() = delete;
 	virtual ~GpuMemoryBuffer() = default;
@@ -378,13 +385,13 @@ public:
 		usage_flags(usage_flags),
 		create_flags(create_flags)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, GpuMemoryBuffer, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, GpuMemoryBuffer, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, GpuMemoryBuffer, update);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(allocvisitor, GpuMemoryBuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(recordvisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(rendervisitor, GpuMemoryBuffer, update);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
 			context->device,
@@ -400,14 +407,15 @@ public:
 			context->state.bufferdata->size(),						// size
 		} };
 
-		vkCmdCopyBuffer(context->command->buffer(),
+		vkCmdCopyBuffer(
+			context->command->buffer(),
 			context->state.buffer,
 			this->bufferobject->buffer->buffer,
 			static_cast<uint32_t>(regions.size()),
 			regions.data());
 	}
 
-	void update(Context* context)
+	void update(Visitor* context)
 	{
 		context->state.buffer = this->bufferobject->buffer->buffer;
 	}
@@ -421,18 +429,18 @@ private:
 
 class TransformBuffer : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(TransformBuffer)
 	virtual ~TransformBuffer() = default;
 
 	TransformBuffer()
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, TransformBuffer, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, TransformBuffer, pipeline);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, TransformBuffer, render);
+		REGISTER_VISITOR(allocvisitor, TransformBuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, TransformBuffer, pipeline);
+		REGISTER_VISITOR(rendervisitor, TransformBuffer, render);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->buffer = std::make_shared<VulkanBufferObject>(
 			context->device,
@@ -443,12 +451,12 @@ public:
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 	}
 
-	void pipeline(Context* creator)
+	void pipeline(Visitor* context)
 	{
-		creator->state.buffer = this->buffer->buffer->buffer;
+		context->state.buffer = this->buffer->buffer->buffer;
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		std::array<glm::mat4, 3> data = {
 		  glm::mat4(context->state.ViewMatrix * context->state.ModelMatrix),
@@ -466,7 +474,7 @@ private:
 
 class IndexBufferDescription : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(IndexBufferDescription)
 	IndexBufferDescription() = delete;
 	virtual ~IndexBufferDescription() = default;
@@ -474,15 +482,15 @@ public:
 	explicit IndexBufferDescription(VkIndexType type) :
 		type(type)
 	{
-		REGISTER_VISITOR_CALLBACK(recordvisitor, IndexBufferDescription, record);
+		REGISTER_VISITOR(allocvisitor, IndexBufferDescription, update);
+		REGISTER_VISITOR(recordvisitor, IndexBufferDescription, update);
 	}
 
-	void record(Context* context)
+	void update(Visitor* context)
 	{
-		context->state.index_buffer_description = {
-		  this->type,
-		  context->state.buffer
-		};
+		context->state.index_buffer = context->state.buffer;
+		context->state.index_buffer_type = this->type;
+		context->state.index_count = context->state.bufferdata->count();
 	}
 
 private:
@@ -492,7 +500,7 @@ private:
 
 class VertexInputAttributeDescription : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(VertexInputAttributeDescription)
 	VertexInputAttributeDescription() = delete;
 	virtual ~VertexInputAttributeDescription() = default;
@@ -506,19 +514,17 @@ public:
 			location, binding, format, offset
 		})
 	{
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, VertexInputAttributeDescription, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, VertexInputAttributeDescription, record);
+		REGISTER_VISITOR(allocvisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(pipelinevisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(recordvisitor, VertexInputAttributeDescription, update);
 	}
 
-	void pipeline(Context* creator)
+	void update(Visitor* context)
 	{
-		creator->state.vertex_attributes.push_back(this->vertex_input_attribute_description);
-	}
-
-	void record(Context* recorder)
-	{
-		recorder->state.vertex_attribute_buffers.push_back(recorder->state.buffer);
-		recorder->state.vertex_attribute_buffer_offsets.push_back(0);
+		context->state.vertex_attributes.push_back(this->vertex_input_attribute_description);
+		context->state.vertex_attribute_buffers.push_back(context->state.buffer);
+		context->state.vertex_attribute_buffer_offsets.push_back(0);
+		context->state.vertex_counts.push_back(context->state.bufferdata->count());
 	}
 
 private:
@@ -528,7 +534,7 @@ private:
 
 class VertexInputBindingDescription : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(VertexInputBindingDescription)
 	VertexInputBindingDescription() = delete;
 	virtual ~VertexInputBindingDescription() = default;
@@ -541,12 +547,13 @@ public:
 		stride(stride),
 		inputRate(inputRate)
 	{
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, VertexInputBindingDescription, pipeline);
+		REGISTER_VISITOR(allocvisitor, VertexInputBindingDescription, update);
+		REGISTER_VISITOR(pipelinevisitor, VertexInputBindingDescription, update);
 	}
 
-	void pipeline(Context* creator)
+	void update(Visitor* context)
 	{
-		creator->state.vertex_input_bindings.push_back({
+		context->state.vertex_input_bindings.push_back({
 		  this->binding,
 		  this->stride,
 		  this->inputRate,
@@ -562,7 +569,7 @@ private:
 
 class DescriptorSetLayoutBinding : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(DescriptorSetLayoutBinding)
 	DescriptorSetLayoutBinding() = delete;
 	virtual ~DescriptorSetLayoutBinding() = default;
@@ -575,10 +582,10 @@ public:
 		descriptorType(descriptorType),
 		stageFlags(stageFlags)
 	{
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
+		REGISTER_VISITOR(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.descriptor_pool_sizes.push_back({
 		  this->descriptorType,											// type 
@@ -630,7 +637,7 @@ private:
 
 class Shader : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(Shader)
 	Shader() = delete;
 	virtual ~Shader() = default;
@@ -638,8 +645,9 @@ public:
 	explicit Shader(const VkShaderStageFlagBits stage, std::string glsl) :
 		stage(stage)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Shader, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Shader, pipeline);
+		REGISTER_VISITOR(devicevisitor, Shader, device);
+		REGISTER_VISITOR(allocvisitor, Shader, alloc);
+		REGISTER_VISITOR(pipelinevisitor, Shader, pipeline);
 
 		//std::ifstream input(filename, std::ios::in);
 		//std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
@@ -659,6 +667,16 @@ public:
 				return shaderc_tess_control_shader;
 			case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
 				return shaderc_tess_evaluation_shader;
+			case VK_SHADER_STAGE_RAYGEN_BIT_KHR:
+				return shaderc_raygen_shader;
+			case VK_SHADER_STAGE_ANY_HIT_BIT_KHR:
+				return shaderc_anyhit_shader;
+			case VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:
+				return shaderc_closesthit_shader;
+			case VK_SHADER_STAGE_MISS_BIT_KHR:
+				return shaderc_miss_shader;
+			case VK_SHADER_STAGE_INTERSECTION_BIT_KHR:
+				return shaderc_intersection_shader;
 			default:
 				throw std::runtime_error("Unknown shader stage");
 			}
@@ -674,12 +692,28 @@ public:
 		this->spv = { module.cbegin(), module.cend() };
 	}
 
-	void alloc(Context* context)
+	void device(DeviceVisitor* context)
+	{
+		switch (this->stage) {
+		case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
+			context->device_features.tessellationShader = VK_TRUE;
+			break;
+		case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
+			context->device_features.tessellationShader = VK_TRUE;
+			break;
+		case VK_SHADER_STAGE_GEOMETRY_BIT:
+			context->device_features.geometryShader = VK_TRUE;
+			break;
+		default: break;
+		}
+	}
+
+	void alloc(CommandVisitor* context)
 	{
 		this->shader = std::make_unique<VulkanShaderModule>(context->device, this->spv);
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.shader_stage_infos.push_back({
 			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// sType
@@ -699,9 +733,196 @@ public:
 };
 
 
+class AccelerationStructure : public Node {
+public:
+	IMPLEMENT_VISITABLE
+	NO_COPY_OR_ASSIGNMENT(AccelerationStructure)
+	virtual ~AccelerationStructure() = default;
+
+	explicit AccelerationStructure()
+	{
+		REGISTER_VISITOR(devicevisitor, AccelerationStructure, device);
+		REGISTER_VISITOR(allocvisitor, AccelerationStructure, alloc);
+	}
+
+	void device(DeviceVisitor* visitor)
+	{
+		visitor->instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+		visitor->device_address_features.bufferDeviceAddress = VK_TRUE;
+		visitor->device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
+	}
+
+	void alloc(CommandVisitor* context)
+	{
+		VkDeviceAddress index_address = VulkanBuffer::getDeviceAddress(
+			context->device->device, 
+			context->state.index_buffer);
+
+		VkIndexType indexType = context->state.index_buffer_type;
+		uint32_t maxPrimitiveCount = context->state.index_count / 3;
+
+		std::vector<VkAccelerationStructureGeometryKHR> geometries;
+		std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos;
+		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos;
+
+		for (size_t i = 0; i < context->state.vertex_attributes.size(); i++)
+		{
+			VkFormat vertexFormat = context->state.vertex_attributes[i].format;
+			uint32_t maxVertexCount = context->state.vertex_counts[i];
+
+			create_geometry_infos.push_back({
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+				nullptr,
+				VK_GEOMETRY_TYPE_TRIANGLES_KHR,						// geometryType,
+				maxPrimitiveCount,									// maxPrimitiveCount
+				indexType,											// indexType
+				maxVertexCount,										// maxVertexCount
+				vertexFormat,										// vertexFormat,
+				VK_FALSE											// allowsTransforms
+			});
+
+			VkBuffer vertex_buffer = context->state.vertex_attribute_buffers[i];
+			VkDeviceAddress vertex_address = VulkanBuffer::getDeviceAddress(context->device->device, vertex_buffer);
+			VkDeviceSize vertexStride = context->state.vertex_input_bindings[i].stride;
+
+			VkAccelerationStructureGeometryTrianglesDataKHR geometry_triangles_data{
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+				nullptr,
+				vertexFormat,										// vertexFormat
+				vertex_address,										// vertexData
+				vertexStride,										// vertexStride
+				indexType,											// indexType
+				index_address,										// indexData
+				{}													// transformData
+			};
+
+			VkAccelerationStructureGeometryDataKHR geometry_data{};
+			geometry_data.triangles = geometry_triangles_data;
+
+			VkAccelerationStructureGeometryKHR geometry{
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+				nullptr,
+				VK_GEOMETRY_TYPE_TRIANGLES_KHR,						// geometryType
+				geometry_data,										// geometry
+				VK_GEOMETRY_OPAQUE_BIT_KHR,							// flags
+			};
+
+			geometries.push_back(geometry);
+
+			VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
+				maxPrimitiveCount,									// primitiveCount
+				0,													// primitiveOffset
+				0,													// firstVertex;
+				0													// transformOffset
+			};
+
+			build_offset_infos.push_back(build_offset_info);
+		}
+
+		auto blas = std::make_shared<VulkanAccelerationStructure>(
+			context->vulkan,
+			context->device,
+			0,															// compactedSize
+			VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,			// type
+			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
+			create_geometry_infos,										// geometryInfos
+			0);															// deviceAddress
+
+		blas->build(
+			context->command->buffer(),
+			geometries,
+			build_offset_infos);
+
+		{
+			std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos{ {
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+				nullptr,
+				VK_GEOMETRY_TYPE_INSTANCES_KHR,								// geometryType
+				1,															// maxPrimitiveCount
+				VK_INDEX_TYPE_NONE_KHR,										// indexType
+				0,															// maxVertexCount
+				VK_FORMAT_UNDEFINED,										// vertexFormat,
+				VK_FALSE													// allowsTransforms
+			} };
+
+			auto tlas = std::make_shared<VulkanAccelerationStructure>(
+				context->vulkan,
+				context->device,
+				0,															// compactedSize
+				VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,				// type
+				VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
+				create_geometry_infos,										// geometryInfos
+				0);															// deviceAddress
+
+			VkTransformMatrixKHR transform{ {
+				{ 1, 0, 0, 0 },
+				{ 0, 1, 0, 0 },
+				{ 0, 0, 1, 0 }
+			} };
+
+			VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+				nullptr,
+				blas->as,													// accelerationStructure
+			};
+
+			VkDeviceOrHostAddressConstKHR data;
+			data.deviceAddress = 
+				context->vulkan->vkGetAccelerationStructureDeviceAddress(context->device->device, &device_address_info);
+
+			VkAccelerationStructureInstanceKHR instance{
+				transform,													// transform
+				0,															// instanceCustomIndex:24
+				1,															// mask:8
+				0,															// instanceShaderBindingTableRecordOffset:24
+				VK_GEOMETRY_OPAQUE_BIT_KHR,									// flags:8
+				data.deviceAddress											// accelerationStructureReference
+			};
+
+			VkAccelerationStructureGeometryInstancesDataKHR geometry_instances_data{
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+				nullptr,
+				VK_FALSE,													// arrayOfPointers
+				data,														// data
+			};
+
+			VkAccelerationStructureGeometryDataKHR geometry_data{};
+			geometry_data.instances = geometry_instances_data;
+
+			std::vector<VkAccelerationStructureGeometryKHR> geometries{ {
+				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+				nullptr,
+				VK_GEOMETRY_TYPE_INSTANCES_KHR,								// geometryType
+				geometry_data,												// geometry
+				VK_GEOMETRY_OPAQUE_BIT_KHR,									// flags
+			} };
+
+			std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos{ {
+				1,															// primitiveCount
+				0,															// primitiveOffset
+				0,															// firstVertex;
+				0															// transformOffset
+			} };
+
+			tlas->build(
+				context->command->buffer(),
+				geometries,
+				build_offset_infos);
+		}
+	}
+};
+
+
 class Sampler : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(Sampler)
 	virtual ~Sampler() = default;
 
@@ -721,27 +942,27 @@ public:
 		float maxLod,
 		VkBorderColor borderColor,
 		VkBool32 unnormalizedCoordinates) :
-		magFilter(magFilter),
-		minFilter(minFilter),
-		mipmapMode(mipmapMode),
-		addressModeU(addressModeU),
-		addressModeV(addressModeV),
-		addressModeW(addressModeW),
-		mipLodBias(mipLodBias),
-		anisotropyEnable(anisotropyEnable),
-		maxAnisotropy(maxAnisotropy),
-		compareEnable(compareEnable),
-		compareOp(compareOp),
-		minLod(minLod),
-		maxLod(maxLod),
-		borderColor(borderColor),
-		unnormalizedCoordinates(unnormalizedCoordinates)
+			magFilter(magFilter),
+			minFilter(minFilter),
+			mipmapMode(mipmapMode),
+			addressModeU(addressModeU),
+			addressModeV(addressModeV),
+			addressModeW(addressModeW),
+			mipLodBias(mipLodBias),
+			anisotropyEnable(anisotropyEnable),
+			maxAnisotropy(maxAnisotropy),
+			compareEnable(compareEnable),
+			compareOp(compareOp),
+			minLod(minLod),
+			maxLod(maxLod),
+			borderColor(borderColor),
+			unnormalizedCoordinates(unnormalizedCoordinates)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Sampler, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Sampler, pipeline);
+		REGISTER_VISITOR(allocvisitor, Sampler, alloc);
+		REGISTER_VISITOR(pipelinevisitor, Sampler, pipeline);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->sampler = std::make_unique<VulkanSampler>(
 			context->device,
@@ -762,7 +983,7 @@ public:
 			this->unnormalizedCoordinates);
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.sampler = this->sampler->sampler;
 	}
@@ -789,27 +1010,28 @@ private:
 
 class Image : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(Image)
 	virtual ~Image() = default;
-	Image(VkSampleCountFlagBits sample_count,
+	Image(
+		VkSampleCountFlagBits sample_count,
 		VkImageTiling tiling,
 		VkImageUsageFlags usage_flags,
 		VkSharingMode sharing_mode,
 		VkImageCreateFlags create_flags,
 		VkImageLayout layout) :
-		sample_count(sample_count),
-		tiling(tiling),
-		usage_flags(usage_flags),
-		sharing_mode(sharing_mode),
-		create_flags(create_flags),
-		layout(layout)
+			sample_count(sample_count),
+			tiling(tiling),
+			usage_flags(usage_flags),
+			sharing_mode(sharing_mode),
+			create_flags(create_flags),
+			layout(layout)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Image, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Image, pipeline);
+		REGISTER_VISITOR(allocvisitor, Image, alloc);
+		REGISTER_VISITOR(pipelinevisitor, Image, pipeline);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->image = std::make_shared<VulkanImageObject>(
 			context->device,
@@ -894,7 +1116,7 @@ public:
 		context->state.image = this->image->image->image;
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.imageLayout = this->layout;
 	}
@@ -913,7 +1135,7 @@ private:
 
 class ImageView : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ImageView)
 	virtual ~ImageView() = default;
 	ImageView(
@@ -923,11 +1145,11 @@ public:
 		VkComponentSwizzle a) :
 		component_mapping({ r, g, b, a })
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, ImageView, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, ImageView, pipeline);
+		REGISTER_VISITOR(allocvisitor, ImageView, alloc);
+		REGISTER_VISITOR(pipelinevisitor, ImageView, pipeline);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->view = std::make_unique<VulkanImageView>(
 			context->device,
@@ -938,7 +1160,7 @@ public:
 			context->state.texture->subresource_range());
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.imageView = this->view->view;
 	}
@@ -951,7 +1173,7 @@ private:
 
 class Extent : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(Extent)
 	Extent() = delete;
 	virtual ~Extent() = default;
@@ -959,14 +1181,14 @@ public:
 	Extent(uint32_t width, uint32_t height) :
 		extent{ width, height }
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Extent, update);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Extent, update);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, Extent, update);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, Extent, update);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, Extent, update);
+		REGISTER_VISITOR(allocvisitor, Extent, update);
+		REGISTER_VISITOR(pipelinevisitor, Extent, update);
+		REGISTER_VISITOR(recordvisitor, Extent, update);
+		REGISTER_VISITOR(resizevisitor, Extent, update);
+		REGISTER_VISITOR(rendervisitor, Extent, update);
 	}
 
-	void update(Context* context)
+	void update(Visitor* context)
 	{
 		context->state.extent = this->extent;
 	}
@@ -978,7 +1200,7 @@ private:
 
 class CullMode : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(CullMode)
 	CullMode() = delete;
 	virtual ~CullMode() = default;
@@ -986,10 +1208,10 @@ public:
 	explicit CullMode(VkCullModeFlags cullmode) :
 		cullmode(cullmode)
 	{
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, CullMode, pipeline);
+		REGISTER_VISITOR(pipelinevisitor, CullMode, pipeline);
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.rasterization_state.cullMode = this->cullmode;
 	}
@@ -1001,7 +1223,7 @@ private:
 
 class ComputeCommand : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ComputeCommand)
 	ComputeCommand() = delete;
 	virtual ~ComputeCommand() = default;
@@ -1014,10 +1236,10 @@ public:
 		group_count_y(group_count_y),
 		group_count_z(group_count_z)
 	{
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, ComputeCommand, pipeline);
+		REGISTER_VISITOR(pipelinevisitor, ComputeCommand, pipeline);
 	}
 
-	void pipeline(Context* context)
+	void pipeline(PipelineVisitor* context)
 	{
 		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
 			context->device,
@@ -1045,7 +1267,7 @@ public:
 			this->pipeline_layout->layout);
 	}
 
-	void record(Context* context)
+	void record(Visitor* context)
 	{
 		vkCmdBindDescriptorSets(this->command->buffer(),
 			VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -1083,7 +1305,7 @@ private:
 
 class DrawCommandBase : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(DrawCommandBase)
 	DrawCommandBase() = delete;
 	virtual ~DrawCommandBase() = default;
@@ -1092,7 +1314,7 @@ public:
 		topology(topology)
 	{}
 
-	void alloc(Context* context)
+	void alloc(Visitor* context)
 	{
 		this->command = std::make_unique<VulkanCommandBuffers>(
 			context->device,
@@ -1100,9 +1322,9 @@ public:
 			VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 	}
 
-	virtual void execute(VkCommandBuffer command, Context* context) = 0;
+	virtual void execute(VkCommandBuffer command, Visitor*) = 0;
 
-	void pipeline(Context* context)
+	void pipeline(PipelineVisitor* context)
 	{
 		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
 			context->device,
@@ -1144,7 +1366,7 @@ public:
 			context->state.vertex_attributes);
 	}
 
-	void record(Context* context)
+	void record(Visitor* context)
 	{
 		this->command->begin(
 			0,
@@ -1200,7 +1422,7 @@ public:
 		this->command->end();
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		vkCmdExecuteCommands(
 			context->state.command->buffer(),
@@ -1224,11 +1446,12 @@ private:
 
 class DrawCommand : public DrawCommandBase {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(DrawCommand)
 	virtual ~DrawCommand() = default;
 
-	explicit DrawCommand(uint32_t vertexcount,
+	explicit DrawCommand(
+		uint32_t vertexcount,
 		uint32_t instancecount,
 		uint32_t firstvertex,
 		uint32_t firstinstance,
@@ -1239,16 +1462,21 @@ public:
 		firstvertex(firstvertex),
 		firstinstance(firstinstance)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, DrawCommand, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, DrawCommand, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, DrawCommand, record);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, DrawCommand, render);
+		REGISTER_VISITOR(allocvisitor, DrawCommand, alloc);
+		REGISTER_VISITOR(pipelinevisitor, DrawCommand, pipeline);
+		REGISTER_VISITOR(recordvisitor, DrawCommand, record);
+		REGISTER_VISITOR(rendervisitor, DrawCommand, render);
 	}
 
 private:
-	void execute(VkCommandBuffer command, Context*) override
+	void execute(VkCommandBuffer command, Visitor*) override
 	{
-		vkCmdDraw(command, this->vertexcount, this->instancecount, this->firstvertex, this->firstinstance);
+		vkCmdDraw(
+			command, 
+			this->vertexcount, 
+			this->instancecount, 
+			this->firstvertex, 
+			this->firstinstance);
 	}
 
 	uint32_t vertexcount;
@@ -1259,39 +1487,42 @@ private:
 
 class IndexedDrawCommand : public DrawCommandBase {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(IndexedDrawCommand)
 	virtual ~IndexedDrawCommand() = default;
 
-	explicit IndexedDrawCommand(uint32_t indexcount,
+	explicit IndexedDrawCommand(
+		uint32_t indexcount,
 		uint32_t instancecount,
 		uint32_t firstindex,
 		int32_t vertexoffset,
 		uint32_t firstinstance,
 		VkPrimitiveTopology topology) :
-		DrawCommandBase(topology),
-		indexcount(indexcount),
-		instancecount(instancecount),
-		firstindex(firstindex),
-		vertexoffset(vertexoffset),
-		firstinstance(firstinstance),
-		offset(0)
+			DrawCommandBase(topology),
+			indexcount(indexcount),
+			instancecount(instancecount),
+			firstindex(firstindex),
+			vertexoffset(vertexoffset),
+			firstinstance(firstinstance),
+			offset(0)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, IndexedDrawCommand, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, IndexedDrawCommand, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, IndexedDrawCommand, record);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, IndexedDrawCommand, render);
+		REGISTER_VISITOR(allocvisitor, IndexedDrawCommand, alloc);
+		REGISTER_VISITOR(pipelinevisitor, IndexedDrawCommand, pipeline);
+		REGISTER_VISITOR(recordvisitor, IndexedDrawCommand, record);
+		REGISTER_VISITOR(rendervisitor, IndexedDrawCommand, render);
 	}
 
 private:
-	void execute(VkCommandBuffer command, Context* context) override
+	void execute(VkCommandBuffer command, Visitor* context) override
 	{
-		vkCmdBindIndexBuffer(command,
-			context->state.index_buffer_description.buffer,
+		vkCmdBindIndexBuffer(
+			command,
+			context->state.index_buffer,
 			this->offset,
-			context->state.index_buffer_description.type);
+			context->state.index_buffer_type);
 
-		vkCmdDrawIndexed(command,
+		vkCmdDrawIndexed(
+			command,
 			this->indexcount,
 			this->instancecount,
 			this->firstindex,
@@ -1310,7 +1541,7 @@ private:
 
 class FramebufferAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(FramebufferAttachment)
 	virtual ~FramebufferAttachment() = default;
 
@@ -1325,11 +1556,12 @@ public:
 			aspectMask, 0, 1, 0, 1
 		};
 
-		REGISTER_VISITOR_CALLBACK(allocvisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(resizevisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(recordvisitor, FramebufferAttachment, record);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		VkExtent3D extent = {
 			context->state.extent.width, context->state.extent.height, 1
@@ -1358,6 +1590,17 @@ public:
 			this->subresource_range);
 
 		context->state.framebuffer_attachments.push_back(this->imageview->view);
+
+		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+			context->state.swapchain_fmt = this->format;
+		}
+	}
+
+	void record(Visitor* context)
+	{
+		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+			context->state.swapchain_src = this->image->image->image;
+		}
 	}
 
 public:
@@ -1379,18 +1622,19 @@ public:
 
 class Framebuffer : public Group {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(Framebuffer)
 	virtual ~Framebuffer() = default;
 
 	explicit Framebuffer(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Framebuffer, alloc);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, Framebuffer, resize);
+		REGISTER_VISITOR(allocvisitor, Framebuffer, alloc);
+		REGISTER_VISITOR(resizevisitor, Framebuffer, alloc);
+		REGISTER_VISITOR(recordvisitor, Framebuffer, record);
 	}
 
-	void do_alloc(Context* context)
+	void do_alloc(CommandVisitor* context)
 	{
 		this->framebuffer = std::make_unique<VulkanFramebuffer>(
 			context->device,
@@ -1401,16 +1645,15 @@ public:
 		context->state.framebuffer = this->framebuffer;
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
-		Group::visit(&allocvisitor, context);
+		Group::visit(context);
 		this->do_alloc(context);
 	}
 
-	void resize(Context* context)
+	void record(Visitor* context)
 	{
-		Group::visit(&allocvisitor, context);
-		this->do_alloc(context);
+		Group::visit(context);
 	}
 
 public:
@@ -1420,16 +1663,16 @@ public:
 
 class InputAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(InputAttachment)
 	virtual ~InputAttachment() = default;
 	explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, InputAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, InputAttachment, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.input_attachments.push_back(this->attachment);
 	}
@@ -1440,16 +1683,16 @@ public:
 
 class ColorAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ColorAttachment)
 	virtual ~ColorAttachment() = default;
 	explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, ColorAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, ColorAttachment, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.color_attachments.push_back(this->attachment);
 	}
@@ -1461,16 +1704,16 @@ private:
 
 class ResolveAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(ResolveAttachment)
 	virtual ~ResolveAttachment() = default;
 	explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, ResolveAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, ResolveAttachment, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.resolve_attachments.push_back(this->attachment);
 	}
@@ -1482,16 +1725,16 @@ private:
 
 class DepthStencilAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(DepthStencilAttachment)
 	virtual ~DepthStencilAttachment() = default;
 	explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, DepthStencilAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, DepthStencilAttachment, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.depth_stencil_attachment = this->attachment;
 	}
@@ -1502,16 +1745,16 @@ private:
 
 class PreserveAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(PreserveAttachment)
 	virtual ~PreserveAttachment() = default;
 	explicit PreserveAttachment(uint32_t attachment) :
 		attachment(attachment)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, PreserveAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, PreserveAttachment, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.preserve_attachments.push_back(this->attachment);
 	}
@@ -1523,16 +1766,16 @@ private:
 
 class PipelineBindpoint : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(PipelineBindpoint)
 	virtual ~PipelineBindpoint() = default;
 	explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
 		bind_point(bind_point)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, PipelineBindpoint, alloc);
+		REGISTER_VISITOR(allocvisitor, PipelineBindpoint, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.bind_point = this->bind_point;
 	}
@@ -1544,7 +1787,7 @@ private:
 
 class SubpassDescription : public Group {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(SubpassDescription)
 	SubpassDescription() = delete;
 	virtual ~SubpassDescription() = default;
@@ -1552,12 +1795,12 @@ public:
 	SubpassDescription(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, SubpassDescription, alloc);
+		REGISTER_VISITOR(allocvisitor, SubpassDescription, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
-		Group::visit(&allocvisitor, context);
+		Group::visit(context);
 
 		context->state.subpass_descriptions.push_back({
 			0,																	// flags
@@ -1577,7 +1820,7 @@ public:
 
 class RenderpassAttachment : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(RenderpassAttachment)
 	virtual ~RenderpassAttachment() = default;
 
@@ -1603,10 +1846,10 @@ public:
 		  finalLayout
 		};
 
-		REGISTER_VISITOR_CALLBACK(allocvisitor, RenderpassAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, RenderpassAttachment, alloc);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		context->state.attachment_descriptions.push_back(this->description);
 	}
@@ -1618,45 +1861,45 @@ private:
 
 class Renderpass : public Group {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(Renderpass)
 	virtual ~Renderpass() = default;
 
 	Renderpass(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR_CALLBACK(eventvisitor, Renderpass, events);
-		REGISTER_VISITOR_CALLBACK(devicevisitor, Renderpass, device);
-		REGISTER_VISITOR_CALLBACK(allocvisitor, Renderpass, alloc);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, Renderpass, resize);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, Renderpass, render);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, Renderpass, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, Renderpass, record);
+		REGISTER_VISITOR(eventvisitor, Renderpass, events);
+		REGISTER_VISITOR(devicevisitor, Renderpass, device);
+		REGISTER_VISITOR(allocvisitor, Renderpass, alloc);
+		REGISTER_VISITOR(resizevisitor, Renderpass, resize);
+		REGISTER_VISITOR(rendervisitor, Renderpass, render);
+		REGISTER_VISITOR(pipelinevisitor, Renderpass, pipeline);
+		REGISTER_VISITOR(recordvisitor, Renderpass, record);
 	}
 
-	void events(Context* context)
+	void events(EventVisitor* context)
 	{
-		Group::visit(&eventvisitor, context);
+		Group::visit(context);
 	}
 
-	void device(Context* context)
+	void device(Visitor* context)
 	{
-		Group::visit(&devicevisitor, context);
+		Group::visit(context);
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
-		Group::visit(&pipelinevisitor, context);
+		Group::visit(context);
 	}
 
-	void record(Context* context)
+	void record(Visitor* context)
 	{
-		Group::visit(&recordvisitor, context);
+		Group::visit(context);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
-		Group::visit(&allocvisitor, context);
+		Group::visit(context);
 
 		this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
 		this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
@@ -1665,13 +1908,13 @@ public:
 		this->framebuffer = context->state.framebuffer;
 	}
 
-	void resize(Context* context)
+	void resize(CommandVisitor* context)
 	{
-		Group::visit(&resizevisitor, context);
+		Group::visit(context);
 		this->framebuffer = context->state.framebuffer;
 	}
 
-	void render(Context* context)
+	void render(CommandVisitor* context)
 	{
 		const VkRect2D renderarea{
 			{ 0, 0 },						// offset
@@ -1694,7 +1937,7 @@ public:
 
 			context->state.command = this->render_command.get();
 
-			Group::visit(&rendervisitor, context);
+			Group::visit(context);
 		}
 		this->render_command->end();
 
@@ -1713,21 +1956,21 @@ public:
 
 class RenderpassDescription : public Group {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(RenderpassDescription)
 	virtual ~RenderpassDescription() = default;
 	RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, RenderpassDescription, alloc);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, RenderpassDescription, resize);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, RenderpassDescription, pipeline);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, RenderpassDescription, record);
+		REGISTER_VISITOR(allocvisitor, RenderpassDescription, alloc);
+		REGISTER_VISITOR(resizevisitor, RenderpassDescription, resize);
+		REGISTER_VISITOR(pipelinevisitor, RenderpassDescription, pipeline);
+		REGISTER_VISITOR(recordvisitor, RenderpassDescription, record);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
-		Group::visit(&allocvisitor, context);
+		Group::visit(context);
 
 		this->renderpass = std::make_shared<VulkanRenderpass>(
 			context->device,
@@ -1737,21 +1980,21 @@ public:
 		context->state.renderpass = this->renderpass;
 	}
 
-	void resize(Context* context)
+	void resize(CommandVisitor* context)
 	{
-		Group::visit(&allocvisitor, context);
+		Group::visit(context);
 		context->state.renderpass = this->renderpass;
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
-		Group::visit(&pipelinevisitor, context);
+		Group::visit(context);
 		context->state.renderpass = this->renderpass;
 	}
 
-	void record(Context* context)
+	void record(Visitor* context)
 	{
-		Group::visit(&recordvisitor, context);
+		Group::visit(context);
 		context->state.renderpass = this->renderpass;
 	}
 
@@ -1762,29 +2005,26 @@ public:
 
 class SwapchainObject : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(SwapchainObject)
 	virtual ~SwapchainObject() = default;
 
 	SwapchainObject(
-		std::shared_ptr<FramebufferAttachment> color_attachment,
 		std::shared_ptr<VulkanSurface> surface,
-		VkSurfaceFormatKHR surface_format,
 		VkPresentModeKHR present_mode) :
-		color_attachment(std::move(color_attachment)),
-		surface(std::move(surface)),
-		surface_format(surface_format),
-		present_mode(present_mode),
-		present_queue(nullptr)
+			surface(std::move(surface)),
+			present_mode(present_mode),
+			present_queue(nullptr)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, SwapchainObject, alloc);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, SwapchainObject, resize);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, SwapchainObject, record);
-		REGISTER_VISITOR_CALLBACK(presentvisitor, SwapchainObject, present);
+		REGISTER_VISITOR(allocvisitor, SwapchainObject, alloc);
+		REGISTER_VISITOR(resizevisitor, SwapchainObject, resize);
+		REGISTER_VISITOR(recordvisitor, SwapchainObject, record);
+		REGISTER_VISITOR(presentvisitor, SwapchainObject, present);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
+		this->surface->checkPresentModeSupport(context->device, this->present_mode);
 		this->present_queue = context->device->getQueue(0, this->surface->surface);
 		this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->device);
 		this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->device);
@@ -1792,8 +2032,11 @@ public:
 		this->resize(context);
 	}
 
-	void resize(Context* context)
+	void resize(CommandVisitor* context)
 	{
+		VkSurfaceFormatKHR surface_format = 
+			this->surface->getSupportedSurfaceFormat(context->device, context->state.swapchain_fmt);
+
 		VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : nullptr;
 
 		this->swapchain = std::make_unique<VulkanSwapchain>(
@@ -1801,8 +2044,8 @@ public:
 			context->vulkan,
 			this->surface->surface,
 			3,
-			this->surface_format.format,
-			this->surface_format.colorSpace,
+			surface_format.format,
+			surface_format.colorSpace,
 			context->state.extent,
 			1,
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -1820,6 +2063,7 @@ public:
 			this->swapchain->swapchain,
 			&count,
 			nullptr));
+
 		this->swapchain_images.resize(count);
 		THROW_ON_ERROR(context->vulkan->vkGetSwapchainImages(
 			context->device->device,
@@ -1841,7 +2085,7 @@ public:
 		}
 	}
 
-	void record(Context* context)
+	void record(Visitor* context)
 	{
 		this->swap_buffers_command = std::make_unique<VulkanCommandBuffers>(
 			context->device,
@@ -1874,7 +2118,7 @@ public:
 
 			VulkanCommandBuffers::Scope command_scope(this->swap_buffers_command.get(), i);
 
-			VkImage srcImage = this->color_attachment->image->image->image;
+			VkImage srcImage = context->state.swapchain_src;
 			VkImage dstImage = this->swapchain_images[i];
 
 			this->swap_buffers_command->pipelineBarrier(
@@ -1924,7 +2168,7 @@ public:
 		}
 	}
 
-	void present(Context* context)
+	void present(Visitor* context)
 	{
 		THROW_ON_ERROR(context->vulkan->vkAcquireNextImage(
 			context->device->device,
@@ -1960,10 +2204,8 @@ public:
 	}
 
 private:
-	std::shared_ptr<FramebufferAttachment> color_attachment;
 	std::shared_ptr<VulkanSurface> surface;
 	VkPresentModeKHR present_mode;
-	VkSurfaceFormatKHR surface_format;
 	VkQueue present_queue;
 
 	std::unique_ptr<VulkanSwapchain> swapchain;
@@ -1982,20 +2224,20 @@ private:
 
 class OffscreenImage : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(OffscreenImage)
 	virtual ~OffscreenImage() = default;
 
 	OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment) :
 		color_attachment(std::move(color_attachment))
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, OffscreenImage, alloc);
-		REGISTER_VISITOR_CALLBACK(resizevisitor, OffscreenImage, alloc);
-		REGISTER_VISITOR_CALLBACK(recordvisitor, OffscreenImage, record);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, OffscreenImage, render);
+		REGISTER_VISITOR(allocvisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR(resizevisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR(recordvisitor, OffscreenImage, record);
+		REGISTER_VISITOR(rendervisitor, OffscreenImage, render);
 	}
 
-	void alloc(Context* context)
+	void alloc(CommandVisitor* context)
 	{
 		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
 
@@ -2034,7 +2276,7 @@ public:
 		this->dataOffset = subresource_layout.offset;
 	}
 
-	void record(Context* context)
+	void record(Visitor* context)
 	{
 		const VkImageSubresourceLayers subresource_layers{
 			this->subresource_range.aspectMask,								// aspectMask
@@ -2104,7 +2346,7 @@ public:
 				this->subresource_range) });
 	}
 
-	std::set<uint32_t> getTiles(class Context* context)
+	std::set<uint32_t> getTiles(CommandVisitor* context)
 	{
 		//Timer timer("offscreen render");
 
@@ -2137,7 +2379,7 @@ public:
 		return tiles;
 	}
 
-	void render(Context* context)
+	void render(RenderVisitor* context)
 	{
 		context->image = this;
 	}
@@ -2156,7 +2398,7 @@ private:
 
 class SparseImage : public Node {
 public:
-	IMPLEMENT_VISITABLE_INLINE
+	IMPLEMENT_VISITABLE
 	NO_COPY_OR_ASSIGNMENT(SparseImage)
 	SparseImage() = delete;
 	virtual ~SparseImage() = default;
@@ -2174,12 +2416,20 @@ public:
 		create_flags(create_flags),
 		layout(layout)
 	{
-		REGISTER_VISITOR_CALLBACK(allocvisitor, SparseImage, alloc);
-		REGISTER_VISITOR_CALLBACK(pipelinevisitor, SparseImage, pipeline);
-		REGISTER_VISITOR_CALLBACK(rendervisitor, SparseImage, render);
+		REGISTER_VISITOR(devicevisitor, SparseImage, device);
+		REGISTER_VISITOR(allocvisitor, SparseImage, alloc);
+		REGISTER_VISITOR(pipelinevisitor, SparseImage, pipeline);
+		REGISTER_VISITOR(rendervisitor, SparseImage, render);
 	}
 
-	void alloc(Context* context)
+	void device(DeviceVisitor* context)
+	{
+		context->device_features.sparseBinding = VK_TRUE;
+		context->device_features.sparseResidencyImage2D = VK_TRUE;
+		context->device_features.sparseResidencyImage3D = VK_TRUE;
+	}
+
+	void alloc(CommandVisitor* context)
 	{
 		this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
 		this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
@@ -2244,12 +2494,12 @@ public:
 		context->state.image = this->image->image;
 	}
 
-	void pipeline(Context* context)
+	void pipeline(Visitor* context)
 	{
 		context->state.imageLayout = this->layout;
 	}
 
-	void render(Context* context)
+	void render(RenderVisitor* context)
 	{
 		VulkanTextureImage* texture = context->state.texture;
 

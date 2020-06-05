@@ -10,19 +10,19 @@ Class(const Class&) = delete;																	\
 Class & operator=(Class&&) = delete;															\
 Class & operator=(const Class&) = delete;														\
 
-#define IMPLEMENT_VISITABLE_INLINE																\
-	void visit(Visitor* visitor, Context* context) override										\
+#define IMPLEMENT_VISITABLE																		\
+	void visit(Visitor* visitor) override														\
 	{																							\
-		visitor->apply(this, context);															\
+		visitor->apply(this);																	\
 	}																							\
 
-#define REGISTER_VISITOR_CALLBACK(__visitor__, __nodetype__, __method__)						\
+#define REGISTER_VISITOR(__visitor__, __nodetype__, __method__)									\
 {																								\
 	static bool once = []() {																	\
-		__visitor__.register_callback<__nodetype__>([](__nodetype__* self, Context* context) {	\
-			self->__method__(context);															\
+		__visitor__.register_callback<__nodetype__>([](__nodetype__* self)	 {					\
+			self->__method__(&__visitor__);														\
 		});																						\
-	return true;																				\
+		return true;																			\
 	}();																						\
 }																								\
 

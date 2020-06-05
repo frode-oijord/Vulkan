@@ -1,45 +1,4 @@
 (begin
-   (define texture2d (filename)
-      (group
-         (sampler 
-            VK_FILTER_LINEAR
-            VK_FILTER_LINEAR
-            VK_SAMPLER_MIPMAP_MODE_NEAREST
-            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-            (float 0)
-            (uint32 0)
-            (float 1)
-            (uint32 0)
-            VK_COMPARE_OP_NEVER
-            (float 0)
-            (float 10)
-            VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
-            (uint32 0))
-
-         (textureimage filename)
-         (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
-
-         (image 
-            VK_SAMPLE_COUNT_1_BIT
-            VK_IMAGE_TILING_OPTIMAL
-            (imageusageflags VK_IMAGE_USAGE_TRANSFER_DST_BIT VK_IMAGE_USAGE_SAMPLED_BIT)
-            VK_SHARING_MODE_EXCLUSIVE
-            (imagecreateflags)
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-
-         (imageview 
-            VK_COMPONENT_SWIZZLE_R
-            VK_COMPONENT_SWIZZLE_G
-            VK_COMPONENT_SWIZZLE_B
-            VK_COMPONENT_SWIZZLE_A)
-
-         (descriptorsetlayoutbinding 
-            (uint32 1) 
-            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER 
-            VK_SHADER_STAGE_FRAGMENT_BIT)))
-
    (define indexed-shape (indices vertices)
       (group
          vertices
@@ -135,7 +94,6 @@
 
       (projmatrix 1000 0.1 1.0 0.7)
 
-      (texture2d "crate/texture.ktx")
       (shader VK_SHADER_STAGE_VERTEX_BIT [[
          #version 450
 
@@ -158,22 +116,21 @@
             gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
          }
       ]])
+
       (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
          #version 450
 
-         layout(binding = 1) uniform sampler2D Texture;
          layout(location = 0) in vec2 texCoord;
          layout(location = 0) out vec4 FragColor;
 
          void main() {
-            FragColor = texture(Texture, texCoord);
+            FragColor = vec4(texCoord, 0, 1);
          }
       ]])
+
       (indexed-shape 
-         (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float -1 -1 0  1 -1 0  1 1 0  -1 1 0))
-      
-      (acceleration-structure)))
+         (bufferdata-uint32 0 1 2)
+         (bufferdata-float -1 -1 0  1 -1 0  1 1 0))))
 
    (define vulkan-window (window main-renderpass main-color-attachment))
       vulkan-window)
