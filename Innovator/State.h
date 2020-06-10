@@ -34,8 +34,8 @@ struct State {
 	};
 
 	VkImage image{ nullptr };
-	VkImage swapchain_src{ nullptr };
-	VkFormat swapchain_fmt{ VK_FORMAT_UNDEFINED };
+	VkImage swapchain_source{ nullptr };
+	VkFormat swapchain_format{ VK_FORMAT_UNDEFINED };
 	VkImageView imageView{ nullptr };
 	VkImageLayout imageLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 	VkSampler sampler{ nullptr };

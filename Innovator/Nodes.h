@@ -1592,14 +1592,14 @@ public:
 		context->state.framebuffer_attachments.push_back(this->imageview->view);
 
 		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-			context->state.swapchain_fmt = this->format;
+			context->state.swapchain_format = this->format;
 		}
 	}
 
 	void record(Visitor* context)
 	{
 		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-			context->state.swapchain_src = this->image->image->image;
+			context->state.swapchain_source = this->image->image->image;
 		}
 	}
 
@@ -2035,7 +2035,7 @@ public:
 	void resize(CommandVisitor* context)
 	{
 		VkSurfaceFormatKHR surface_format = 
-			this->surface->getSupportedSurfaceFormat(context->device, context->state.swapchain_fmt);
+			this->surface->getSupportedSurfaceFormat(context->device, context->state.swapchain_format);
 
 		VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : nullptr;
 
@@ -2118,7 +2118,7 @@ public:
 
 			VulkanCommandBuffers::Scope command_scope(this->swap_buffers_command.get(), i);
 
-			VkImage srcImage = context->state.swapchain_src;
+			VkImage srcImage = context->state.swapchain_source;
 			VkImage dstImage = this->swapchain_images[i];
 
 			this->swap_buffers_command->pipelineBarrier(

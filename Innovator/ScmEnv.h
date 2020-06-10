@@ -75,17 +75,6 @@ std::string toString(const List& list)
 	return obj->toString();
 }
 
-
-VkFormat format(const List& list)
-{
-	auto node = std::any_cast<std::shared_ptr<Node>>(list[0]);
-	auto attachment = std::dynamic_pointer_cast<FramebufferAttachment>(node);
-	if (!attachment) {
-		throw std::invalid_argument("format only works on FramebufferAttachment nodes!");
-	}
-	return static_cast<VkFormat>(attachment->format);
-}
-
 template <typename Flags, typename FlagBits>
 Flags flags(const List& lst) {
 	if (lst.empty()) {
@@ -98,7 +87,6 @@ Flags flags(const List& lst) {
 	}
 	return flags;
 }
-
 
 std::shared_ptr<VulkanWindow> window(const List& lst)
 {
@@ -125,7 +113,6 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "dvec3", fun_ptr(make_object<glm::dvec3, Number, Number, Number>) });
 	innovator_env->inner.insert({ "count", fun_ptr(count) });
 	innovator_env->inner.insert({ "print", fun_ptr(toString) });
-	innovator_env->inner.insert({ "format", fun_ptr(format) });
 	innovator_env->inner.insert({ "window", fun_ptr(window) });
 	innovator_env->inner.insert({ "extent", fun_ptr(node<Extent, uint32_t, uint32_t>) });
 	innovator_env->inner.insert({ "offscreen-image", fun_ptr(offscreen) });

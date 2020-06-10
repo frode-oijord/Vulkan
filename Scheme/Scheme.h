@@ -265,7 +265,8 @@ namespace scm {
 				auto begin = std::any_cast<Begin>(exp);
 				std::transform(next(begin.exps->begin()), begin.exps->end(), begin.exps->begin(),
 					std::bind(eval, std::placeholders::_1, env));
-				exp = begin.exps->back();
+				begin.exps->pop_back();
+				return begin.exps->back();
 			}
 			else {
 				auto list = std::any_cast<lst_ptr>(exp);
@@ -297,7 +298,7 @@ namespace scm {
 		template <typename T>
 		std::any operator()(std::vector<T> const& v) const
 		{
-			scm::List list(v.size());
+			List list(v.size());
 			std::transform(v.begin(), v.end(), list.begin(), expand);
 
 			if (list[0].type() == typeid(Symbol)) {
