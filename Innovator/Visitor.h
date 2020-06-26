@@ -35,33 +35,59 @@ public:
 	void init(
 		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
-		VkExtent2D extent)
+		std::shared_ptr<VkExtent2D> extent)
 	{
 		this->vulkan = std::move(vulkan);
 		this->device = std::move(device);
-		this->extent = extent;
-	}
-
-	void resize(VkExtent2D extent)
-	{
-		this->extent = extent;
+		this->extent = std::move(extent);
 	}
 
 	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
 	std::shared_ptr<VulkanDevice> device{ nullptr };
 
 	State state;
-	VkExtent2D extent{ 0, 0 };
+	std::shared_ptr<VkExtent2D> extent;
 };
 
 
 class EventVisitor : public Visitor {
 public:
 	EventVisitor();
+
+	void visit(class Node* node);
+
+private:
 	void visit(class ViewMatrix* node);
 	void visit(class ModelMatrix* node);
 	void visit(class TextureMatrix* node);
 
+public:
+	void mousePressed(Node* root, int x, int y, int button)
+	{
+		this->press = true;
+		this->button = button;
+		this->currpos = glm::dvec2(x, y);
+		this->visit(root);
+		this->prevpos = this->currpos;
+	}
+
+	void mouseReleased(Node* root)
+	{
+		this->press = false;
+		this->visit(root);
+		this->prevpos = this->currpos;
+	}
+
+	void mouseMoved(Node* root, int x, int y)
+	{
+		this->move = true;
+		this->currpos = glm::dvec2(x, y);
+		this->visit(root);
+		this->prevpos = this->currpos;
+		this->move = false;
+	}
+
+private:
 	bool press;
 	bool move;
 	int button;
@@ -97,7 +123,7 @@ public:
 	void init(
 		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
-		VkExtent2D extent)
+		std::shared_ptr<VkExtent2D> extent)
 	{
 		Visitor::init(vulkan, device, extent);
 		this->fence = std::make_unique<VulkanFence>(this->device);
@@ -117,7 +143,7 @@ public:
 	void init(
 		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
-		VkExtent2D extent)
+		std::shared_ptr<VkExtent2D> extent)
 	{
 		Visitor::init(vulkan, device, extent);
 		this->pipelinecache = std::make_shared<VulkanPipelineCache>(this->device);
@@ -140,3 +166,17 @@ inline static RenderVisitor rendervisitor;
 inline static PipelineVisitor pipelinevisitor;
 inline static Visitor recordvisitor;
 inline static Visitor presentvisitor;
+
+static void InitVisitors(
+	std::shared_ptr<VulkanInstance> vulkan,
+	std::shared_ptr<VulkanDevice> device,
+	std::shared_ptr<VkExtent2D> extent)
+{
+	allocvisitor.init(vulkan, device, extent);
+	resizevisitor.init(vulkan, device, extent);
+	rendervisitor.init(vulkan, device, extent);
+	pipelinevisitor.init(vulkan, device, extent);
+	recordvisitor.init(vulkan, device, extent);
+	presentvisitor.init(vulkan, device, extent);
+	eventvisitor.init(vulkan, device, extent);
+}

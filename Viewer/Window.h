@@ -186,14 +186,9 @@ public:
 			VK_PRESENT_MODE_FIFO_KHR);
 
 		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(device);
-		VkExtent2D extent = surface_capabilities.currentExtent;
+		this->extent = std::make_shared<VkExtent2D>(surface_capabilities.currentExtent);
 
-		allocvisitor.init(vulkan, device, extent);
-		resizevisitor.init(vulkan, device, extent);
-		rendervisitor.init(vulkan, device, extent);
-		pipelinevisitor.init(vulkan, device, extent);
-		recordvisitor.init(vulkan, device, extent);
-		presentvisitor.init(vulkan, device, extent);
+		InitVisitors(vulkan, device, this->extent);
 
 		this->root = std::make_shared<Separator>();
 		this->root->children = {
@@ -221,50 +216,32 @@ public:
 
 	void resize(int width, int height) override
 	{
-		VkExtent2D extent{
-		  static_cast<uint32_t>(width),
-		  static_cast<uint32_t>(height)
+		*this->extent = VkExtent2D{
+			static_cast<uint32_t>(width),
+			static_cast<uint32_t>(height)
 		};
-
-		allocvisitor.resize(extent);
-		resizevisitor.resize(extent);
-		rendervisitor.resize(extent);
-		pipelinevisitor.resize(extent);
-		recordvisitor.resize(extent);
-		presentvisitor.resize(extent);
-		eventvisitor.resize(extent);
 
 		resizevisitor.visit(this->root.get());
 		recordvisitor.visit(this->root.get());
 		this->redraw();
 	}
 
-	void mousePressed(int x, int y, int button)
+	void mousePressed(int x, int y, int button) override
 	{
-		eventvisitor.press = true;
-		eventvisitor.button = button;
-		eventvisitor.currpos = glm::dvec2(x, y);
-		this->root->visit(&eventvisitor);
-		eventvisitor.prevpos = eventvisitor.currpos;
+		eventvisitor.mousePressed(this->root.get(), x, y, button);
 	}
 
 	void mouseReleased() override
 	{
-		eventvisitor.press = false;
-		this->root->visit(&eventvisitor);
-		eventvisitor.prevpos = eventvisitor.currpos;
+		eventvisitor.mouseReleased(this->root.get());
 	}
 
 	void mouseMoved(int x, int y)
 	{
-		eventvisitor.move = true;
-		eventvisitor.currpos = glm::dvec2(x, y);
-		this->root->visit(&eventvisitor);
-		eventvisitor.prevpos = eventvisitor.currpos;
-		eventvisitor.move = false;
-
+		eventvisitor.mouseMoved(this->root.get(), x, y);
 		this->redraw();
 	}
 
 	std::shared_ptr<Group> root;
+	std::shared_ptr<VkExtent2D> extent;
 };

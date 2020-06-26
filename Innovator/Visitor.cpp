@@ -7,7 +7,7 @@ void
 Visitor::visit(Node* node)
 {
 	this->state = State();
-	this->state.extent = this->extent;
+	this->state.extent = *this->extent;
 
 	node->visit(this);
 }
@@ -21,7 +21,7 @@ CommandVisitor::visit(Node* node)
 	this->command->begin();
 	this->wait_semaphores.clear();
 	this->state = State();
-	this->state.extent = this->extent;
+	this->state.extent = *this->extent;
 
 	node->visit(this);
 
@@ -52,10 +52,17 @@ EventVisitor::EventVisitor()
 
 
 void
+EventVisitor::visit(Node* node)
+{
+	this->state = State();
+	this->state.extent = *this->extent;
+	node->visit(this);
+}
+
+
+void
 EventVisitor::visit(ViewMatrix* node)
 {
-	this->state.extent = this->extent;
-
 	if (this->move && this->press) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		dx[0] /= this->state.extent.width;
