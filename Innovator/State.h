@@ -86,6 +86,8 @@ public:
 
 	~StateScope()
 	{
+		this->statecpy.swapchain_source = stateptr->swapchain_source;
+		this->statecpy.swapchain_format = stateptr->swapchain_format;
 		*stateptr = this->statecpy;
 	}
 

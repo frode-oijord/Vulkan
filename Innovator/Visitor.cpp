@@ -142,7 +142,8 @@ DeviceVisitor::visit(class Node* node)
 	device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR;
 	device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
 	device_features2.pNext = &device_address_features;
-	device_features2.features = device_features;
 
 	node->visit(this);
+
+	device_features2.features = device_features;
 }

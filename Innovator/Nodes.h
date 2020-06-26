@@ -2420,6 +2420,7 @@ public:
 		REGISTER_VISITOR(allocvisitor, SparseImage, alloc);
 		REGISTER_VISITOR(pipelinevisitor, SparseImage, pipeline);
 		REGISTER_VISITOR(rendervisitor, SparseImage, render);
+		REGISTER_VISITOR(devicevisitor, SparseImage, device);
 	}
 
 	void device(DeviceVisitor* context)

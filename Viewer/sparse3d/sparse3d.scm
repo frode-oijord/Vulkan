@@ -79,21 +79,11 @@
          (bufferdata-uint32 0 1 2 2 3 0)
          (bufferdata-float 0 0 z  1 0 z  1 1 z  0 1 z)))
 
-
-   (define main-color-attachment 
-      (framebuffer-attachment 
-         VK_FORMAT_B8G8R8A8_UNORM
-         (imageusageflags 
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
-            VK_IMAGE_USAGE_SAMPLED_BIT)
-         (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
-
-   (define framebuffer-object (attachment scene)
+   (define main-renderpass
       (renderpass
          (renderpass-description
             (renderpass-attachment
-               (format attachment)
+               VK_FORMAT_B8G8R8A8_UNORM
                VK_SAMPLE_COUNT_1_BIT
                VK_ATTACHMENT_LOAD_OP_CLEAR
                VK_ATTACHMENT_STORE_OP_STORE
@@ -118,77 +108,114 @@
                (depth-attachment (uint32 1) VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)))
 
          (framebuffer
-            attachment
+            (framebuffer-attachment 
+               VK_FORMAT_B8G8R8A8_UNORM
+               (imageusageflags 
+                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
+                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
+                  VK_IMAGE_USAGE_SAMPLED_BIT)
+               (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT))
             (framebuffer-attachment
                VK_FORMAT_D32_SFLOAT
                (imageusageflags VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                (imageaspectflags VK_IMAGE_ASPECT_DEPTH_BIT)))
                
-         scene))
+         (group
+            (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
+               #version 450
 
-   (define lod-renderpass (framebuffer-object
-      (define lod-color-attachment 
-         (framebuffer-attachment 
-            VK_FORMAT_R8G8B8A8_UINT
-            (imageusageflags 
-               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
-               VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
-               VK_IMAGE_USAGE_SAMPLED_BIT)
-            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
+               layout(binding = 1) uniform sampler3D Texture;
+               layout(location = 0) in vec3 texCoord;
+               layout(location = 0) out vec4 FragColor;
+
+               void main() {
+                  float r = texture(Texture, texCoord).r;
+                  FragColor = vec4(r, r, r, 1.0);
+               }
+            ]])
+
+            (sparse-texture "")
+            (slice 0.0))))
+
+   (define lod-renderpass
       (group
-         (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
-            #version 450
+         (extent (uint32 240) (uint32 135))
+         (renderpass
+            (renderpass-description
+               (renderpass-attachment
+                  VK_FORMAT_R8G8B8A8_UINT
+                  VK_SAMPLE_COUNT_1_BIT
+                  VK_ATTACHMENT_LOAD_OP_CLEAR
+                  VK_ATTACHMENT_STORE_OP_STORE
+                  VK_ATTACHMENT_LOAD_OP_DONT_CARE
+                  VK_ATTACHMENT_STORE_OP_DONT_CARE
+                  VK_IMAGE_LAYOUT_UNDEFINED
+                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 
-            layout(location = 0) in vec3 texCoord;
-            layout(location = 0) out uvec4 FragColor;
+               (renderpass-attachment
+                  VK_FORMAT_D32_SFLOAT
+                  VK_SAMPLE_COUNT_1_BIT
+                  VK_ATTACHMENT_LOAD_OP_CLEAR
+                  VK_ATTACHMENT_STORE_OP_STORE
+                  VK_ATTACHMENT_LOAD_OP_DONT_CARE
+                  VK_ATTACHMENT_STORE_OP_DONT_CARE
+                  VK_IMAGE_LAYOUT_UNDEFINED
+                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
 
-            const vec3 textureSize = vec3(4096.0);
-            const vec3 tileSize = vec3(64.0, 32.0, 32.0);
+               (subpass 
+                  (pipeline-bindpoint VK_PIPELINE_BIND_POINT_GRAPHICS)
+                  (color-attachment (uint32 0) VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+                  (depth-attachment (uint32 1) VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)))
 
-            float mipmapLevel(vec3 uv)
-            {
-               vec3 dx = dFdx(uv);
-               vec3 dy = dFdy(uv);
-               float d = max(dot(dx, dx), dot(dy, dy));
-               return 0.5 * log2(d);
-            }
+            (framebuffer
+               (define lod-color-attachment 
+                  (framebuffer-attachment 
+                     VK_FORMAT_R8G8B8A8_UINT
+                     (imageusageflags 
+                        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
+                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT 
+                        VK_IMAGE_USAGE_SAMPLED_BIT)
+                     (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
 
-            void main() 
-            {
-               float lod = mipmapLevel(texCoord * textureSize);
+               (framebuffer-attachment
+                  VK_FORMAT_D32_SFLOAT
+                  (imageusageflags VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                  (imageaspectflags VK_IMAGE_ASPECT_DEPTH_BIT)))
 
-               uint mip = uint(lod);
-               mip = uint(max(int(mip) - 3, 0));
-               uvec3 ijk = uvec3(texCoord * (textureSize / tileSize));
+               (group
+                  (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
+                     #version 450
 
-               FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip);
-            }
-         ]])
+                     layout(location = 0) in vec3 texCoord;
+                     layout(location = 0) out uvec4 FragColor;
 
-         (slice 0.0)
-         (offscreen-image lod-color-attachment))))
+                     const vec3 textureSize = vec3(4096.0);
+                     const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
+                     float mipmapLevel(vec3 uv)
+                     {
+                        vec3 dx = dFdx(uv);
+                        vec3 dy = dFdy(uv);
+                        float d = max(dot(dx, dx), dot(dy, dy));
+                        return 0.5 * log2(d);
+                     }
 
-   (define main-renderpass (framebuffer-object
-      main-color-attachment
-      (group
-         (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
-            #version 450
+                     void main() 
+                     {
+                        float lod = mipmapLevel(texCoord * textureSize);
 
-            layout(binding = 1) uniform sampler3D Texture;
-            layout(location = 0) in vec3 texCoord;
-            layout(location = 0) out vec4 FragColor;
+                        uint mip = uint(lod);
+                        mip = uint(max(int(mip) - 3, 0));
+                        uvec3 ijk = uvec3(texCoord * (textureSize / tileSize));
 
-            void main() {
-               float r = texture(Texture, texCoord).r;
-               FragColor = vec4(r, r, r, 1.0);
-            }
-         ]])
+                        FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip);
+                     }
+                  ]])
 
-         (sparse-texture "")
-         (slice 0.0))))
+               (slice 0.0)
+               (offscreen-image lod-color-attachment)))))
 
-   (define scene 
+   (window
       (group
          (viewmatrix 
             (dvec3 10.5 .5  2)
@@ -222,10 +249,5 @@
             }
          ]])
 
-         (separator 
-            (extent (uint32 240) (uint32 135))
-            lod-renderpass)
-         (separator main-renderpass)))
-
-   (define vulkan-window (window scene main-color-attachment))
-      vulkan-window)
+         (separator lod-renderpass)
+         (separator main-renderpass))))

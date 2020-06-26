@@ -10,8 +10,8 @@
 int main(int argc, char* argv[])
 {
 	try {
-		VulkanImageFactory::Register<GliTextureImage>();
-		//VulkanImageFactory::Register<DebugTextureImage>();
+		//VulkanImageFactory::Register<GliTextureImage>();
+		VulkanImageFactory::Register<DebugTextureImage>();
 		scm::env_ptr global_env = scm::global_env();
 		global_env->outer = innovator_env();
 
