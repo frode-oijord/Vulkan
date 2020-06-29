@@ -2,3 +2,5 @@
 Scheme/build
 Viewer/build
 Server/build
+Generator/build
+*.bin

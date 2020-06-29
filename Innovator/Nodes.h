@@ -2365,11 +2365,11 @@ public:
 			uint8_t k = data[p + 2];
 			uint8_t m = data[p + 3];
 
-			if (i != 0 || j != 0 || k != 0 || m != 0) {
-				uint32_t key = (i >> 0) << 24 | (j >> 0) << 16 | (k >> 0) << 8 | m + 0;
+			if (m > 0 && m < 6) {
+				uint32_t key = (i >> 0) << 24 | (j >> 0) << 16 | (k >> 0) << 8 | m - 1;
 				if (tiles.find(key) == tiles.end()) {
 					tiles.insert(key);
-					tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m + 1);
+					tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m);
 				}
 			}
 		}
@@ -2409,12 +2409,12 @@ public:
 		VkSharingMode sharing_mode,
 		VkImageCreateFlags create_flags,
 		VkImageLayout layout) :
-		sample_count(sample_count),
-		tiling(tiling),
-		usage_flags(usage_flags),
-		sharing_mode(sharing_mode),
-		create_flags(create_flags),
-		layout(layout)
+			sample_count(sample_count),
+			tiling(tiling),
+			usage_flags(usage_flags),
+			sharing_mode(sharing_mode),
+			create_flags(create_flags),
+			layout(layout)
 	{
 		REGISTER_VISITOR(devicevisitor, SparseImage, device);
 		REGISTER_VISITOR(allocvisitor, SparseImage, alloc);
@@ -2572,16 +2572,16 @@ public:
 					subresource_range.layerCount,								// layerCount
 				};
 
+				VkExtent3D extent = texture->extent(mipLevel);
+
 				regions.push_back({
 					memoryOffset,												// bufferOffset 
-					0,															// bufferRowLength
-					0,															// bufferImageHeight
+					extent.width,												// bufferRowLength
+					extent.height,												// bufferImageHeight
 					imageSubresource,											// imageSubresource
 					imageOffset,												// imageOffset
 					imageExtent,												// imageExtent
 				});
-
-				VkExtent3D extent = texture->extent(mipLevel);
 
 				VkDeviceSize mipOffset = 0;
 				for (uint32_t m = 0; m < mipLevel; m++) {

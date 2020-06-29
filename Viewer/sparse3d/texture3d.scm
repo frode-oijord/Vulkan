@@ -19,13 +19,14 @@
             (uint32 0))
 
          (textureimage filename)
+         (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
 
-         (sparse-image 
+         (image 
             VK_SAMPLE_COUNT_1_BIT
             VK_IMAGE_TILING_OPTIMAL
             (imageusageflags VK_IMAGE_USAGE_TRANSFER_DST_BIT VK_IMAGE_USAGE_SAMPLED_BIT)
             VK_SHARING_MODE_EXCLUSIVE
-            (imagecreateflags VK_IMAGE_CREATE_SPARSE_BINDING_BIT VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT)
+            (imagecreateflags)
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 
          (imageview 
@@ -134,8 +135,8 @@
                }
             ]])
 
-            (sparse-texture "sparse3d/noise2048.bin")
-            (slice 0))))
+            (sparse-texture "")
+            (slice 0.0))))
 
    (define lod-renderpass
       (group
@@ -189,7 +190,7 @@
                      layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out uvec4 FragColor;
 
-                     const vec3 textureSize = vec3(2048.0);
+                     const vec3 textureSize = vec3(256.0);
                      const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
                      float mipmapLevel(vec3 uv)
@@ -208,11 +209,11 @@
                         mip = uint(max(int(mip) - 3, 0));
                         uvec3 ijk = uvec3(texCoord * (textureSize / tileSize));
 
-                        FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip + 1);
+                        FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip);
                      }
                   ]])
 
-               (slice 0)
+               (slice 0.0)
                (offscreen-image lod-color-attachment)))))
 
    (window
@@ -249,5 +250,4 @@
             }
          ]])
 
-         (separator lod-renderpass)
          (separator main-renderpass))))

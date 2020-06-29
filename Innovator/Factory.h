@@ -140,39 +140,15 @@ public:
 	gli::texture2d texture;
 };
 
-#include <cmath>
-#include <fstream>
-#include <filesystem>
 
 class DebugTextureImage : public VulkanTextureImage {
 public:
 	NO_COPY_OR_ASSIGNMENT(DebugTextureImage)
 
-		explicit DebugTextureImage(const std::string&)
+	explicit DebugTextureImage(const std::string& filename)
 	{
-		this->lod0_size = 4096;
-		this->num_lods = log2(lod0_size) + 1;
-
-		std::string filename = "sparse3d/checkerboard" + std::to_string(lod0_size) + ".bin";
-
-		if (!std::filesystem::exists(filename)) {
-			std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
-			for (size_t lod = 0; lod < num_lods; lod++) {
-				size_t lod_size = lod0_size >> lod;
-				glm::u8vec1* data = new glm::u8vec1[lod_size * lod_size * lod_size];
-				for (size_t i = 0; i < lod_size; i++) {
-					std::cout << "i = " << i << std::endl;
-					for (size_t j = 0; j < lod_size; j++) {
-						for (size_t k = 0; k < lod_size; k++) {
-							int value = (((i & 64) == 0) ^ ((j & 32) == 0) ^ ((k & 32) == 0)) * 254 + 1;
-							data[((i * lod_size) + j) * lod_size + k] = glm::u8vec1(value);
-						}
-					}
-				}
-				out.write(reinterpret_cast<char*>(data), lod_size* lod_size* lod_size);
-			}
-		}
-
+		this->lod0_size = 2048;
+		this->num_lods = log2(this->lod0_size) + 1;
 		this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
 	}
 
