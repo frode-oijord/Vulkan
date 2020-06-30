@@ -2349,7 +2349,6 @@ public:
 
 	std::set<uint32_t> getTiles(CommandVisitor* context)
 	{
-		//Timer timer("offscreen render");
 		this->fence->reset();
 		this->get_image_command->submit(
 			context->queue,
@@ -2374,7 +2373,6 @@ public:
 				if (tiles.find(key) == tiles.end()) {
 					tiles.insert(key);
 					tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m + 0);
-					tiles.insert((i >> 2) << 24 | (j >> 2) << 16 | (k >> 2) << 8 | m + 1);
 				}
 			}
 		}
@@ -2400,6 +2398,314 @@ private:
 
 	VkDeviceSize dataOffset;
 };
+
+
+class MemoryPage {
+public:
+	MemoryPage(
+		VulkanTextureImage* texture,
+		VkExtent3D imageExtent,
+		VkDeviceSize memoryOffset) :
+		texture(texture),
+		imageExtent(imageExtent),
+		memoryOffset(memoryOffset),
+		key(0)
+	{
+		this->image_memory_bind.memory = nullptr;
+	}
+
+	void bind(uint32_t key, VkDeviceMemory memory)
+	{
+		this->key = key;
+
+		uint32_t i = key >> 24 & 0xFF;
+		uint32_t j = key >> 16 & 0xFF;
+		uint32_t k = key >> 8 & 0xFF;
+		uint32_t mipLevel = key & 0xFF;
+
+		VkOffset3D imageOffset = {
+		  int32_t(i * this->imageExtent.width),
+		  int32_t(j * this->imageExtent.height),
+		  int32_t(k * this->imageExtent.depth)
+		};
+
+		const VkImageSubresource subresource{
+		  this->texture->subresource_range().aspectMask,
+		  mipLevel,
+		  0
+		};
+
+		this->image_memory_bind = {
+		  subresource,                                // subresource
+		  imageOffset,                                // offset
+		  this->imageExtent,                          // extent
+		  memory,                                     // memory
+		  memoryOffset,                               // memoryOffset
+		  0                                           // flags
+		};
+
+		if (mipLevel >= texture->levels()) {
+			throw std::runtime_error("invalid mip level");
+		}
+
+		VkDeviceSize x = imageOffset.x;
+		VkDeviceSize y = imageOffset.y;
+		VkDeviceSize z = imageOffset.z;
+
+		VkDeviceSize mipOffset = 0;
+		for (uint32_t m = 0; m < mipLevel; m++) {
+			mipOffset += texture->size(m);
+		}
+
+		VkExtent3D extent = texture->extent(mipLevel);
+		VkDeviceSize width = extent.width;
+		VkDeviceSize height = extent.height;
+		VkDeviceSize elementSize = texture->element_size();
+		VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
+
+		const VkImageSubresourceLayers imageSubresource{
+		  texture->subresource_range().aspectMask,               // aspectMask
+		  mipLevel,                                              // mipLevel
+		  texture->subresource_range().baseArrayLayer,           // baseArrayLayer
+		  texture->subresource_range().layerCount,               // layerCount
+		};
+
+		this->buffer_image_copy = {
+		  bufferOffset,                               // bufferOffset 
+		  extent.width,                               // bufferRowLength
+		  extent.height,                              // bufferImageHeight
+		  imageSubresource,                           // imageSubresource
+		  imageOffset,                                // imageOffset
+		  imageExtent,                                // imageExtent
+		};
+	}
+
+	uint32_t key;
+	VkExtent3D imageExtent;
+	VulkanTextureImage* texture;
+	VkDeviceSize memoryOffset;
+	VkSparseImageMemoryBind image_memory_bind;
+	VkBufferImageCopy buffer_image_copy;
+};
+
+class MemoryPageManager {
+public:
+	MemoryPageManager(CommandVisitor* context, std::shared_ptr<VulkanImage> image) :
+		image(std::move(image))
+	{
+		this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
+		this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
+		this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->device);
+
+		VkMemoryRequirements memory_requirements;
+		vkGetImageMemoryRequirements(
+			context->device->device,
+			this->image->image,
+			&memory_requirements);
+
+		uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+			memory_requirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		uint32_t sparse_memory_requirements_count;
+		vkGetImageSparseMemoryRequirements(
+			context->device->device,
+			this->image->image,
+			&sparse_memory_requirements_count,
+			nullptr);
+
+		std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
+		vkGetImageSparseMemoryRequirements(
+			context->device->device,
+			this->image->image,
+			&sparse_memory_requirements_count,
+			sparse_memory_requirements.data());
+
+		VkSparseImageMemoryRequirements sparse_memory_requirement;
+		sparse_memory_requirement = [&]() {
+			for (auto requirements : sparse_memory_requirements) {
+				if (requirements.formatProperties.aspectMask & context->state.texture->subresource_range().aspectMask) {
+					return requirements;
+				}
+			}
+			throw std::runtime_error("Could not find sparse image memory requirements for color aspect bit");
+		}();
+
+		uint32_t numTiles = 1000;
+
+		this->image_memory = std::make_shared<VulkanMemory>(
+			context->device,
+			numTiles * memory_requirements.alignment,
+			memory_type_index);
+
+		VkDeviceSize memoryOffset = 0;
+		VkExtent3D imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
+
+		for (uint32_t i = 0; i < numTiles; i++) {
+			MemoryPage page(
+				context->state.texture,
+				imageExtent,
+				memoryOffset);
+
+			this->image_memory_pages.push_back(page);
+			memoryOffset += memory_requirements.alignment;
+		}
+	}
+
+	void updateBindings(RenderVisitor* context)
+	{
+		std::set<uint32_t> tiles = context->image->getTiles(context);
+		std::set<uint32_t> memory_pages_bind;
+
+		std::set_difference(
+			tiles.begin(), tiles.end(),
+			this->bound_memory_pages.begin(), this->bound_memory_pages.end(),
+			std::inserter(memory_pages_bind, memory_pages_bind.begin()));
+
+		std::set<uint32_t> memory_pages_free;
+
+		std::set_difference(
+			this->bound_memory_pages.begin(), this->bound_memory_pages.end(),
+			tiles.begin(), tiles.end(),
+			std::inserter(memory_pages_free, memory_pages_free.begin()));
+
+		this->bound_memory_pages = tiles;
+
+		std::vector<VkBufferImageCopy> regions;
+		std::vector<VkSparseImageMemoryBind> image_memory_binds;
+
+		for (auto& key : memory_pages_bind) {
+			// find free page
+			size_t i = [this]() {
+				for (size_t i = 0; i < this->image_memory_pages.size(); i++) {
+					if (this->image_memory_pages[i].image_memory_bind.memory == nullptr) {
+						return i;
+					}
+				}
+				throw std::runtime_error("no free pages");
+			}();
+
+			this->image_memory_pages[i].bind(key, this->image_memory->memory);
+
+			image_memory_binds.push_back(this->image_memory_pages[i].image_memory_bind);
+			regions.push_back(this->image_memory_pages[i].buffer_image_copy);
+		}
+
+		for (auto& key : memory_pages_free) {
+			// find page with key
+			size_t i = [this](uint32_t key) {
+				for (size_t i = 0; i < this->image_memory_pages.size(); i++) {
+					if (this->image_memory_pages[i].key == key) {
+						return i;
+					}
+				}
+				throw std::runtime_error("no page with given key");
+			}(key);
+
+			this->image_memory_pages[i].image_memory_bind.memory = nullptr;
+			image_memory_binds.push_back(this->image_memory_pages[i].image_memory_bind);
+		}
+
+		if (image_memory_binds.empty()) {
+			return;
+		}
+
+		std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info
+		{ {
+		  this->image->image,
+		  static_cast<uint32_t>(image_memory_binds.size()),
+		  image_memory_binds.data(),
+		} };
+
+		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
+
+		std::vector<VkSemaphore> wait_semaphores;
+		std::vector<VkSemaphore> signal_semaphores{ this->bind_sparse_finished->semaphore };
+		std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
+
+		VkBindSparseInfo bind_sparse_info = {
+		  VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,                           // sType
+		  nullptr,                                                      // pNext
+		  static_cast<uint32_t>(wait_semaphores.size()),                // waitSemaphoreCount
+		  wait_semaphores.data(),                                       // pWaitSemaphores
+		  static_cast<uint32_t>(buffer_memory_bind_infos.size()),       // bufferBindCount
+		  buffer_memory_bind_infos.data(),                              // pBufferBinds;
+		  static_cast<uint32_t>(image_opaque_memory_bind_infos.size()), // imageOpaqueBindCount
+		  image_opaque_memory_bind_infos.data(),                        // pImageOpaqueBinds
+		  static_cast<uint32_t>(image_memory_bind_info.size()),         // imageBindCount
+		  image_memory_bind_info.data(),                                // pImageBinds
+		  static_cast<uint32_t>(signal_semaphores.size()),              // signalSemaphoreCount
+		  signal_semaphores.data(),                                     // pSignalSemaphores
+		};
+
+		vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
+
+		if (regions.empty()) {
+			context->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
+		}
+		else {
+			this->copy_sparse_command->begin();
+
+			this->copy_sparse_command->pipelineBarrier(
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				{
+				  VulkanImage::MemoryBarrier(
+					this->image->image,
+					0,
+					0,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					context->state.texture->subresource_range())
+				});
+
+			vkCmdCopyBufferToImage(
+				this->copy_sparse_command->buffer(),
+				context->state.buffer,
+				this->image->image,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				static_cast<uint32_t>(regions.size()),
+				regions.data());
+
+			this->copy_sparse_command->pipelineBarrier(
+				VK_PIPELINE_STAGE_TRANSFER_BIT,                     // wait for transfer operation (copy)
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,              // block fragment shader where texture is sampled
+				{
+				  VulkanImage::MemoryBarrier(
+					this->image->image,
+					0,
+					0,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					context->state.texture->subresource_range())
+				});
+
+			this->copy_sparse_command->end();
+
+			std::vector<VkSemaphore> wait_semaphores{ this->bind_sparse_finished->semaphore };
+			std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
+
+			this->copy_sparse_command->submit(
+				context->queue,
+				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+				VK_NULL_HANDLE,
+				wait_semaphores,
+				signal_semaphores);
+
+			context->wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
+		}
+	}
+
+	std::shared_ptr<VulkanImage> image;
+	std::shared_ptr<VulkanMemory> image_memory;
+	std::vector<MemoryPage> image_memory_pages;
+	std::set<uint32_t> bound_memory_pages;
+
+	std::unique_ptr<VulkanSemaphore> bind_sparse_finished;
+	std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
+	std::unique_ptr<VulkanCommandBuffers> copy_sparse_command;
+};
+
 
 
 class SparseImage : public Node {
@@ -2438,10 +2744,6 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
-		this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
-		this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
-		this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->device);
-
 		VulkanTextureImage* texture = context->state.texture;
 
 		this->image = std::make_shared<VulkanImage>(
@@ -2467,38 +2769,7 @@ public:
 			  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			  context->state.texture->subresource_range()) });
 
-		VkSparseImageMemoryRequirements sparse_memory_requirement =
-			image->getSparseMemoryRequirements(texture->subresource_range().aspectMask);
-
-		VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
-
-		this->numPages = 10000;
-		this->pageSize = memory_requirements.alignment;
-		this->imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
-
-		uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
-			memory_requirements.memoryTypeBits,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		this->image_memory = std::make_shared<VulkanMemory>(
-			context->device,
-			numPages * pageSize,
-			memory_type_index);
-
-		this->image_buffer = std::make_shared<VulkanBufferObject>(
-			context->device,
-			0,
-			this->numPages * this->pageSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_SHARING_MODE_EXCLUSIVE,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-		this->buffer_memory_map = std::make_shared<MemoryMap>(this->image_buffer->memory.get());
-
-		for (uint32_t i = 0; i < this->numPages; i++) {
-			this->free_memory_offsets.push(i * this->pageSize);
-		}
-
+		this->memory_manager = std::make_unique<MemoryPageManager>(context, this->image);
 		context->state.image = this->image->image;
 	}
 
@@ -2509,199 +2780,7 @@ public:
 
 	void render(RenderVisitor* context)
 	{
-		VulkanTextureImage* texture = context->state.texture;
-
-		std::vector<VkSparseImageMemoryBind> image_memory_binds;
-		std::set<uint32_t> tiles = context->image->getTiles(context);
-
-		// try to free some pages
-		std::vector<uint32_t> erase_these_keys;
-		for (auto& [key, image_memory_bind] : this->bound_memory_pages) {
-			if (tiles.find(key) == tiles.end()) { // we can free this page
-				image_memory_bind.memory = nullptr;
-				image_memory_binds.push_back(image_memory_bind);
-				this->free_memory_offsets.push(image_memory_bind.memoryOffset);
-				erase_these_keys.push_back(key);
-			}
-		}
-
-		for (auto key : erase_these_keys) {
-			this->bound_memory_pages.erase(key);
-		}
-
-		std::vector<VkBufferImageCopy> regions;
-		for (uint32_t key : tiles) {
-			if (this->bound_memory_pages.find(key) == this->bound_memory_pages.end()) {
-				if (this->free_memory_offsets.empty()) {
-					throw std::runtime_error("no free memory pages");
-				}
-
-				uint32_t i = key >> 24 & 0xFF;
-				uint32_t j = key >> 16 & 0xFF;
-				uint32_t k = key >> 8 & 0xFF;
-				uint32_t mipLevel = key & 0xFF;
-
-				if (mipLevel >= texture->levels()) {
-					throw std::runtime_error("invalid mip level");
-				}
-
-				VkExtent3D extent = texture->extent(mipLevel);
-
-				// don't have a mip tail, ignore mip levels smaller than a brick
-				if (extent.width < this->imageExtent.width ||
-					extent.depth < this->imageExtent.depth ||
-					extent.height < this->imageExtent.height) {
-					continue;
-				}
-
-				VkDeviceSize memoryOffset = this->free_memory_offsets.front();
-				this->free_memory_offsets.pop();
-
-				VkOffset3D imageOffset = {
-				  int32_t(i * this->imageExtent.width),
-				  int32_t(j * this->imageExtent.height),
-				  int32_t(k * this->imageExtent.depth)
-				};
-
-				VkImageSubresourceRange subresource_range = texture->subresource_range();
-
-				const VkImageSubresource subresource{
-				  subresource_range.aspectMask, mipLevel, 0
-				};
-
-				VkSparseImageMemoryBind image_memory_bind{
-					subresource,												// subresource
-					imageOffset,												// offset
-					this->imageExtent,											// extent
-					image_memory->memory,										// memory
-					memoryOffset,												// memoryOffset
-					0															// flags
-				};
-
-				this->bound_memory_pages.insert({ key, image_memory_bind });
-				image_memory_binds.push_back(image_memory_bind);
-
-				const VkImageSubresourceLayers imageSubresource{
-					subresource_range.aspectMask,								// aspectMask
-					mipLevel,													// mipLevel
-					subresource_range.baseArrayLayer,							// baseArrayLayer
-					subresource_range.layerCount,								// layerCount
-				};
-
-
-				regions.push_back({
-					memoryOffset,												// bufferOffset 
-					extent.width,												// bufferRowLength
-					extent.height,												// bufferImageHeight
-					imageSubresource,											// imageSubresource
-					imageOffset,												// imageOffset
-					this->imageExtent,											// imageExtent
-				});
-
-				VkDeviceSize mipOffset = 0;
-				for (uint32_t m = 0; m < mipLevel; m++) {
-					mipOffset += texture->size(m);
-				}
-
-				VkDeviceSize bufferOffset = mipOffset +
-					(((static_cast<VkDeviceSize>(imageOffset.z)* extent.height) + imageOffset.y)* extent.width + imageOffset.x)* texture->element_size();
-
-				auto first = texture->data() + bufferOffset;
-				auto last = first + pageSize;
-				auto dest = buffer_memory_map->mem + memoryOffset;
-
-				std::copy(first, last, dest);
-			}
-		}
-
-		if (image_memory_binds.empty()) {
-			return;
-		}
-
-		std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info
-		{ {
-			this->image->image,
-			static_cast<uint32_t>(image_memory_binds.size()),
-			image_memory_binds.data(),
-		} };
-
-		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
-
-		std::vector<VkSemaphore> wait_semaphores;
-		std::vector<VkSemaphore> signal_semaphores{ this->bind_sparse_finished->semaphore };
-		std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
-
-		VkBindSparseInfo bind_sparse_info = {
-			VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,										// sType
-			nullptr,																// pNext
-			static_cast<uint32_t>(wait_semaphores.size()),							// waitSemaphoreCount
-			wait_semaphores.data(),													// pWaitSemaphores
-			static_cast<uint32_t>(buffer_memory_bind_infos.size()),					// bufferBindCount
-			buffer_memory_bind_infos.data(),										// pBufferBinds
-			static_cast<uint32_t>(image_opaque_memory_bind_infos.size()),			// imageOpaqueBindCount
-			image_opaque_memory_bind_infos.data(),									// pImageOpaqueBinds
-			static_cast<uint32_t>(image_memory_bind_info.size()),					// imageBindCount
-			image_memory_bind_info.data(),											// pImageBinds
-			static_cast<uint32_t>(signal_semaphores.size()),						// signalSemaphoreCount
-			signal_semaphores.data(),												// pSignalSemaphores
-		};
-
-		vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
-
-		if (regions.empty()) {
-			context->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
-		}
-		else {
-			this->copy_sparse_command->begin();
-
-			this->copy_sparse_command->pipelineBarrier(
-				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				{
-				  VulkanImage::MemoryBarrier(
-					this->image->image,
-					0,
-					0,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					context->state.texture->subresource_range())
-				});
-
-			vkCmdCopyBufferToImage(
-				this->copy_sparse_command->buffer(),
-				this->image_buffer->buffer->buffer,
-				this->image->image,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				static_cast<uint32_t>(regions.size()),
-				regions.data());
-
-			this->copy_sparse_command->pipelineBarrier(
-				VK_PIPELINE_STAGE_TRANSFER_BIT,							// wait for transfer operation (copy)
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,					// block fragment shader where texture is sampled
-				{
-					VulkanImage::MemoryBarrier(
-						this->image->image,
-						0,
-						0,
-						VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-						context->state.texture->subresource_range())
-				});
-
-			this->copy_sparse_command->end();
-
-			std::vector<VkSemaphore> wait_semaphores{ this->bind_sparse_finished->semaphore };
-			std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
-
-			this->copy_sparse_command->submit(
-				context->queue,
-				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				VK_NULL_HANDLE,
-				wait_semaphores,
-				signal_semaphores);
-
-			context->wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
-		}
+		this->memory_manager->updateBindings(context);
 	}
 
 private:
@@ -2715,16 +2794,5 @@ private:
 	VkImageCreateFlags create_flags;
 	VkImageLayout layout;
 
-	std::shared_ptr<VulkanBufferObject> image_buffer;
-	std::shared_ptr<MemoryMap> buffer_memory_map;
-	VkDeviceSize pageSize;
-	uint32_t numPages;
-	VkExtent3D imageExtent;
-
-	std::queue<VkDeviceSize> free_memory_offsets;
-	std::map<uint32_t, VkSparseImageMemoryBind> bound_memory_pages;
-
-	std::unique_ptr<VulkanSemaphore> bind_sparse_finished;
-	std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
-	std::unique_ptr<VulkanCommandBuffers> copy_sparse_command;
+	std::unique_ptr<MemoryPageManager> memory_manager;
 };

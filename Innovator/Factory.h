@@ -56,7 +56,7 @@ class GliTextureImage : public VulkanTextureImage {
 public:
 	NO_COPY_OR_ASSIGNMENT(GliTextureImage)
 
-		explicit GliTextureImage(const std::string& filename) :
+	explicit GliTextureImage(const std::string& filename) :
 		texture(gli::load(filename))
 	{}
 
@@ -147,7 +147,7 @@ public:
 
 	explicit DebugTextureImage(const std::string& filename)
 	{
-		this->lod0_size = 256;
+		this->lod0_size = 512;
 		this->num_lods = log2(this->lod0_size) + 1;
 		this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
 	}

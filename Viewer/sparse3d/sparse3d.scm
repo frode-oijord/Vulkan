@@ -19,6 +19,7 @@
             (uint32 0))
 
          (textureimage filename)
+         (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
 
          (sparse-image 
             VK_SAMPLE_COUNT_1_BIT
@@ -77,7 +78,7 @@
    (define slice (z) 
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float 0 0 0.15  1 0 0.15  1 1 z  0 1 0.15)))
+         (bufferdata-float 0 0 z  1 0 z  1 1 z  0 1 z)))
 
    (define main-renderpass
       (renderpass
@@ -134,7 +135,7 @@
                }
             ]])
 
-            (sparse-texture "sparse3d/noise256.bin")
+            (sparse-texture "sparse3d/noise512.bin")
             (slice 0))))
 
    (define lod-renderpass
@@ -189,8 +190,8 @@
                      layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out uvec4 FragColor;
 
-                     const vec3 textureSize = vec3(256.0);
-                     const vec3 tileSize = vec3(64.0, 32.0, 32.0);
+                     const vec3 textureSize = vec3(512.0);
+                     const vec3 tileSize = vec3(32.0, 32.0, 16.0);
 
                      float mipmapLevel(vec3 uv)
                      {

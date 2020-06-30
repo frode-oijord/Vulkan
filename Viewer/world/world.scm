@@ -152,7 +152,7 @@
             mip = uint(max(int(mip) - 4, 0));
             uvec2 ij = uvec2(texCoord * (textureSize / tileSize));
 
-            FragColor = uvec4(ij.x >> mip, ij.y >> mip, 0, mip);
+            FragColor = uvec4(ij.x >> mip, ij.y >> mip, 0, mip + 1);
          }
       ]])
 

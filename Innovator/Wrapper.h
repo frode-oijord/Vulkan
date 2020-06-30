@@ -1174,22 +1174,22 @@ class VulkanCommandBuffers {
 public:
 	NO_COPY_OR_ASSIGNMENT(VulkanCommandBuffers)
 
-		class Scope {
-		public:
-			Scope(VulkanCommandBuffers* buffer, size_t index = 0) :
-				buffer(buffer),
-				index(index)
-			{
-				this->buffer->begin(this->index);
-			}
+	class Scope {
+	public:
+		Scope(VulkanCommandBuffers* buffer, size_t index = 0) :
+			buffer(buffer),
+			index(index)
+		{
+			this->buffer->begin(this->index);
+		}
 
-			~Scope()
-			{
-				this->buffer->end(this->index);
-			}
+		~Scope()
+		{
+			this->buffer->end(this->index);
+		}
 
-			size_t index;
-			VulkanCommandBuffers* buffer;
+		size_t index;
+		VulkanCommandBuffers* buffer;
 	};
 
 	VulkanCommandBuffers() = delete;
