@@ -2239,6 +2239,7 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
+		this->fence = std::make_unique<VulkanFence>(context->device);
 		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
 
 		VkExtent3D extent = {
@@ -2349,10 +2350,13 @@ public:
 	std::set<uint32_t> getTiles(CommandVisitor* context)
 	{
 		//Timer timer("offscreen render");
-
+		this->fence->reset();
 		this->get_image_command->submit(
 			context->queue,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			this->fence->fence);
+
+		this->fence->wait();
 
 		const uint8_t* data = reinterpret_cast<uint8_t*>(this->image->memory->map(VK_WHOLE_SIZE, 0, 0));
 		data += this->dataOffset;
@@ -2369,7 +2373,8 @@ public:
 				uint32_t key = (i >> 0) << 24 | (j >> 0) << 16 | (k >> 0) << 8 | m - 1;
 				if (tiles.find(key) == tiles.end()) {
 					tiles.insert(key);
-					tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m);
+					tiles.insert((i >> 1) << 24 | (j >> 1) << 16 | (k >> 1) << 8 | m + 0);
+					tiles.insert((i >> 2) << 24 | (j >> 2) << 16 | (k >> 2) << 8 | m + 1);
 				}
 			}
 		}
@@ -2391,6 +2396,7 @@ private:
 		VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
 	};
 	std::shared_ptr<VulkanImageObject> image;
+	std::shared_ptr<VulkanFence> fence{ nullptr };
 
 	VkDeviceSize dataOffset;
 };
@@ -2492,6 +2498,7 @@ public:
 		for (uint32_t i = 0; i < this->numPages; i++) {
 			this->free_memory_offsets.push(i * this->pageSize);
 		}
+
 		context->state.image = this->image->image;
 	}
 
@@ -2505,8 +2512,6 @@ public:
 		VulkanTextureImage* texture = context->state.texture;
 
 		std::vector<VkSparseImageMemoryBind> image_memory_binds;
-		std::vector<VkBufferImageCopy> regions;
-
 		std::set<uint32_t> tiles = context->image->getTiles(context);
 
 		// try to free some pages
@@ -2524,13 +2529,12 @@ public:
 			this->bound_memory_pages.erase(key);
 		}
 
+		std::vector<VkBufferImageCopy> regions;
 		for (uint32_t key : tiles) {
 			if (this->bound_memory_pages.find(key) == this->bound_memory_pages.end()) {
 				if (this->free_memory_offsets.empty()) {
 					throw std::runtime_error("no free memory pages");
 				}
-				VkDeviceSize memoryOffset = this->free_memory_offsets.front();
-				this->free_memory_offsets.pop();
 
 				uint32_t i = key >> 24 & 0xFF;
 				uint32_t j = key >> 16 & 0xFF;
@@ -2541,10 +2545,22 @@ public:
 					throw std::runtime_error("invalid mip level");
 				}
 
+				VkExtent3D extent = texture->extent(mipLevel);
+
+				// don't have a mip tail, ignore mip levels smaller than a brick
+				if (extent.width < this->imageExtent.width ||
+					extent.depth < this->imageExtent.depth ||
+					extent.height < this->imageExtent.height) {
+					continue;
+				}
+
+				VkDeviceSize memoryOffset = this->free_memory_offsets.front();
+				this->free_memory_offsets.pop();
+
 				VkOffset3D imageOffset = {
-				  int32_t(i * imageExtent.width),
-				  int32_t(j * imageExtent.height),
-				  int32_t(k * imageExtent.depth)
+				  int32_t(i * this->imageExtent.width),
+				  int32_t(j * this->imageExtent.height),
+				  int32_t(k * this->imageExtent.depth)
 				};
 
 				VkImageSubresourceRange subresource_range = texture->subresource_range();
@@ -2556,7 +2572,7 @@ public:
 				VkSparseImageMemoryBind image_memory_bind{
 					subresource,												// subresource
 					imageOffset,												// offset
-					imageExtent,												// extent
+					this->imageExtent,											// extent
 					image_memory->memory,										// memory
 					memoryOffset,												// memoryOffset
 					0															// flags
@@ -2572,7 +2588,6 @@ public:
 					subresource_range.layerCount,								// layerCount
 				};
 
-				VkExtent3D extent = texture->extent(mipLevel);
 
 				regions.push_back({
 					memoryOffset,												// bufferOffset 
@@ -2580,7 +2595,7 @@ public:
 					extent.height,												// bufferImageHeight
 					imageSubresource,											// imageSubresource
 					imageOffset,												// imageOffset
-					imageExtent,												// imageExtent
+					this->imageExtent,											// imageExtent
 				});
 
 				VkDeviceSize mipOffset = 0;

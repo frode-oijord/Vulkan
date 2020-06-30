@@ -2,6 +2,7 @@
 #include <Innovator/Visitor.h>
 #include <Innovator/Nodes.h>
 
+#include <glm/glm.hpp>
 
 void
 Visitor::visit(Node* node)
@@ -69,7 +70,7 @@ EventVisitor::visit(ViewMatrix* node)
 		dx[1] /= this->state.extent.height;
 		dx *= 20.0;
 		switch (this->button) {
-			case 0: node->orbit(dx); break;
+			// case 0: node->orbit(dx); break;
 			case 1: node->pan(dx); break;
 			case 2: node->zoom(dx[1]); break;
 			default: break;
@@ -81,54 +82,37 @@ EventVisitor::visit(ViewMatrix* node)
 void 
 EventVisitor::visit(class TextureMatrix* node)
 {
-	//auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-	//if (press) {
-	//	this->press = press;
-	//}
 
-	//if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-	//	this->press.reset();
-	//}
-
-	//auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-	//if (move && this->press) {
-	//	glm::dvec2 dx = (this->press->pos - move->pos) * .01;	
-	//	dx[1] = -dx[1];
-	//	switch (this->press->button) {
-	//	case 0: {
-	//		node->mat[3][2] += dx[1] * 0.2f;
-	//		node->mat[3][2] = std::clamp(node->mat[3][2], 0.0, 1.0);
-	//		break;
-	//	}
-	//	default: break;
-	//	}
-	//	this->press->pos = move->pos;
-	//}
+	if (this->move && this->press) {
+		glm::dvec2 dx = this->prevpos - this->currpos;
+		double translation = dx[1] * 0.01;
+		glm::dvec3 t(0, 0, translation);
+		switch (this->button) {
+		case 0: {
+			node->mat = glm::translate(node->mat, t);
+			break;
+		}
+		default: break;
+		}
+	}
 }
 
 
 void
 EventVisitor::visit(class ModelMatrix* node)
 {
-	//auto press = std::dynamic_pointer_cast<MousePressEvent>(context->event);
-	//if (press) {
-	//	this->press = press;
-	//}
-
-	//if (std::dynamic_pointer_cast<MouseReleaseEvent>(context->event)) {
-	//	this->press.reset();
-	//}
-
-	//auto move = std::dynamic_pointer_cast<MouseMoveEvent>(context->event);
-	//if (move && this->press) {
-	//	glm::dvec2 dx = (this->press->pos - move->pos) * .01;
-	//	dx[1] = -dx[1];
-	//	switch (this->press->button) {
-	//	case 0: node->matrix[3][2] += dx[1] * 0.2f; break;
-	//	default: break;
-	//	}
-	//	this->press->pos = move->pos;
-	//}
+	if (this->move && this->press) {
+		glm::dvec2 dx = this->prevpos - this->currpos;
+		double translation = dx[1] * 0.01;
+		glm::dvec3 t(0, 0, translation);
+		switch (this->button) {
+		case 0: {
+			node->mat = glm::translate(node->mat, t);
+			break;
+		}
+		default: break;
+		}
+	}
 }
 
 

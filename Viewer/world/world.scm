@@ -222,9 +222,9 @@
    (define scene 
       (group
          (viewmatrix 
-            0.5 0.5 3 
-            0 0 0 
-            0 1 0)
+            (dvec3 0.5 0.5 3)
+            (dvec3 0 0 0)
+            (dvec3 0 1 0))
 
          (projmatrix 1000 0.001 1.0 0.7)
 

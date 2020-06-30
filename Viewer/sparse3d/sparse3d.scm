@@ -77,7 +77,7 @@
    (define slice (z) 
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float 0 0 z  1 0 z  1 1 z  0 1 z)))
+         (bufferdata-float 0 0 0.15  1 0 0.15  1 1 z  0 1 0.15)))
 
    (define main-renderpass
       (renderpass
@@ -134,7 +134,7 @@
                }
             ]])
 
-            (sparse-texture "sparse3d/noise2048.bin")
+            (sparse-texture "sparse3d/noise256.bin")
             (slice 0))))
 
    (define lod-renderpass
@@ -189,7 +189,7 @@
                      layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out uvec4 FragColor;
 
-                     const vec3 textureSize = vec3(2048.0);
+                     const vec3 textureSize = vec3(256.0);
                      const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
                      float mipmapLevel(vec3 uv)
@@ -218,13 +218,13 @@
    (window
       (group
          (viewmatrix 
-            (dvec3 10.5 .5  2)
-            (dvec3 10.2 .2  0)
+            (dvec3 .5 .5  2)
+            (dvec3 .2 .2  0)
             (dvec3  0  1  0))
 
          (projmatrix 1000 0.001 1.0 0.7)
          (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
-         (modelmatrix (dvec3 10 0 0) (dvec3 1 1 1))
+         (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
 
          (shader VK_SHADER_STAGE_VERTEX_BIT [[
             #version 450

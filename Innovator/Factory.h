@@ -147,7 +147,7 @@ public:
 
 	explicit DebugTextureImage(const std::string& filename)
 	{
-		this->lod0_size = 2048;
+		this->lod0_size = 256;
 		this->num_lods = log2(this->lod0_size) + 1;
 		this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
 	}
@@ -165,7 +165,7 @@ public:
 
 	uint32_t element_size() const override
 	{
-		return 1;
+		return 4;
 	}
 
 	uint32_t base_level() const override
@@ -207,7 +207,7 @@ public:
 
 	VkFormat format() const override
 	{
-		return VK_FORMAT_R8_UNORM;
+		return VK_FORMAT_R8G8B8A8_UNORM;
 	}
 
 	VkImageType image_type() const override
