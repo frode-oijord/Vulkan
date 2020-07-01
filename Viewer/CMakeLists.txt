@@ -28,7 +28,6 @@ add_executable(
 	Viewer 
 	main.cpp 
 	Window.h
-	${PROJECT_SOURCE_DIR}/../Innovator/Context.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Defines.h
 	${PROJECT_SOURCE_DIR}/../Innovator/Factory.h
 	${PROJECT_SOURCE_DIR}/../Innovator/ScmEnv.h

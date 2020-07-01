@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Innovator/Nodes.h>
-#include <Innovator/Context.h>
 #include <Innovator/Defines.h>
 #include <Innovator/VulkanSurface.h>
 
