@@ -130,8 +130,7 @@
                layout(location = 0) out vec4 FragColor;
 
                void main() {
-                  float r = texture(Texture, texCoord).r;
-                  FragColor = vec4(r, r, r, 1.0);
+                  FragColor = texture(Texture, texCoord);
                }
             ]])
 
