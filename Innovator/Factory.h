@@ -145,34 +145,38 @@ class DebugTextureImage : public VulkanTextureImage {
 public:
 	NO_COPY_OR_ASSIGNMENT(DebugTextureImage)
 
-		explicit DebugTextureImage(const std::string& filename)
+	explicit DebugTextureImage(const std::string& filename)
 	{
-		this->lod0_size = 512;
-		this->num_lods = log2(lod0_size) + 1;
+		this->lod0_size = 256;
+		this->num_lods = 4;// log2(lod0_size) + 1;
 
-		//{
-		//	std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
-		//	for (size_t lod = 0; lod < num_lods; lod++) {
-		//		size_t lod_size = lod0_size >> lod;
-		//		for (size_t start_i = 0; start_i < lod_size; start_i += 32) {
-		//			for (size_t start_j = 0; start_j < lod_size; start_j += 32) {
-		//				for (size_t start_k = 0; start_k < lod_size; start_k += 16) {
-		//					std::vector<glm::u8vec4> brick(32 * 32 * 16);
-		//					for (size_t i = 0; i < 32; i++) {
-		//						for (size_t j = 0; j < 32; j++) {
-		//							for (size_t k = 0; k < 16; k++) {
-		//								glm::u8vec4 texel(i + start_i, j + start_j, k + start_k, 255);
-		//								brick[i + j * 32 + k * 32 * 32] = texel;
-		//							}
-		//						}
-		//					}
-		//					out.write(reinterpret_cast<char*>(brick.data()), brick.size() * 4);
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
+		{
+			std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
+			for (size_t lod = 0; lod < num_lods; lod++) {
+				size_t lod_size = lod0_size >> lod;
+				std::cout << std::endl << "writing lod " << lod;
+				for (size_t start_i = 0; start_i < lod_size; start_i += 32) {
+					std::cout << ".";
+					for (size_t start_j = 0; start_j < lod_size; start_j += 32) {
+						for (size_t start_k = 0; start_k < lod_size; start_k += 16) {
 
+							std::vector<glm::u8vec4> brick(32 * 32 * 16);
+
+							for (size_t i = 0; i < 32; i++) {
+								for (size_t j = 0; j < 32; j++) {
+									for (size_t k = 0; k < 16; k++) {
+										glm::u8vec4 texel(i * 8 , j * 8, k * 16, 255);
+										brick[((k * 32) + j) * 32 + i] = texel;
+									}
+								}
+							}
+							out.write(reinterpret_cast<char*>(brick.data()), brick.size() * sizeof(glm::u8vec4));
+						}
+					}
+				}
+			}
+		}
+		std::cout << std::endl;
 
 		this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
 	}

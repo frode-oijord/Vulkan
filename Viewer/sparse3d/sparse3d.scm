@@ -134,7 +134,7 @@
                }
             ]])
 
-            (sparse-texture "sparse3d/noise512.bin")
+            (sparse-texture "sparse3d/noise256.bin")
             (slice 0))))
 
    (define lod-renderpass
@@ -189,7 +189,7 @@
                      layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out uvec4 FragColor;
 
-                     const vec3 textureSize = vec3(512.0);
+                     const vec3 textureSize = vec3(256.0);
                      const vec3 tileSize = vec3(32.0, 32.0, 16.0);
 
                      float mipmapLevel(vec3 uv)

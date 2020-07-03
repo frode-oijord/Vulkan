@@ -2460,8 +2460,8 @@ public:
 		VkDeviceSize height = extent.height;
 		VkDeviceSize depth = extent.depth;
 		VkDeviceSize elementSize = this->texture->element_size();
-		VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
-		//VkDeviceSize bufferOffset = mipOffset + (x * width + y * height + z * depth) * elementSize;
+		//VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
+		VkDeviceSize bufferOffset = mipOffset + (x * width + y * height + z * depth) * elementSize;
 
 		const VkImageSubresourceLayers imageSubresource{
 		  this->texture->subresource_range().aspectMask,				// aspectMask
@@ -2472,8 +2472,8 @@ public:
 
 		this->buffer_image_copy = {
 		  bufferOffset,											// bufferOffset 
-		  extent.width,											// bufferRowLength
-		  extent.height,										// bufferImageHeight
+		  0, // extent.width,											// bufferRowLength
+		  0,										// bufferImageHeight
 		  imageSubresource,										// imageSubresource
 		  imageOffset,											// imageOffset
 		  this->imageExtent,									// imageExtent
