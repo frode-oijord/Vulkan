@@ -149,8 +149,8 @@ public:
 		devicevisitor.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 #ifdef DEBUG
-		devicevisitor.device_layers.push_back("VK_LAYER_KHRONOS_validation");
-		devicevisitor.instance_layers.push_back("VK_LAYER_KHRONOS_validation");
+		//devicevisitor.device_layers.push_back("VK_LAYER_KHRONOS_validation");
+		//devicevisitor.instance_layers.push_back("VK_LAYER_KHRONOS_validation");
 		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif

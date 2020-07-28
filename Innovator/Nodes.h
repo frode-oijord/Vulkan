@@ -2446,37 +2446,73 @@ public:
 		  0													// flags
 		};
 
-		VkDeviceSize x = imageOffset.x;
-		VkDeviceSize y = imageOffset.y;
-		VkDeviceSize z = imageOffset.z;
-
 		VkDeviceSize mipOffset = 0;
 		for (uint32_t m = 0; m < mipLevel; m++) {
 			mipOffset += this->texture->size(m);
 		}
 
 		VkExtent3D extent = this->texture->extent(mipLevel);
-		VkDeviceSize width = extent.width;
-		VkDeviceSize height = extent.height;
-		VkDeviceSize depth = extent.depth;
 		VkDeviceSize elementSize = this->texture->element_size();
-		//VkDeviceSize bufferOffset = mipOffset + (((z * height) + y) * width + x) * elementSize;
-		VkDeviceSize bufferOffset = mipOffset + (x * width + y * height + z * depth) * elementSize;
+
+		VkExtent3D brickExtent = this->texture->brick_size();
+		VkDeviceSize brickSize =
+			static_cast<VkDeviceSize>(brickExtent.width)*
+			static_cast<VkDeviceSize>(brickExtent.height)*
+			static_cast<VkDeviceSize>(brickExtent.depth);
 
 		const VkImageSubresourceLayers imageSubresource{
-		  this->texture->subresource_range().aspectMask,				// aspectMask
-		  mipLevel,														// mipLevel
-		  this->texture->subresource_range().baseArrayLayer,			// baseArrayLayer
-		  this->texture->subresource_range().layerCount,				// layerCount
+			this->texture->subresource_range().aspectMask,				// aspectMask
+			mipLevel,													// mipLevel
+			this->texture->subresource_range().baseArrayLayer,			// baseArrayLayer
+			this->texture->subresource_range().layerCount,				// layerCount
 		};
 
+		if (false) {
+			VkDeviceSize width = extent.width / brickExtent.width;
+			VkDeviceSize height = extent.height / brickExtent.height;
+
+			this->buffer_image_copy = {
+				mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
+				0,
+				0,
+				imageSubresource,
+				imageOffset,
+				this->imageExtent,
+			};
+		}
+		else {
+			VkDeviceSize i = imageOffset.x;
+			VkDeviceSize j = imageOffset.y;
+			VkDeviceSize k = imageOffset.z;
+
+			VkDeviceSize width = extent.width;
+			VkDeviceSize height = extent.height;
+
+			this->bufferImageCopy(
+				mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
+				width,
+				height,
+				imageSubresource,
+				imageOffset,
+				this->imageExtent);
+		}
+	}
+
+	void bufferImageCopy(
+		VkDeviceSize bufferOffset,
+		uint32_t bufferRowLength,
+		uint32_t bufferImageHeight,
+		VkImageSubresourceLayers imageSubresource,
+		VkOffset3D imageOffset,
+		VkExtent3D imageExtent)
+	{
 		this->buffer_image_copy = {
-		  bufferOffset,											// bufferOffset 
-		  0, // extent.width,											// bufferRowLength
-		  0,										// bufferImageHeight
-		  imageSubresource,										// imageSubresource
-		  imageOffset,											// imageOffset
-		  this->imageExtent,									// imageExtent
+			bufferOffset,										// bufferOffset 
+			bufferRowLength,									// bufferRowLength
+			bufferImageHeight,									// bufferImageHeight
+			imageSubresource,									// imageSubresource
+			imageOffset,										// imageOffset
+			this->imageExtent,									// imageExtent
 		};
 	}
 

@@ -11,7 +11,7 @@
 
 int main(int argc, char* argv[])
 {
-	size_t lod0_size = 512;
+	size_t lod0_size = 256;
 	size_t num_lods = log2(lod0_size) + 1;
 
 	const siv::PerlinNoise perlin;
