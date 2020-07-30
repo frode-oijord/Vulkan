@@ -29,29 +29,29 @@ public:
 	{
 		this->features2.pNext = &this->device_address_features;
 
-		vkGetPhysicalDeviceFeatures(this->device, &this->features);
-		vkGetPhysicalDeviceFeatures2(this->device, &this->features2);
-		vkGetPhysicalDeviceProperties(this->device, &this->properties);
-		vkGetPhysicalDeviceMemoryProperties(this->device, &this->memory_properties);
+		vk.GetPhysicalDeviceFeatures(this->device, &this->features);
+		vk.GetPhysicalDeviceFeatures2(this->device, &this->features2);
+		vk.GetPhysicalDeviceProperties(this->device, &this->properties);
+		vk.GetPhysicalDeviceMemoryProperties(this->device, &this->memory_properties);
 
 		uint32_t count;
-		vkGetPhysicalDeviceQueueFamilyProperties(this->device, &count, nullptr);
+		vk.GetPhysicalDeviceQueueFamilyProperties(this->device, &count, nullptr);
 		this->queue_family_properties.resize(count);
-		vkGetPhysicalDeviceQueueFamilyProperties(this->device, &count, this->queue_family_properties.data());
+		vk.GetPhysicalDeviceQueueFamilyProperties(this->device, &count, this->queue_family_properties.data());
 
-		THROW_ON_ERROR(vkEnumerateDeviceLayerProperties(this->device, &count, nullptr));
+		THROW_ON_ERROR(vk.EnumerateDeviceLayerProperties(this->device, &count, nullptr));
 		this->layer_properties.resize(count);
-		THROW_ON_ERROR(vkEnumerateDeviceLayerProperties(this->device, &count, this->layer_properties.data()));
+		THROW_ON_ERROR(vk.EnumerateDeviceLayerProperties(this->device, &count, this->layer_properties.data()));
 
-		THROW_ON_ERROR(vkEnumerateDeviceExtensionProperties(this->device, nullptr, &count, nullptr));
+		THROW_ON_ERROR(vk.EnumerateDeviceExtensionProperties(this->device, nullptr, &count, nullptr));
 		this->extension_properties.resize(count);
-		THROW_ON_ERROR(vkEnumerateDeviceExtensionProperties(this->device, nullptr, &count, this->extension_properties.data()));
+		THROW_ON_ERROR(vk.EnumerateDeviceExtensionProperties(this->device, nullptr, &count, this->extension_properties.data()));
 	}
 
 	VkFormatProperties getFormatProperties(VkFormat format)
 	{
 		VkFormatProperties properties;
-		vkGetPhysicalDeviceFormatProperties(
+		vk.GetPhysicalDeviceFormatProperties(
 			this->device,
 			format,
 			&properties);
@@ -67,7 +67,7 @@ public:
 		VkImageTiling tiling)
 	{
 		uint32_t count;
-		vkGetPhysicalDeviceSparseImageFormatProperties(
+		vk.GetPhysicalDeviceSparseImageFormatProperties(
 			this->device,
 			format,
 			type,
@@ -82,7 +82,7 @@ public:
 		}
 
 		std::vector<VkSparseImageFormatProperties> properties(count);
-		vkGetPhysicalDeviceSparseImageFormatProperties(
+		vk.GetPhysicalDeviceSparseImageFormatProperties(
 			this->device,
 			format,
 			type,
@@ -224,20 +224,19 @@ static VkBool32 DebugUtilsCallback(
 	return VK_FALSE;
 }
 
-
 class VulkanInstance : public VulkanObject {
 public:
 	NO_COPY_OR_ASSIGNMENT(VulkanInstance)
 
-		explicit VulkanInstance(
-			const std::string& application_name = "",
-			const std::vector<const char*>& required_layers = {},
-			const std::vector<const char*>& required_extensions = {})
+	explicit VulkanInstance(
+		const std::string& application_name = "",
+		const std::vector<const char*>& required_layers = {},
+		const std::vector<const char*>& required_extensions = {})
 	{
 		uint32_t layer_count;
-		THROW_ON_ERROR(vkEnumerateInstanceLayerProperties(&layer_count, nullptr));
+		THROW_ON_ERROR(vk.EnumerateInstanceLayerProperties(&layer_count, nullptr));
 		std::vector<VkLayerProperties> layer_properties(layer_count);
-		THROW_ON_ERROR(vkEnumerateInstanceLayerProperties(&layer_count, layer_properties.data()));
+		THROW_ON_ERROR(vk.EnumerateInstanceLayerProperties(&layer_count, layer_properties.data()));
 
 		std::for_each(required_layers.begin(), required_layers.end(), [&](const char* layer_name) {
 			for (auto properties : layer_properties)
@@ -247,9 +246,9 @@ public:
 			});
 
 		uint32_t extension_count;
-		THROW_ON_ERROR(vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr));
+		THROW_ON_ERROR(vk.EnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr));
 		std::vector<VkExtensionProperties> extension_properties(extension_count);
-		THROW_ON_ERROR(vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extension_properties.data()));
+		THROW_ON_ERROR(vk.EnumerateInstanceExtensionProperties(nullptr, &extension_count, extension_properties.data()));
 
 		std::for_each(required_extensions.begin(), required_extensions.end(), [&](const char* extension_name) {
 			for (auto properties : extension_properties)
@@ -265,7 +264,7 @@ public:
 			1,														// applicationVersion
 			"Innovator",											// pEngineName
 			1,														// engineVersion
-			VK_API_VERSION_1_2,										// apiVersion
+			VK_API_VERSION_1_0,										// apiVersion
 		};
 
 		VkInstanceCreateInfo create_info{
@@ -279,61 +278,51 @@ public:
 			required_extensions.data()								// ppEnabledExtensionNames
 		};
 
-		THROW_ON_ERROR(vkCreateInstance(&create_info, nullptr, &this->instance));
+		THROW_ON_ERROR(vk.CreateInstance(&create_info, nullptr, &this->instance));
 
 		uint32_t physical_device_count;
-		THROW_ON_ERROR(vkEnumeratePhysicalDevices(this->instance, &physical_device_count, nullptr));
+		THROW_ON_ERROR(vk.EnumeratePhysicalDevices(this->instance, &physical_device_count, nullptr));
 
 		std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
-		THROW_ON_ERROR(vkEnumeratePhysicalDevices(this->instance, &physical_device_count, physical_devices.data()));
+		THROW_ON_ERROR(vk.EnumeratePhysicalDevices(this->instance, &physical_device_count, physical_devices.data()));
 
 		for (const auto& physical_device : physical_devices) {
 			this->physical_devices.emplace_back(physical_device);
 		}
 
-		this->vkQueuePresent = this->getProcAddress<PFN_vkQueuePresentKHR>("vkQueuePresentKHR");
-		this->vkCreateSwapchain = this->getProcAddress<PFN_vkCreateSwapchainKHR>("vkCreateSwapchainKHR");
-		this->vkAcquireNextImage = this->getProcAddress<PFN_vkAcquireNextImageKHR>("vkAcquireNextImageKHR");
-		this->vkDestroySwapchain = this->getProcAddress<PFN_vkDestroySwapchainKHR>("vkDestroySwapchainKHR");
-		this->vkGetSwapchainImages = this->getProcAddress<PFN_vkGetSwapchainImagesKHR>("vkGetSwapchainImagesKHR");
-		this->vkGetPhysicalDeviceSurfaceSupport = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>("vkGetPhysicalDeviceSurfaceSupportKHR");
-		this->vkGetPhysicalDeviceSurfaceFormats = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>("vkGetPhysicalDeviceSurfaceFormatsKHR");
-		this->vkGetPhysicalDeviceSurfaceCapabilities = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>("vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
-		this->vkGetPhysicalDeviceSurfacePresentModes = this->getProcAddress<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>("vkGetPhysicalDeviceSurfacePresentModesKHR");
-		this->vkCreateDebugReportCallback = this->getProcAddress<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
-		this->vkCreateDebugUtilsMessenger = this->getProcAddress<PFN_vkCreateDebugUtilsMessengerEXT>("vkCreateDebugUtilsMessengerEXT");
-		this->vkDestroyDebugReportCallback = this->getProcAddress<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
+		this->vkCreateDebugReportCallbackEXT = this->getProcAddress<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
+		this->vkDestroyDebugReportCallbackEXT = this->getProcAddress<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
 
 		// VK_KHR_ray_tracing extension
-		this->vkBindAccelerationStructureMemory = this->getProcAddress<PFN_vkBindAccelerationStructureMemoryKHR>("vkBindAccelerationStructureMemoryKHR");
-		this->vkBuildAccelerationStructure = this->getProcAddress<PFN_vkBuildAccelerationStructureKHR>("vkBuildAccelerationStructureKHR");
-		this->vkCmdBuildAccelerationStructureIndirect = this->getProcAddress<PFN_vkCmdBuildAccelerationStructureIndirectKHR>("vkCmdBuildAccelerationStructureIndirectKHR");
-		this->vkCmdBuildAccelerationStructure = this->getProcAddress<PFN_vkCmdBuildAccelerationStructureKHR>("vkCmdBuildAccelerationStructureKHR");
-		this->vkCmdCopyAccelerationStructure = this->getProcAddress<PFN_vkCmdCopyAccelerationStructureKHR>("vkCmdCopyAccelerationStructureKHR");
-		this->vkCmdCopyAccelerationStructureToMemory = this->getProcAddress<PFN_vkCmdCopyAccelerationStructureToMemoryKHR>("vkCmdCopyAccelerationStructureToMemoryKHR");
-		this->vkCmdCopyMemoryToAccelerationStructure = this->getProcAddress<PFN_vkCmdCopyMemoryToAccelerationStructureKHR>("vkCmdCopyMemoryToAccelerationStructureKHR");
-		this->vkCmdTraceRaysIndirect = this->getProcAddress<PFN_vkCmdTraceRaysIndirectKHR>("vkCmdTraceRaysIndirectKHR");
-		this->vkCmdTraceRays = this->getProcAddress<PFN_vkCmdTraceRaysKHR>("vkCmdTraceRaysKHR");
-		this->vkCmdWriteAccelerationStructuresProperties = this->getProcAddress<PFN_vkCmdWriteAccelerationStructuresPropertiesKHR>("vkCmdWriteAccelerationStructuresPropertiesKHR");
-		this->vkCopyAccelerationStructure = this->getProcAddress<PFN_vkCopyAccelerationStructureKHR>("vkCopyAccelerationStructureKHR");
-		this->vkCopyAccelerationStructureToMemory = this->getProcAddress<PFN_vkCopyAccelerationStructureToMemoryKHR>("vkCopyAccelerationStructureToMemoryKHR");
-		this->vkCopyMemoryToAccelerationStructure = this->getProcAddress<PFN_vkCopyMemoryToAccelerationStructureKHR>("vkCopyMemoryToAccelerationStructureKHR");
-		this->vkCreateAccelerationStructure = this->getProcAddress<PFN_vkCreateAccelerationStructureKHR>("vkCreateAccelerationStructureKHR");
-		this->vkCreateRayTracingPipelines = this->getProcAddress<PFN_vkCreateRayTracingPipelinesKHR>("vkCreateRayTracingPipelinesKHR");
-		this->vkDestroyAccelerationStructure = this->getProcAddress<PFN_vkDestroyAccelerationStructureKHR>("vkDestroyAccelerationStructureKHR");
-		this->vkGetAccelerationStructureDeviceAddress = this->getProcAddress<PFN_vkGetAccelerationStructureDeviceAddressKHR>("vkGetAccelerationStructureDeviceAddressKHR");
-		this->vkGetAccelerationStructureMemoryRequirements = this->getProcAddress<PFN_vkGetAccelerationStructureMemoryRequirementsKHR>("vkGetAccelerationStructureMemoryRequirementsKHR");
-		this->vkGetDeviceAccelerationStructureCompatibility = this->getProcAddress<PFN_vkGetDeviceAccelerationStructureCompatibilityKHR>("vkGetDeviceAccelerationStructureCompatibilityKHR");
-		this->vkGetRayTracingCaptureReplayShaderGroupHandles = this->getProcAddress<PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR>("vkGetRayTracingCaptureReplayShaderGroupHandlesKHR");
-		this->vkGetRayTracingShaderGroupHandles = this->getProcAddress<PFN_vkGetRayTracingShaderGroupHandlesKHR>("vkGetRayTracingShaderGroupHandlesKHR");
-		this->vkWriteAccelerationStructuresProperties = this->getProcAddress<PFN_vkWriteAccelerationStructuresPropertiesKHR>("vkWriteAccelerationStructuresPropertiesKHR");
+		this->vkBindAccelerationStructureMemoryKHR = this->getProcAddress<PFN_vkBindAccelerationStructureMemoryKHR>("vkBindAccelerationStructureMemoryKHR");
+		this->vkBuildAccelerationStructureKHR = this->getProcAddress<PFN_vkBuildAccelerationStructureKHR>("vkBuildAccelerationStructureKHR");
+		this->vkCmdBuildAccelerationStructureIndirectKHR = this->getProcAddress<PFN_vkCmdBuildAccelerationStructureIndirectKHR>("vkCmdBuildAccelerationStructureIndirectKHR");
+		this->vkCmdBuildAccelerationStructureKHR = this->getProcAddress<PFN_vkCmdBuildAccelerationStructureKHR>("vkCmdBuildAccelerationStructureKHR");
+		this->vkCmdCopyAccelerationStructureKHR = this->getProcAddress<PFN_vkCmdCopyAccelerationStructureKHR>("vkCmdCopyAccelerationStructureKHR");
+		this->vkCmdCopyAccelerationStructureToMemoryKHR = this->getProcAddress<PFN_vkCmdCopyAccelerationStructureToMemoryKHR>("vkCmdCopyAccelerationStructureToMemoryKHR");
+		this->vkCmdCopyMemoryToAccelerationStructureKHR = this->getProcAddress<PFN_vkCmdCopyMemoryToAccelerationStructureKHR>("vkCmdCopyMemoryToAccelerationStructureKHR");
+		this->vkCmdTraceRaysIndirectKHR = this->getProcAddress<PFN_vkCmdTraceRaysIndirectKHR>("vkCmdTraceRaysIndirectKHR");
+		this->vkCmdTraceRaysKHR = this->getProcAddress<PFN_vkCmdTraceRaysKHR>("vkCmdTraceRaysKHR");
+		this->vkCmdWriteAccelerationStructuresPropertiesKHR = this->getProcAddress<PFN_vkCmdWriteAccelerationStructuresPropertiesKHR>("vkCmdWriteAccelerationStructuresPropertiesKHR");
+		this->vkCopyAccelerationStructureKHR = this->getProcAddress<PFN_vkCopyAccelerationStructureKHR>("vkCopyAccelerationStructureKHR");
+		this->vkCopyAccelerationStructureToMemoryKHR = this->getProcAddress<PFN_vkCopyAccelerationStructureToMemoryKHR>("vkCopyAccelerationStructureToMemoryKHR");
+		this->vkCopyMemoryToAccelerationStructureKHR = this->getProcAddress<PFN_vkCopyMemoryToAccelerationStructureKHR>("vkCopyMemoryToAccelerationStructureKHR");
+		this->vkCreateAccelerationStructureKHR = this->getProcAddress<PFN_vkCreateAccelerationStructureKHR>("vkCreateAccelerationStructureKHR");
+		this->vkCreateRayTracingPipelinesKHR = this->getProcAddress<PFN_vkCreateRayTracingPipelinesKHR>("vkCreateRayTracingPipelinesKHR");
+		this->vkDestroyAccelerationStructureKHR = this->getProcAddress<PFN_vkDestroyAccelerationStructureKHR>("vkDestroyAccelerationStructureKHR");
+		this->vkGetAccelerationStructureDeviceAddressKHR = this->getProcAddress<PFN_vkGetAccelerationStructureDeviceAddressKHR>("vkGetAccelerationStructureDeviceAddressKHR");
+		this->vkGetAccelerationStructureMemoryRequirementsKHR = this->getProcAddress<PFN_vkGetAccelerationStructureMemoryRequirementsKHR>("vkGetAccelerationStructureMemoryRequirementsKHR");
+		this->vkGetDeviceAccelerationStructureCompatibilityKHR = this->getProcAddress<PFN_vkGetDeviceAccelerationStructureCompatibilityKHR>("vkGetDeviceAccelerationStructureCompatibilityKHR");
+		this->vkGetRayTracingCaptureReplayShaderGroupHandlesKHR = this->getProcAddress<PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR>("vkGetRayTracingCaptureReplayShaderGroupHandlesKHR");
+		this->vkGetRayTracingShaderGroupHandlesKHR = this->getProcAddress<PFN_vkGetRayTracingShaderGroupHandlesKHR>("vkGetRayTracingShaderGroupHandlesKHR");
+		this->vkWriteAccelerationStructuresPropertiesKHR = this->getProcAddress<PFN_vkWriteAccelerationStructuresPropertiesKHR>("vkWriteAccelerationStructuresPropertiesKHR");
 
-		this->vkGetBufferDeviceAddress = this->getProcAddress<PFN_vkGetBufferDeviceAddressKHR>("vkGetBufferDeviceAddressKHR");
+		 this->vkGetBufferDeviceAddressKHR = this->getProcAddress<PFN_vkGetBufferDeviceAddressKHR>("vkGetBufferDeviceAddressKHR");
 	}
 
 	~VulkanInstance()
 	{
-		vkDestroyInstance(this->instance, nullptr);
+		vk.DestroyInstance(this->instance, nullptr);
 	}
 
 	std::string toString() override
@@ -352,7 +341,7 @@ public:
 
 	template <typename T>
 	T getProcAddress(const std::string& name) {
-		return reinterpret_cast<T>(vkGetInstanceProcAddr(this->instance, name.c_str()));
+		return reinterpret_cast<T>(vk.GetInstanceProcAddr(this->instance, name.c_str()));
 	};
 
 	VulkanPhysicalDevice selectPhysicalDevice(const VkPhysicalDeviceFeatures& required_features)
@@ -372,66 +361,56 @@ public:
 	VkSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilities(VkPhysicalDevice device, VkSurfaceKHR surface)
 	{
 		VkSurfaceCapabilitiesKHR surface_capabilities;
-		THROW_ON_ERROR(this->vkGetPhysicalDeviceSurfaceCapabilities(device, surface, &surface_capabilities));
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &surface_capabilities));
 		return surface_capabilities;
 	}
 
 	std::vector<VkSurfaceFormatKHR> getPhysicalDeviceSurfaceFormats(VkPhysicalDevice device, VkSurfaceKHR surface)
 	{
 		uint32_t count;
-		THROW_ON_ERROR(this->vkGetPhysicalDeviceSurfaceFormats(device, surface, &count, nullptr));
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr));
 		std::vector<VkSurfaceFormatKHR> surface_formats(count);
-		THROW_ON_ERROR(this->vkGetPhysicalDeviceSurfaceFormats(device, surface, &count, surface_formats.data()));
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, surface_formats.data()));
 		return surface_formats;
 	}
 
 	std::vector<VkPresentModeKHR> getPhysicalDeviceSurfacePresentModes(VkPhysicalDevice device, VkSurfaceKHR surface)
 	{
 		uint32_t count;
-		THROW_ON_ERROR(this->vkGetPhysicalDeviceSurfacePresentModes(device, surface, &count, nullptr));
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr));
 		std::vector<VkPresentModeKHR> present_modes(count);
-		THROW_ON_ERROR(this->vkGetPhysicalDeviceSurfacePresentModes(device, surface, &count, present_modes.data()));
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, present_modes.data()));
 		return present_modes;
 	}
 
-	PFN_vkQueuePresentKHR vkQueuePresent;
-	PFN_vkCreateSwapchainKHR vkCreateSwapchain;
-	PFN_vkAcquireNextImageKHR vkAcquireNextImage;
-	PFN_vkDestroySwapchainKHR vkDestroySwapchain;
-	PFN_vkGetSwapchainImagesKHR vkGetSwapchainImages;
-	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallback;
-	PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessenger;
-	PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallback;
-	PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupport;
-	PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormats;
-	PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilities;
-	PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModes;
+	// VK_EXT_debug_report
+	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
+	PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT;
 
 	// VK_KHR_ray_tracing extension
-	PFN_vkBindAccelerationStructureMemoryKHR vkBindAccelerationStructureMemory;
-	PFN_vkBuildAccelerationStructureKHR vkBuildAccelerationStructure;
-	PFN_vkCmdBuildAccelerationStructureIndirectKHR vkCmdBuildAccelerationStructureIndirect;
-	PFN_vkCmdBuildAccelerationStructureKHR vkCmdBuildAccelerationStructure;
-	PFN_vkCmdCopyAccelerationStructureKHR vkCmdCopyAccelerationStructure;
-	PFN_vkCmdCopyAccelerationStructureToMemoryKHR vkCmdCopyAccelerationStructureToMemory;
-	PFN_vkCmdCopyMemoryToAccelerationStructureKHR vkCmdCopyMemoryToAccelerationStructure;
-	PFN_vkCmdTraceRaysIndirectKHR vkCmdTraceRaysIndirect;
-	PFN_vkCmdTraceRaysKHR vkCmdTraceRays;
-	PFN_vkCmdWriteAccelerationStructuresPropertiesKHR vkCmdWriteAccelerationStructuresProperties;
-	PFN_vkCopyAccelerationStructureKHR vkCopyAccelerationStructure;
-	PFN_vkCopyAccelerationStructureToMemoryKHR vkCopyAccelerationStructureToMemory;
-	PFN_vkCopyMemoryToAccelerationStructureKHR vkCopyMemoryToAccelerationStructure;
-	PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructure;
-	PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelines;
-	PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructure;
-	PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddress;
-	PFN_vkGetAccelerationStructureMemoryRequirementsKHR vkGetAccelerationStructureMemoryRequirements;
-	PFN_vkGetDeviceAccelerationStructureCompatibilityKHR vkGetDeviceAccelerationStructureCompatibility;
-	PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR vkGetRayTracingCaptureReplayShaderGroupHandles;
-	PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandles;
-	PFN_vkWriteAccelerationStructuresPropertiesKHR vkWriteAccelerationStructuresProperties;
-
-	PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddress;
+	PFN_vkBindAccelerationStructureMemoryKHR vkBindAccelerationStructureMemoryKHR;
+	PFN_vkBuildAccelerationStructureKHR vkBuildAccelerationStructureKHR;
+	PFN_vkCmdBuildAccelerationStructureIndirectKHR vkCmdBuildAccelerationStructureIndirectKHR;
+	PFN_vkCmdBuildAccelerationStructureKHR vkCmdBuildAccelerationStructureKHR;
+	PFN_vkCmdCopyAccelerationStructureKHR vkCmdCopyAccelerationStructureKHR;
+	PFN_vkCmdCopyAccelerationStructureToMemoryKHR vkCmdCopyAccelerationStructureToMemoryKHR;
+	PFN_vkCmdCopyMemoryToAccelerationStructureKHR vkCmdCopyMemoryToAccelerationStructureKHR;
+	PFN_vkCmdTraceRaysIndirectKHR vkCmdTraceRaysIndirectKHR;
+	PFN_vkCmdTraceRaysKHR vkCmdTraceRaysKHR;
+	PFN_vkCmdWriteAccelerationStructuresPropertiesKHR vkCmdWriteAccelerationStructuresPropertiesKHR;
+	PFN_vkCopyAccelerationStructureKHR vkCopyAccelerationStructureKHR;
+	PFN_vkCopyAccelerationStructureToMemoryKHR vkCopyAccelerationStructureToMemoryKHR;
+	PFN_vkCopyMemoryToAccelerationStructureKHR vkCopyMemoryToAccelerationStructureKHR;
+	PFN_vkCreateAccelerationStructureKHR vkCreateAccelerationStructureKHR;
+	PFN_vkCreateRayTracingPipelinesKHR vkCreateRayTracingPipelinesKHR;
+	PFN_vkDestroyAccelerationStructureKHR vkDestroyAccelerationStructureKHR;
+	PFN_vkGetAccelerationStructureDeviceAddressKHR vkGetAccelerationStructureDeviceAddressKHR;
+	PFN_vkGetAccelerationStructureMemoryRequirementsKHR vkGetAccelerationStructureMemoryRequirementsKHR;
+	PFN_vkGetDeviceAccelerationStructureCompatibilityKHR vkGetDeviceAccelerationStructureCompatibilityKHR;
+	PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR vkGetRayTracingCaptureReplayShaderGroupHandlesKHR;
+	PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR;
+	PFN_vkWriteAccelerationStructuresPropertiesKHR vkWriteAccelerationStructuresPropertiesKHR;
+	PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
 
 	VkInstance instance{ nullptr };
 	std::vector<VulkanPhysicalDevice> physical_devices;
@@ -442,12 +421,12 @@ public:
 	NO_COPY_OR_ASSIGNMENT(VulkanDevice)
 	VulkanDevice() = delete;
 
-	VulkanDevice(std::shared_ptr<VulkanInstance> vulkan,
+	VulkanDevice(
+		std::shared_ptr<VulkanInstance> vulkan,
 		const VkPhysicalDeviceFeatures2& device_features2,
 		const std::vector<const char*>& required_layers = {},
 		const std::vector<const char*>& required_extensions = {}) :
-		vulkan(std::move(vulkan)),
-		physical_device(this->vulkan->selectPhysicalDevice(device_features2.features))
+			physical_device(vulkan->selectPhysicalDevice(device_features2.features))
 	{
 		std::for_each(required_layers.begin(), required_layers.end(), [&](const char* layer_name) {
 			for (auto properties : physical_device.layer_properties)
@@ -494,11 +473,11 @@ public:
 		  nullptr,													// pEnabledFeatures
 		};
 
-		THROW_ON_ERROR(vkCreateDevice(this->physical_device.device, &device_create_info, nullptr, &this->device));
+		THROW_ON_ERROR(vk.CreateDevice(this->physical_device.device, &device_create_info, nullptr, &this->device));
 
 		this->queues.resize(num_queues);
 		for (uint32_t i = 0; i < num_queues; i++) {
-			vkGetDeviceQueue(this->device, i, 0, &this->queues[i]);
+			vk.GetDeviceQueue(this->device, i, 0, &this->queues[i]);
 		}
 
 		VkCommandPoolCreateInfo create_info{
@@ -508,23 +487,23 @@ public:
 		  0,													// queueFamilyIndex 
 		};
 
-		THROW_ON_ERROR(vkCreateCommandPool(this->device, &create_info, nullptr, &this->default_pool));
+		THROW_ON_ERROR(vk.CreateCommandPool(this->device, &create_info, nullptr, &this->default_pool));
 	}
 
 	~VulkanDevice()
 	{
-		vkDestroyCommandPool(this->device, this->default_pool, nullptr);
-		vkDestroyDevice(this->device, nullptr);
+		vk.DestroyCommandPool(this->device, this->default_pool, nullptr);
+		vk.DestroyDevice(this->device, nullptr);
 	}
 
 	void bindImageMemory(VkImage image, VkDeviceMemory memory, VkDeviceSize offset)
 	{
-		THROW_ON_ERROR(vkBindImageMemory(this->device, image, memory, offset));
+		THROW_ON_ERROR(vk.BindImageMemory(this->device, image, memory, offset));
 	}
 
 	void bindBufferMemory(VkBuffer buffer, VkDeviceMemory memory, VkDeviceSize offset)
 	{
-		THROW_ON_ERROR(vkBindBufferMemory(this->device, buffer, memory, offset));
+		THROW_ON_ERROR(vk.BindBufferMemory(this->device, buffer, memory, offset));
 	}
 
 	VkQueue getQueue(VkQueueFlags required_flags, VkSurfaceKHR surface = VK_NULL_HANDLE)
@@ -532,14 +511,13 @@ public:
 		std::vector<VkBool32> filter(physical_device.queue_family_properties.size(), VK_TRUE);
 		if (surface != VK_NULL_HANDLE) {
 			for (uint32_t i = 0; i < physical_device.queue_family_properties.size(); i++) {
-				vkGetPhysicalDeviceSurfaceSupportKHR(physical_device.device, i, surface, &filter[i]);
+				vk.GetPhysicalDeviceSurfaceSupportKHR(physical_device.device, i, surface, &filter[i]);
 			}
 		}
 		uint32_t queue_index = this->physical_device.getQueueIndex(required_flags, filter);
 		return this->queues[queue_index];
 	}
 
-	std::shared_ptr<VulkanInstance> vulkan;
 	VkDevice device{ nullptr };
 	VulkanPhysicalDevice physical_device;
 	std::vector<VkQueue> queues;
@@ -619,12 +597,12 @@ public:
 			userdata,											// pUserData
 		};
 
-		THROW_ON_ERROR(this->vulkan->vkCreateDebugReportCallback(this->vulkan->instance, &create_info, nullptr, &this->callback));
+		THROW_ON_ERROR(this->vulkan->vkCreateDebugReportCallbackEXT(this->vulkan->instance, &create_info, nullptr, &this->callback));
 	}
 
 	~VulkanDebugCallback()
 	{
-		this->vulkan->vkDestroyDebugReportCallback(this->vulkan->instance, this->callback, nullptr);
+		this->vulkan->vkDestroyDebugReportCallbackEXT(this->vulkan->instance, this->callback, nullptr);
 	}
 
 	std::shared_ptr<VulkanInstance> vulkan;
@@ -644,12 +622,12 @@ public:
 			nullptr,									// pNext
 			0											// flags (reserved for future use)
 		};
-		THROW_ON_ERROR(vkCreateSemaphore(this->device->device, &create_info, nullptr, &this->semaphore));
+		THROW_ON_ERROR(vk.CreateSemaphore(this->device->device, &create_info, nullptr, &this->semaphore));
 	}
 
 	~VulkanSemaphore()
 	{
-		vkDestroySemaphore(this->device->device, this->semaphore, nullptr);
+		vk.DestroySemaphore(this->device->device, this->semaphore, nullptr);
 	}
 
 	VkSemaphore semaphore{ nullptr };
@@ -663,7 +641,6 @@ public:
 
 	VulkanSwapchain(
 		std::shared_ptr<VulkanDevice> device,
-		std::shared_ptr<VulkanInstance> vulkan,
 		VkSurfaceKHR surface,
 		uint32_t minImageCount,
 		VkFormat imageFormat,
@@ -678,7 +655,6 @@ public:
 		VkPresentModeKHR presentMode,
 		VkBool32 clipped,
 		VkSwapchainKHR oldSwapchain) :
-		vulkan(std::move(vulkan)),
 		device(std::move(device))
 	{
 		VkSwapchainCreateInfoKHR create_info{
@@ -702,15 +678,14 @@ public:
 			oldSwapchain
 		};
 
-		THROW_ON_ERROR(this->vulkan->vkCreateSwapchain(this->device->device, &create_info, nullptr, &this->swapchain));
+		THROW_ON_ERROR(vk.CreateSwapchainKHR(this->device->device, &create_info, nullptr, &this->swapchain));
 	}
 
 	~VulkanSwapchain()
 	{
-		this->vulkan->vkDestroySwapchain(this->device->device, this->swapchain, nullptr);
+		vk.DestroySwapchainKHR(this->device->device, this->swapchain, nullptr);
 	}
 
-	std::shared_ptr<VulkanInstance> vulkan;
 	std::shared_ptr<VulkanDevice> device;
 	VkSwapchainKHR swapchain{ nullptr };
 };
@@ -734,12 +709,12 @@ public:
 			descriptor_pool_sizes.data()							// pPoolSizes
 		};
 
-		THROW_ON_ERROR(vkCreateDescriptorPool(this->device->device, &create_info, nullptr, &this->pool));
+		THROW_ON_ERROR(vk.CreateDescriptorPool(this->device->device, &create_info, nullptr, &this->pool));
 	}
 
 	~VulkanDescriptorPool()
 	{
-		vkDestroyDescriptorPool(this->device->device, this->pool, nullptr);
+		vk.DestroyDescriptorPool(this->device->device, this->pool, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -764,12 +739,12 @@ public:
 			descriptor_set_layout_bindings.data()							// pBindings
 		};
 
-		THROW_ON_ERROR(vkCreateDescriptorSetLayout(this->device->device, &create_info, nullptr, &this->layout));
+		THROW_ON_ERROR(vk.CreateDescriptorSetLayout(this->device->device, &create_info, nullptr, &this->layout));
 	}
 
 	~VulkanDescriptorSetLayout()
 	{
-		vkDestroyDescriptorSetLayout(this->device->device, this->layout, nullptr);
+		vk.DestroyDescriptorSetLayout(this->device->device, this->layout, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -797,12 +772,12 @@ public:
 		};
 
 		this->descriptor_sets.resize(set_layouts.size());
-		THROW_ON_ERROR(vkAllocateDescriptorSets(this->device->device, &allocate_info, this->descriptor_sets.data()));
+		THROW_ON_ERROR(vk.AllocateDescriptorSets(this->device->device, &allocate_info, this->descriptor_sets.data()));
 	}
 
 	~VulkanDescriptorSets()
 	{
-		vkFreeDescriptorSets(this->device->device,
+		vk.FreeDescriptorSets(this->device->device,
 			this->pool->pool,
 			static_cast<uint32_t>(this->descriptor_sets.size()),
 			this->descriptor_sets.data());
@@ -811,7 +786,7 @@ public:
 	void update(const std::vector<VkWriteDescriptorSet>& descriptor_writes,
 		const std::vector<VkCopyDescriptorSet>& descriptor_copies = std::vector<VkCopyDescriptorSet>()) const
 	{
-		vkUpdateDescriptorSets(this->device->device,
+		vk.UpdateDescriptorSets(this->device->device,
 			static_cast<uint32_t>(descriptor_writes.size()), descriptor_writes.data(),
 			static_cast<uint32_t>(descriptor_copies.size()), descriptor_copies.data());
 	}
@@ -835,22 +810,22 @@ public:
 			VK_FENCE_CREATE_SIGNALED_BIT			// flags
 		};
 
-		THROW_ON_ERROR(vkCreateFence(this->device->device, &create_info, nullptr, &this->fence));
+		THROW_ON_ERROR(vk.CreateFence(this->device->device, &create_info, nullptr, &this->fence));
 	}
 
 	~VulkanFence()
 	{
-		vkDestroyFence(this->device->device, this->fence, nullptr);
+		vk.DestroyFence(this->device->device, this->fence, nullptr);
 	}
 
 	void wait()
 	{
-		THROW_ON_ERROR(vkWaitForFences(this->device->device, 1, &this->fence, VK_TRUE, UINT64_MAX));
+		THROW_ON_ERROR(vk.WaitForFences(this->device->device, 1, &this->fence, VK_TRUE, UINT64_MAX));
 	}
 
 	void reset()
 	{
-		THROW_ON_ERROR(vkResetFences(this->device->device, 1, &this->fence));
+		THROW_ON_ERROR(vk.ResetFences(this->device->device, 1, &this->fence));
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -897,18 +872,18 @@ public:
 			initial_layout,											// initialLayout
 		};
 
-		THROW_ON_ERROR(vkCreateImage(this->device->device, &create_info, nullptr, &this->image));
+		THROW_ON_ERROR(vk.CreateImage(this->device->device, &create_info, nullptr, &this->image));
 	}
 
 	~VulkanImage()
 	{
-		vkDestroyImage(this->device->device, this->image, nullptr);
+		vk.DestroyImage(this->device->device, this->image, nullptr);
 	}
 
 	VkMemoryRequirements getMemoryRequirements()
 	{
 		VkMemoryRequirements memory_requirements;
-		vkGetImageMemoryRequirements(
+		vk.GetImageMemoryRequirements(
 			this->device->device,
 			this->image,
 			&memory_requirements);
@@ -919,7 +894,7 @@ public:
 	VkSubresourceLayout getSubresourceLayout(VkImageSubresource& image_subresource)
 	{
 		VkSubresourceLayout subresource_layout;
-		vkGetImageSubresourceLayout(
+		vk.GetImageSubresourceLayout(
 			this->device->device,
 			this->image,
 			&image_subresource,
@@ -931,14 +906,14 @@ public:
 	std::vector<VkSparseImageMemoryRequirements> getSparseMemoryRequirements()
 	{
 		uint32_t sparse_memory_requirements_count;
-		vkGetImageSparseMemoryRequirements(
+		vk.GetImageSparseMemoryRequirements(
 			this->device->device,
 			this->image,
 			&sparse_memory_requirements_count,
 			nullptr);
 
 		std::vector<VkSparseImageMemoryRequirements> sparse_memory_requirements(sparse_memory_requirements_count);
-		vkGetImageSparseMemoryRequirements(
+		vk.GetImageSparseMemoryRequirements(
 			this->device->device,
 			this->image,
 			&sparse_memory_requirements_count,
@@ -1005,13 +980,15 @@ public:
 		VulkanBuffer() = delete;
 
 	VulkanBuffer(
+		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
 		VkBufferCreateFlags flags,
 		VkDeviceSize size,
 		VkBufferUsageFlags usage,
 		VkSharingMode sharingMode,
 		const std::vector<uint32_t>& queueFamilyIndices = std::vector<uint32_t>()) :
-		device(std::move(device))
+			vulkan(std::move(vulkan)),
+			device(std::move(device))
 	{
 		VkBufferCreateInfo create_info{
 			VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,				// sType  
@@ -1024,18 +1001,18 @@ public:
 			queueFamilyIndices.data(),							// pQueueFamilyIndices  
 		};
 
-		THROW_ON_ERROR(vkCreateBuffer(this->device->device, &create_info, nullptr, &this->buffer));
+		THROW_ON_ERROR(vk.CreateBuffer(this->device->device, &create_info, nullptr, &this->buffer));
 	}
 
 	~VulkanBuffer()
 	{
-		vkDestroyBuffer(this->device->device, this->buffer, nullptr);
+		vk.DestroyBuffer(this->device->device, this->buffer, nullptr);
 	}
 
 	VkMemoryRequirements getMemoryRequirements()
 	{
 		VkMemoryRequirements memory_requirements;
-		vkGetBufferMemoryRequirements(
+		vk.GetBufferMemoryRequirements(
 			this->device->device,
 			this->buffer,
 			&memory_requirements);
@@ -1043,14 +1020,14 @@ public:
 		return memory_requirements;
 	}
 
-	static VkDeviceAddress getDeviceAddress(VkDevice device, VkBuffer buffer)
+	VkDeviceAddress getDeviceAddress(VkDevice device, VkBuffer buffer)
 	{
 		VkBufferDeviceAddressInfo buffer_address_info{
 			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
 			nullptr,
 			buffer
 		};
-		return vkGetBufferDeviceAddress(device, &buffer_address_info);
+		return this->vulkan->vkGetBufferDeviceAddressKHR(device, &buffer_address_info);
 	}
 
 	VkDeviceAddress getDeviceAddress()
@@ -1059,7 +1036,7 @@ public:
 	}
 
 
-
+	std::shared_ptr<VulkanInstance> vulkan;
 	std::shared_ptr<VulkanDevice> device;
 	VkBuffer buffer{ nullptr };
 };
@@ -1068,6 +1045,7 @@ public:
 class VulkanBufferObject {
 public:
 	VulkanBufferObject(
+		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
 		VkBufferCreateFlags createFlags,
 		VkDeviceSize size,
@@ -1076,6 +1054,7 @@ public:
 		VkMemoryPropertyFlags memoryFlags)
 	{
 		this->buffer = std::make_shared<VulkanBuffer>(
+			vulkan,
 			device,
 			createFlags,
 			size,
@@ -1209,12 +1188,12 @@ public:
 		};
 
 		this->buffers.resize(count);
-		THROW_ON_ERROR(vkAllocateCommandBuffers(this->device->device, &allocate_info, this->buffers.data()));
+		THROW_ON_ERROR(vk.AllocateCommandBuffers(this->device->device, &allocate_info, this->buffers.data()));
 	}
 
 	~VulkanCommandBuffers()
 	{
-		vkFreeCommandBuffers(
+		vk.FreeCommandBuffers(
 			this->device->device,
 			this->device->default_pool,
 			static_cast<uint32_t>(this->buffers.size()),
@@ -1246,12 +1225,12 @@ public:
 			&inheritance_info,									// pInheritanceInfo 
 		};
 
-		THROW_ON_ERROR(vkBeginCommandBuffer(this->buffers[buffer_index], &begin_info));
+		THROW_ON_ERROR(vk.BeginCommandBuffer(this->buffers[buffer_index], &begin_info));
 	}
 
 	void end(size_t buffer_index = 0)
 	{
-		THROW_ON_ERROR(vkEndCommandBuffer(this->buffers[buffer_index]));
+		THROW_ON_ERROR(vk.EndCommandBuffer(this->buffers[buffer_index]));
 	}
 
 	void submit(
@@ -1295,7 +1274,7 @@ public:
 			signal_semaphores.data(),							// pSignalSemaphores
 		};
 
-		THROW_ON_ERROR(vkQueueSubmit(queue, 1, &submit_info, fence));
+		THROW_ON_ERROR(vk.QueueSubmit(queue, 1, &submit_info, fence));
 	}
 
 	VkCommandBuffer buffer(size_t buffer_index = 0)
@@ -1310,7 +1289,7 @@ public:
 		std::vector<VkImageMemoryBarrier> barriers,
 		size_t buffer_index = 0)
 	{
-		vkCmdPipelineBarrier(
+		vk.CmdPipelineBarrier(
 			buffer,
 			srcStageMask,
 			dstStageMask,
@@ -1351,27 +1330,27 @@ VulkanMemory::VulkanMemory(
 		memory_type_index,							// memoryTypeIndex 
 	};
 
-	THROW_ON_ERROR(vkAllocateMemory(this->device->device, &allocate_info, nullptr, &this->memory));
+	THROW_ON_ERROR(vk.AllocateMemory(this->device->device, &allocate_info, nullptr, &this->memory));
 }
 
 inline
 VulkanMemory::~VulkanMemory()
 {
-	vkFreeMemory(this->device->device, this->memory, nullptr);
+	vk.FreeMemory(this->device->device, this->memory, nullptr);
 }
 
 inline char*
 VulkanMemory::map(VkDeviceSize size, VkDeviceSize offset, VkMemoryMapFlags flags) const
 {
 	void* data;
-	THROW_ON_ERROR(vkMapMemory(this->device->device, this->memory, offset, size, flags, &data));
+	THROW_ON_ERROR(vk.MapMemory(this->device->device, this->memory, offset, size, flags, &data));
 	return reinterpret_cast<char*>(data);
 }
 
 inline void
 VulkanMemory::unmap() const
 {
-	vkUnmapMemory(this->device->device, this->memory);
+	vk.UnmapMemory(this->device->device, this->memory);
 }
 
 class MemoryMap {
@@ -1424,12 +1403,12 @@ public:
 			subresource_range,							// subresourceRange 
 		};
 
-		THROW_ON_ERROR(vkCreateImageView(this->device->device, &create_info, nullptr, &this->view));
+		THROW_ON_ERROR(vk.CreateImageView(this->device->device, &create_info, nullptr, &this->view));
 	}
 
 	~VulkanImageView()
 	{
-		vkDestroyImageView(this->device->device, this->view, nullptr);
+		vk.DestroyImageView(this->device->device, this->view, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1481,12 +1460,12 @@ public:
 			unnormalizedCoordinates,						// unnormalizedCoordinates
 		};
 
-		THROW_ON_ERROR(vkCreateSampler(this->device->device, &create_info, nullptr, &this->sampler));
+		THROW_ON_ERROR(vk.CreateSampler(this->device->device, &create_info, nullptr, &this->sampler));
 	}
 
 	~VulkanSampler()
 	{
-		vkDestroySampler(this->device->device, this->sampler, nullptr);
+		vk.DestroySampler(this->device->device, this->sampler, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1511,12 +1490,12 @@ public:
 			code.data(),										// pCode
 		};
 
-		THROW_ON_ERROR(vkCreateShaderModule(this->device->device, &create_info, nullptr, &this->module));
+		THROW_ON_ERROR(vk.CreateShaderModule(this->device->device, &create_info, nullptr, &this->module));
 	}
 
 	~VulkanShaderModule()
 	{
-		vkDestroyShaderModule(this->device->device, this->module, nullptr);
+		vk.DestroyShaderModule(this->device->device, this->module, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1540,12 +1519,12 @@ public:
 			nullptr,										// pInitialData
 		};
 
-		THROW_ON_ERROR(vkCreatePipelineCache(this->device->device, &create_info, nullptr, &this->cache));
+		THROW_ON_ERROR(vk.CreatePipelineCache(this->device->device, &create_info, nullptr, &this->cache));
 	}
 
 	~VulkanPipelineCache()
 	{
-		vkDestroyPipelineCache(this->device->device, this->cache, nullptr);
+		vk.DestroyPipelineCache(this->device->device, this->cache, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1576,12 +1555,12 @@ public:
 			dependencies.data(),								// pDependencies
 		};
 
-		THROW_ON_ERROR(vkCreateRenderPass(this->device->device, &create_info, nullptr, &this->renderpass));
+		THROW_ON_ERROR(vk.CreateRenderPass(this->device->device, &create_info, nullptr, &this->renderpass));
 	}
 
 	~VulkanRenderpass()
 	{
-		vkDestroyRenderPass(this->device->device, this->renderpass, nullptr);
+		vk.DestroyRenderPass(this->device->device, this->renderpass, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1611,7 +1590,7 @@ public:
 			clearvalues.data()									// pClearValues
 		};
 
-		vkCmdBeginRenderPass(
+		vk.CmdBeginRenderPass(
 			this->command,
 			&begin_info,
 			VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
@@ -1619,7 +1598,7 @@ public:
 
 	~VulkanRenderPassScope()
 	{
-		vkCmdEndRenderPass(this->command);
+		vk.CmdEndRenderPass(this->command);
 	}
 
 	VkCommandBuffer command;
@@ -1651,12 +1630,12 @@ public:
 			layers,											// layers
 		};
 
-		THROW_ON_ERROR(vkCreateFramebuffer(this->device->device, &create_info, nullptr, &this->framebuffer));
+		THROW_ON_ERROR(vk.CreateFramebuffer(this->device->device, &create_info, nullptr, &this->framebuffer));
 	}
 
 	~VulkanFramebuffer()
 	{
-		vkDestroyFramebuffer(this->device->device, this->framebuffer, nullptr);
+		vk.DestroyFramebuffer(this->device->device, this->framebuffer, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1685,12 +1664,12 @@ public:
 			pushconstantranges.data(),							// pPushConstantRanges
 		};
 
-		THROW_ON_ERROR(vkCreatePipelineLayout(this->device->device, &create_info, nullptr, &this->layout));
+		THROW_ON_ERROR(vk.CreatePipelineLayout(this->device->device, &create_info, nullptr, &this->layout));
 	}
 
 	~VulkanPipelineLayout()
 	{
-		vkDestroyPipelineLayout(this->device->device, this->layout, nullptr);
+		vk.DestroyPipelineLayout(this->device->device, this->layout, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1721,12 +1700,12 @@ public:
 			basePipelineIndex,									// basePipelineIndex
 		};
 
-		THROW_ON_ERROR(vkCreateComputePipelines(this->device->device, pipelineCache, 1, &create_info, nullptr, &this->pipeline));
+		THROW_ON_ERROR(vk.CreateComputePipelines(this->device->device, pipelineCache, 1, &create_info, nullptr, &this->pipeline));
 	}
 
 	~VulkanComputePipeline()
 	{
-		vkDestroyPipeline(this->device->device, this->pipeline, nullptr);
+		vk.DestroyPipeline(this->device->device, this->pipeline, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1868,12 +1847,12 @@ public:
 			0,																// basePipelineIndex
 		};
 
-		THROW_ON_ERROR(vkCreateGraphicsPipelines(this->device->device, pipeline_cache, 1, &create_info, nullptr, &this->pipeline));
+		THROW_ON_ERROR(vk.CreateGraphicsPipelines(this->device->device, pipeline_cache, 1, &create_info, nullptr, &this->pipeline));
 	}
 
 	~VulkanGraphicsPipeline()
 	{
-		vkDestroyPipeline(this->device->device, this->pipeline, nullptr);
+		vk.DestroyPipeline(this->device->device, this->pipeline, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
@@ -1931,13 +1910,14 @@ public:
 			deviceAddress
 		};
 
-		THROW_ON_ERROR(this->vulkan->vkCreateAccelerationStructure(this->device->device, &create_info, nullptr, &this->as));
+		THROW_ON_ERROR(this->vulkan->vkCreateAccelerationStructureKHR(this->device->device, &create_info, nullptr, &this->as));
 
 		VkMemoryRequirements memory_requirements = this->getMemoryRequirements(
 			VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_KHR,	// type
 			VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR);				// buildType
 
 		this->buffer = std::make_shared<VulkanBuffer>(
+			this->vulkan,
 			this->device,
 			0,
 			memory_requirements.size,
@@ -1976,12 +1956,12 @@ public:
 			nullptr,			// pDeviceIndices;
 		};
 
-		this->vulkan->vkBindAccelerationStructureMemory(this->device->device, 1, &memory_info);
+		this->vulkan->vkBindAccelerationStructureMemoryKHR(this->device->device, 1, &memory_info);
 	}
 
 	~VulkanAccelerationStructure()
 	{
-		this->vulkan->vkDestroyAccelerationStructure(this->device->device, this->as, nullptr);
+		this->vulkan->vkDestroyAccelerationStructureKHR(this->device->device, this->as, nullptr);
 	}
 
 	VkMemoryRequirements getMemoryRequirements(
@@ -2000,7 +1980,7 @@ public:
 			VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
 		};
 
-		this->vulkan->vkGetAccelerationStructureMemoryRequirements(this->device->device, &memory_requirements_info, &memory_requirements2);
+		this->vulkan->vkGetAccelerationStructureMemoryRequirementsKHR(this->device->device, &memory_requirements_info, &memory_requirements2);
 
 		return memory_requirements2.memoryRequirements;
 	}
@@ -2029,7 +2009,7 @@ public:
 		};
 
 		VkAccelerationStructureBuildOffsetInfoKHR* pOffsetInfos = build_offset_infos.data();
-		this->vulkan->vkCmdBuildAccelerationStructure(
+		this->vulkan->vkCmdBuildAccelerationStructureKHR(
 			command,
 			static_cast<uint32_t>(build_offset_infos.size()),
 			&build_geometry_info,
@@ -2042,7 +2022,7 @@ public:
 			VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,				// dstAccessMask
 		};
 
-		vkCmdPipelineBarrier(
+		vk.CmdPipelineBarrier(
 			command,
 			VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
 			VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,

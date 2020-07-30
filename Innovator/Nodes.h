@@ -349,6 +349,7 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
+			context->vulkan,
 			context->device,
 			this->create_flags,
 			context->state.bufferdata->size(),
@@ -394,6 +395,7 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
+			context->vulkan,
 			context->device,
 			this->create_flags,
 			context->state.bufferdata->size(),
@@ -407,7 +409,7 @@ public:
 			context->state.bufferdata->size(),						// size
 		} };
 
-		vkCmdCopyBuffer(
+		vk.CmdCopyBuffer(
 			context->command->buffer(),
 			context->state.buffer,
 			this->bufferobject->buffer->buffer,
@@ -443,6 +445,7 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->buffer = std::make_shared<VulkanBufferObject>(
+			context->vulkan,
 			context->device,
 			0,
 			sizeof(glm::mat4) * 3,
@@ -761,9 +764,12 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
-		VkDeviceAddress index_address = VulkanBuffer::getDeviceAddress(
-			context->device->device, 
-			context->state.index_buffer);
+		VkBufferDeviceAddressInfo index_buffer_address_info{
+			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+			nullptr,
+			context->state.index_buffer
+		};
+		VkDeviceAddress index_address = context->vulkan->vkGetBufferDeviceAddressKHR(context->device->device, &index_buffer_address_info);
 
 		VkIndexType indexType = context->state.index_buffer_type;
 		uint32_t maxPrimitiveCount = context->state.index_count / 3;
@@ -789,7 +795,14 @@ public:
 			});
 
 			VkBuffer vertex_buffer = context->state.vertex_attribute_buffers[i];
-			VkDeviceAddress vertex_address = VulkanBuffer::getDeviceAddress(context->device->device, vertex_buffer);
+
+			VkBufferDeviceAddressInfo vertex_buffer_address_info{
+				VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+				nullptr,
+				vertex_buffer
+			};
+
+			VkDeviceAddress vertex_address = context->vulkan->vkGetBufferDeviceAddressKHR(context->device->device, &vertex_buffer_address_info);
 			VkDeviceSize vertexStride = context->state.vertex_input_bindings[i].stride;
 
 			VkAccelerationStructureGeometryTrianglesDataKHR geometry_triangles_data{
@@ -874,8 +887,7 @@ public:
 			};
 
 			VkDeviceOrHostAddressConstKHR data;
-			data.deviceAddress = 
-				context->vulkan->vkGetAccelerationStructureDeviceAddress(context->device->device, &device_address_info);
+			data.deviceAddress = context->vulkan->vkGetAccelerationStructureDeviceAddressKHR(context->device->device, &device_address_info);
 
 			VkAccelerationStructureInstanceKHR instance{
 				transform,													// transform
@@ -1092,7 +1104,7 @@ public:
 				context->state.texture->subresource_range())
 			});
 
-		vkCmdCopyBufferToImage(
+		vk.CmdCopyBufferToImage(
 			context->command->buffer(),
 			context->state.buffer,
 			this->image->image->image,
@@ -1269,7 +1281,7 @@ public:
 
 	void record(Visitor* context)
 	{
-		vkCmdBindDescriptorSets(this->command->buffer(),
+		vk.CmdBindDescriptorSets(this->command->buffer(),
 			VK_PIPELINE_BIND_POINT_COMPUTE,
 			this->pipeline_layout->layout,
 			0,
@@ -1278,11 +1290,11 @@ public:
 			0,
 			nullptr);
 
-		vkCmdBindPipeline(this->command->buffer(),
+		vk.CmdBindPipeline(this->command->buffer(),
 			VK_PIPELINE_BIND_POINT_COMPUTE,
 			this->compute_pipeline->pipeline);
 
-		vkCmdDispatch(this->command->buffer(),
+		vk.CmdDispatch(this->command->buffer(),
 			this->group_count_x,
 			this->group_count_y,
 			this->group_count_z);
@@ -1375,7 +1387,7 @@ public:
 			VK_NULL_HANDLE,
 			VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
 
-		vkCmdBindDescriptorSets(this->command->buffer(),
+		vk.CmdBindDescriptorSets(this->command->buffer(),
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			this->pipeline_layout->layout,
 			0,
@@ -1384,7 +1396,7 @@ public:
 			0,
 			nullptr);
 
-		vkCmdBindPipeline(this->command->buffer(),
+		vk.CmdBindPipeline(this->command->buffer(),
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			this->graphics_pipeline->pipeline);
 
@@ -1402,17 +1414,17 @@ public:
 		  1.0f													// maxDepth
 		} };
 
-		vkCmdSetScissor(this->command->buffer(),
+		vk.CmdSetScissor(this->command->buffer(),
 			0,
 			static_cast<uint32_t>(scissors.size()),
 			scissors.data());
 
-		vkCmdSetViewport(this->command->buffer(),
+		vk.CmdSetViewport(this->command->buffer(),
 			0,
 			static_cast<uint32_t>(viewports.size()),
 			viewports.data());
 
-		vkCmdBindVertexBuffers(this->command->buffer(),
+		vk.CmdBindVertexBuffers(this->command->buffer(),
 			0,
 			static_cast<uint32_t>(context->state.vertex_attribute_buffers.size()),
 			context->state.vertex_attribute_buffers.data(),
@@ -1424,7 +1436,7 @@ public:
 
 	void render(CommandVisitor* context)
 	{
-		vkCmdExecuteCommands(
+		vk.CmdExecuteCommands(
 			context->state.command->buffer(),
 			static_cast<uint32_t>(this->command->buffers.size()),
 			this->command->buffers.data());
@@ -1471,7 +1483,7 @@ public:
 private:
 	void execute(VkCommandBuffer command, Visitor*) override
 	{
-		vkCmdDraw(
+		vk.CmdDraw(
 			command, 
 			this->vertexcount, 
 			this->instancecount, 
@@ -1515,13 +1527,13 @@ public:
 private:
 	void execute(VkCommandBuffer command, Visitor* context) override
 	{
-		vkCmdBindIndexBuffer(
+		vk.CmdBindIndexBuffer(
 			command,
 			context->state.index_buffer,
 			this->offset,
 			context->state.index_buffer_type);
 
-		vkCmdDrawIndexed(
+		vk.CmdDrawIndexed(
 			command,
 			this->indexcount,
 			this->instancecount,
@@ -2041,7 +2053,6 @@ public:
 
 		this->swapchain = std::make_unique<VulkanSwapchain>(
 			context->device,
-			context->vulkan,
 			this->surface->surface,
 			3,
 			surface_format.format,
@@ -2058,14 +2069,14 @@ public:
 			prevswapchain);
 
 		uint32_t count;
-		THROW_ON_ERROR(context->vulkan->vkGetSwapchainImages(
+		THROW_ON_ERROR(vk.GetSwapchainImagesKHR(
 			context->device->device,
 			this->swapchain->swapchain,
 			&count,
 			nullptr));
 
 		this->swapchain_images.resize(count);
-		THROW_ON_ERROR(context->vulkan->vkGetSwapchainImages(
+		THROW_ON_ERROR(vk.GetSwapchainImagesKHR(
 			context->device->device,
 			this->swapchain->swapchain,
 			&count,
@@ -2141,7 +2152,7 @@ public:
 					this->subresource_range)
 				}, i);
 
-			vkCmdCopyImage(this->swap_buffers_command->buffer(i),
+			vk.CmdCopyImage(this->swap_buffers_command->buffer(i),
 				srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				static_cast<uint32_t>(regions.size()), regions.data());
@@ -2170,7 +2181,7 @@ public:
 
 	void present(Visitor* context)
 	{
-		THROW_ON_ERROR(context->vulkan->vkAcquireNextImage(
+		THROW_ON_ERROR(vk.AcquireNextImageKHR(
 			context->device->device,
 			this->swapchain->swapchain,
 			UINT64_MAX,
@@ -2200,7 +2211,7 @@ public:
 		  nullptr											// pResults
 		};
 
-		THROW_ON_ERROR(context->vulkan->vkQueuePresent(this->present_queue, &present_info));
+		THROW_ON_ERROR(vk.QueuePresentKHR(this->present_queue, &present_info));
 	}
 
 private:
@@ -2321,7 +2332,7 @@ public:
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				this->subresource_range) });
 
-		vkCmdCopyImage(
+		vk.CmdCopyImage(
 			this->get_image_command->buffer(),
 			this->color_attachment->image->image->image,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -2631,7 +2642,7 @@ public:
 		  signal_semaphores.data(),											// pSignalSemaphores
 		};
 
-		vkQueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
+		vk.QueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 
 		if (regions.empty()) {
 			context->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
@@ -2652,7 +2663,7 @@ public:
 					context->state.texture->subresource_range())
 				});
 
-			vkCmdCopyBufferToImage(
+			vk.CmdCopyBufferToImage(
 				this->copy_sparse_command->buffer(),
 				context->state.buffer,
 				this->image->image,

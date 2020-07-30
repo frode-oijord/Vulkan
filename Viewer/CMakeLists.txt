@@ -18,7 +18,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 find_package(Vulkan REQUIRED)
 include_directories(${Vulkan_INCLUDE_DIRS})
-link_libraries(${Vulkan_LIBRARIES})
+# link_libraries(${Vulkan_LIBRARIES})
 
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
@@ -37,7 +37,8 @@ add_executable(
 	${PROJECT_SOURCE_DIR}/../Innovator/Visitor.cpp
 	${PROJECT_SOURCE_DIR}/../Innovator/Visitor.h
 	${PROJECT_SOURCE_DIR}/../Innovator/VulkanSurface.h
-	${PROJECT_SOURCE_DIR}/../Innovator/Wrapper.h)
+	${PROJECT_SOURCE_DIR}/../Innovator/Wrapper.h
+	${PROJECT_SOURCE_DIR}/../Innovator/VulkanAPI.h)
 
 set_property(TARGET Viewer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)

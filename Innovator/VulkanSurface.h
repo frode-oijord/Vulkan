@@ -28,7 +28,7 @@ public:
 			window,												// hwnd
 		};
 
-		THROW_ON_ERROR(vkCreateWin32SurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
+		THROW_ON_ERROR(vk.CreateWin32SurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
 	}
 
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
@@ -45,13 +45,13 @@ public:
 			window,												// window
 		};
 
-		THROW_ON_ERROR(vkCreateXcbSurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
+		THROW_ON_ERROR(vk.CreateXcbSurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
 	}
 #endif
 
 	~VulkanSurface()
 	{
-		vkDestroySurfaceKHR(this->vulkan->instance, this->surface, nullptr);
+		vk.DestroySurfaceKHR(this->vulkan->instance, this->surface, nullptr);
 	}
 
 	VkSurfaceFormatKHR getSupportedSurfaceFormat(std::shared_ptr<VulkanDevice> device, VkFormat format)
