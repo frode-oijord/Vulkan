@@ -612,22 +612,22 @@ public:
 		};
 
 		this->descriptor_buffer_info = {
-		  context->state.buffer,										// buffer
-		  0,															// offset
-		  VK_WHOLE_SIZE													// range
+		  .buffer = context->state.buffer,
+		  .offset = 0,
+		  .range = VK_WHOLE_SIZE
 		};
 
 		VkWriteDescriptorSet set{
-				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,						// sType
-				0,														// pNext
-				0,														// dstSet
-				this->binding,												// dstBinding
-				0,															// dstArrayElement
-				1,															// descriptorCount
-				this->descriptorType,											// descriptorType
-				&this->descriptor_image_info,									// pImageInfo
-				&this->descriptor_buffer_info,								// pBufferInfo
-				0,														// pTexelBufferView
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.pNext = 0,
+			.dstSet = 0,
+			.dstBinding = this->binding,
+			.dstArrayElement = 0,
+			.descriptorCount = 1,
+			.descriptorType = this->descriptorType,
+			.pImageInfo = &this->descriptor_image_info,
+			.pBufferInfo = &this->descriptor_buffer_info,
+			.pTexelBufferView = 0,
 		};
 		context->state.write_descriptor_sets.push_back(set);
 	}
