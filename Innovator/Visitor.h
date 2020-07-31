@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #include <any>
+#include <unordered_map>
 #include <typeindex>
 #include <functional>
 
@@ -100,11 +101,11 @@ public:
 	void visit(class Node* node);
 
 	VkPhysicalDeviceFeatures device_features;
-
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	VkPhysicalDeviceBufferDeviceAddressFeatures device_address_features{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR
 	};
-
+#endif
 	VkPhysicalDeviceFeatures2 device_features2{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR
 	};
@@ -128,11 +129,23 @@ public:
 		Visitor::init(vulkan, device, extent);
 		this->fence = std::make_unique<VulkanFence>(this->device);
 		this->command = std::make_unique<VulkanCommandBuffers>(this->device);
-		this->queue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT);
+		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkQueueFlagBits.html
+		// All commands that are allowed on a queue that supports transfer operations are also allowed on a 
+		// queue that supports either graphics or compute operations. Thus, if the capabilities of a queue 
+		// family include VK_QUEUE_GRAPHICS_BIT or VK_QUEUE_COMPUTE_BIT, then reporting the 
+		// VK_QUEUE_TRANSFER_BIT capability separately for that queue family is optional.
+		this->graphicsqueue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+		this->transferqueue = this->graphicsqueue;// this->device->getQueue(VK_QUEUE_TRANSFER_BIT);
+
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+		this->sparsequeue = this->device->getQueue(VK_QUEUE_SPARSE_BINDING_BIT);
+#endif
 	}
 
 
-	VkQueue queue{ nullptr };
+	VkQueue graphicsqueue{ nullptr };
+	VkQueue transferqueue{ nullptr };
+	VkQueue sparsequeue{ nullptr };
 	std::shared_ptr<VulkanFence> fence{ nullptr };
 	std::vector<VkSemaphore> wait_semaphores;
 	std::unique_ptr<VulkanCommandBuffers> command{ nullptr };

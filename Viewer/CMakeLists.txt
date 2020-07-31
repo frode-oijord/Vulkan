@@ -42,6 +42,6 @@ add_executable(
 
 set_property(TARGET Viewer PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
-set_target_properties(Viewer PROPERTIES CXX_STANDARD 17)
+set_target_properties(Viewer PROPERTIES CXX_STANDARD 20)
 
 target_link_libraries(Viewer $ENV{VULKAN_SDK}/Lib/shaderc_shared.lib)

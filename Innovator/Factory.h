@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Innovator/Defines.h>
-
 #include <boost/iostreams/device/mapped_file.hpp>
 
 #include <memory>
@@ -155,7 +154,6 @@ static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vec
 		}
 	}
 }
-
 
 class DebugTextureImage : public VulkanTextureImage {
 public:
@@ -395,4 +393,3 @@ public:
 	size_t lod0_size;
 	size_t num_lods;
 };
-

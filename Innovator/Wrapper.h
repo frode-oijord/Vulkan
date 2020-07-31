@@ -191,8 +191,9 @@ public:
 	VkPhysicalDevice device;
 	VkPhysicalDeviceFeatures features{};
 
-	VkPhysicalDeviceBufferDeviceAddressFeatures device_address_features{
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR
+	// Provided by VK_KHR_buffer_device_address
+	VkPhysicalDeviceBufferDeviceAddressFeaturesEXT device_address_features{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_EXT
 	};
 
 	VkPhysicalDeviceFeatures2 features2{ 
@@ -292,7 +293,7 @@ public:
 
 		this->vkCreateDebugReportCallbackEXT = this->getProcAddress<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
 		this->vkDestroyDebugReportCallbackEXT = this->getProcAddress<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
-
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 		// VK_KHR_ray_tracing extension
 		this->vkBindAccelerationStructureMemoryKHR = this->getProcAddress<PFN_vkBindAccelerationStructureMemoryKHR>("vkBindAccelerationStructureMemoryKHR");
 		this->vkBuildAccelerationStructureKHR = this->getProcAddress<PFN_vkBuildAccelerationStructureKHR>("vkBuildAccelerationStructureKHR");
@@ -316,8 +317,8 @@ public:
 		this->vkGetRayTracingCaptureReplayShaderGroupHandlesKHR = this->getProcAddress<PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR>("vkGetRayTracingCaptureReplayShaderGroupHandlesKHR");
 		this->vkGetRayTracingShaderGroupHandlesKHR = this->getProcAddress<PFN_vkGetRayTracingShaderGroupHandlesKHR>("vkGetRayTracingShaderGroupHandlesKHR");
 		this->vkWriteAccelerationStructuresPropertiesKHR = this->getProcAddress<PFN_vkWriteAccelerationStructuresPropertiesKHR>("vkWriteAccelerationStructuresPropertiesKHR");
-
-		 this->vkGetBufferDeviceAddressKHR = this->getProcAddress<PFN_vkGetBufferDeviceAddressKHR>("vkGetBufferDeviceAddressKHR");
+		this->vkGetBufferDeviceAddressKHR = this->getProcAddress<PFN_vkGetBufferDeviceAddressKHR>("vkGetBufferDeviceAddressKHR");
+#endif
 	}
 
 	~VulkanInstance()
@@ -388,6 +389,7 @@ public:
 	PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT;
 
 	// VK_KHR_ray_tracing extension
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	PFN_vkBindAccelerationStructureMemoryKHR vkBindAccelerationStructureMemoryKHR;
 	PFN_vkBuildAccelerationStructureKHR vkBuildAccelerationStructureKHR;
 	PFN_vkCmdBuildAccelerationStructureIndirectKHR vkCmdBuildAccelerationStructureIndirectKHR;
@@ -411,7 +413,7 @@ public:
 	PFN_vkGetRayTracingShaderGroupHandlesKHR vkGetRayTracingShaderGroupHandlesKHR;
 	PFN_vkWriteAccelerationStructuresPropertiesKHR vkWriteAccelerationStructuresPropertiesKHR;
 	PFN_vkGetBufferDeviceAddressKHR vkGetBufferDeviceAddressKHR;
-
+#endif
 	VkInstance instance{ nullptr };
 	std::vector<VulkanPhysicalDevice> physical_devices;
 };
@@ -521,7 +523,7 @@ public:
 	VkDevice device{ nullptr };
 	VulkanPhysicalDevice physical_device;
 	std::vector<VkQueue> queues;
-	VkCommandPool default_pool{ nullptr };
+	VkCommandPool default_pool{ 0 };
 };
 
 class VulkanMemory {
@@ -542,7 +544,7 @@ public:
 	void memcpy(const void* src, VkDeviceSize size, VkDeviceSize offset);
 
 	std::shared_ptr<VulkanDevice> device;
-	VkDeviceMemory memory{ nullptr };
+	VkDeviceMemory memory{ 0 };
 };
 
 static VkBool32 DebugCallback(
@@ -576,7 +578,7 @@ static VkBool32 DebugCallback(
 	return VK_FALSE;
 }
 
-
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 class VulkanDebugCallback {
 public:
 	NO_COPY_OR_ASSIGNMENT(VulkanDebugCallback)
@@ -608,6 +610,7 @@ public:
 	std::shared_ptr<VulkanInstance> vulkan;
 	VkDebugReportCallbackEXT callback{ nullptr };
 };
+#endif
 
 class VulkanSemaphore {
 public:
@@ -630,7 +633,7 @@ public:
 		vk.DestroySemaphore(this->device->device, this->semaphore, nullptr);
 	}
 
-	VkSemaphore semaphore{ nullptr };
+	VkSemaphore semaphore{ 0 };
 	std::shared_ptr<VulkanDevice> device;
 };
 
@@ -687,7 +690,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkSwapchainKHR swapchain{ nullptr };
+	VkSwapchainKHR swapchain{ 0 };
 };
 
 class VulkanDescriptorPool {
@@ -718,7 +721,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkDescriptorPool pool{ nullptr };
+	VkDescriptorPool pool{ 0 };
 };
 
 class VulkanDescriptorSetLayout {
@@ -748,7 +751,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkDescriptorSetLayout layout{ nullptr };
+	VkDescriptorSetLayout layout{ 0 };
 };
 
 class VulkanDescriptorSets {
@@ -829,7 +832,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkFence fence{ nullptr };
+	VkFence fence{ 0 };
 };
 
 
@@ -971,7 +974,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkImage image{ nullptr };
+	VkImage image{ 0 };
 };
 
 class VulkanBuffer {
@@ -1019,7 +1022,7 @@ public:
 
 		return memory_requirements;
 	}
-
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	VkDeviceAddress getDeviceAddress(VkDevice device, VkBuffer buffer)
 	{
 		VkBufferDeviceAddressInfo buffer_address_info{
@@ -1034,11 +1037,11 @@ public:
 	{
 		return getDeviceAddress(this->device->device, this->buffer);
 	}
-
+#endif
 
 	std::shared_ptr<VulkanInstance> vulkan;
 	std::shared_ptr<VulkanDevice> device;
-	VkBuffer buffer{ nullptr };
+	VkBuffer buffer{ 0 };
 };
 
 
@@ -1067,9 +1070,11 @@ public:
 			memory_requirements.memoryTypeBits,
 			memoryFlags);
 
-		VkMemoryAllocateFlags allocate_flags = (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) ?
+		VkMemoryAllocateFlags allocate_flags = 0;
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+		allocate_flags = (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) ?
 			VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR : 0;
-
+#endif
 		VkMemoryAllocateFlagsInfo allocate_info{
 			VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR,
 			nullptr,
@@ -1167,8 +1172,8 @@ public:
 			this->buffer->end(this->index);
 		}
 
-		size_t index;
 		VulkanCommandBuffers* buffer;
+		size_t index;
 	};
 
 	VulkanCommandBuffers() = delete;
@@ -1202,9 +1207,9 @@ public:
 
 	void begin(
 		size_t buffer_index = 0,
-		VkRenderPass renderpass = nullptr,
+		VkRenderPass renderpass = 0,
 		uint32_t subpass = 0,
-		VkFramebuffer framebuffer = nullptr,
+		VkFramebuffer framebuffer = 0,
 		VkCommandBufferUsageFlags flags = 0)
 	{
 		VkCommandBufferInheritanceInfo inheritance_info{
@@ -1412,7 +1417,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkImageView view{ nullptr };
+	VkImageView view{ 0 };
 };
 
 class VulkanSampler {
@@ -1469,7 +1474,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkSampler sampler{ nullptr };
+	VkSampler sampler{ 0 };
 };
 
 class VulkanShaderModule {
@@ -1499,7 +1504,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkShaderModule module{ nullptr };
+	VkShaderModule module{ 0 };
 };
 
 
@@ -1528,7 +1533,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkPipelineCache cache{ nullptr };
+	VkPipelineCache cache{ 0 };
 };
 
 class VulkanRenderpass {
@@ -1564,7 +1569,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkRenderPass renderpass{ nullptr };
+	VkRenderPass renderpass{ 0 };
 };
 
 class VulkanRenderPassScope {
@@ -1640,7 +1645,7 @@ public:
 
 	std::shared_ptr<VulkanDevice> device;
 	std::shared_ptr<VulkanRenderpass> renderpass;
-	VkFramebuffer framebuffer{ nullptr };
+	VkFramebuffer framebuffer{ 0 };
 };
 
 class VulkanPipelineLayout {
@@ -1673,7 +1678,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkPipelineLayout layout{ nullptr };
+	VkPipelineLayout layout{ 0 };
 };
 
 class VulkanComputePipeline {
@@ -1686,7 +1691,7 @@ public:
 		VkPipelineCache pipelineCache,
 		const VkPipelineShaderStageCreateInfo& stage,
 		VkPipelineLayout layout,
-		VkPipeline basePipelineHandle = nullptr,
+		VkPipeline basePipelineHandle = 0,
 		int32_t basePipelineIndex = 0) :
 		device(std::move(device))
 	{
@@ -1709,7 +1714,7 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkPipeline pipeline{ nullptr };
+	VkPipeline pipeline{ 0 };
 };
 
 class VulkanGraphicsPipeline {
@@ -1843,7 +1848,7 @@ public:
 			pipeline_layout,												// layout
 			render_pass,													// renderPass
 			0,																// subpass
-			nullptr,														// basePipelineHandle
+			0,																// basePipelineHandle
 			0,																// basePipelineIndex
 		};
 
@@ -1856,10 +1861,10 @@ public:
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkPipeline pipeline{ nullptr };
+	VkPipeline pipeline{ 0 };
 };
 
-
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 class VulkanAccelerationStructureGeometry {
 public:
 	VulkanAccelerationStructureGeometry(
@@ -2036,3 +2041,4 @@ public:
 	std::shared_ptr<VulkanBuffer> buffer;
 	std::shared_ptr<VulkanMemory> memory;
 };
+#endif

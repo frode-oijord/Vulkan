@@ -291,6 +291,15 @@ namespace scm {
 		}
 	}
 
+	typedef std::variant<Number, String, Symbol, Boolean, std::vector<struct value>> value_t;
+
+	struct value : value_t {
+		using base_type = value_t;
+		using base_type::variant;
+	};
+
+	std::any expand(value const& v);
+
 	struct {
 		template <typename T>
 		std::any operator()(T const& v) const { return v; }
@@ -344,13 +353,6 @@ namespace scm {
 			return std::make_shared<List>(list);
 		}
 	} expander;
-
-	typedef std::variant<Number, String, Symbol, Boolean, std::vector<struct value>> value_t;
-
-	struct value : value_t {
-		using base_type = value_t;
-		using base_type::variant;
-	};
 
 	std::any expand(value const& v) {
 		return std::visit(expander, v);

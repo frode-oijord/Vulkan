@@ -2,8 +2,14 @@
 
 #include <stdexcept>
 
-#define VK_NO_PROTOTYPES
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+#include <dlfcn.h>
+#endif
+
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 #pragma warning(disable : 26812)
+#endif
+#define VK_NO_PROTOTYPES
 #include <vulkan/vulkan.h>
 
 

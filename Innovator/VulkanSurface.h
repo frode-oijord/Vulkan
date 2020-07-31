@@ -21,15 +21,32 @@ public:
 			vulkan(std::move(vulkan))
 	{
 		VkWin32SurfaceCreateInfoKHR create_info{
-			VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,	// sType 
-			nullptr,											// pNext
-			0,													// flags (reserved for future use)
-			hinstance,											// hinstance 
-			window,												// hwnd
+			.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.flags = 0,
+			.hinstance = hinstance,
+			.hwnd = window
 		};
 
 		THROW_ON_ERROR(vk.CreateWin32SurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
 	}
+
+#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
+	VulkanSurface(
+		std::shared_ptr<VulkanInstance> vulkan,
+		ANativeWindow* window) :
+		vulkan(std::move(vulkan))
+	{
+		VkAndroidSurfaceCreateInfoKHR create_info{
+			.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.flags = 0,
+			.window = window
+		};
+
+		THROW_ON_ERROR(vk.CreateAndroidSurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
+	}
+
 
 #elif defined(VK_USE_PLATFORM_XCB_KHR)
 	VulkanSurface(std::shared_ptr<VulkanInstance> vulkan,
@@ -84,5 +101,5 @@ public:
 
 
 	std::shared_ptr<VulkanInstance> vulkan;
-	VkSurfaceKHR surface{ nullptr };
+	VkSurfaceKHR surface{ 0 };
 };

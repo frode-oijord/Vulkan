@@ -18,6 +18,6 @@ public:
 		std::cout << "Timer: " << this->message << " ran for " << milliseconds << " ms." << std::endl;
 	}
 
-	std::chrono::time_point<std::chrono::steady_clock> t0;
 	std::string message;
+	std::chrono::time_point<std::chrono::steady_clock> t0;
 };

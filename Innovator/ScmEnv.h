@@ -88,11 +88,13 @@ Flags flags(const List& lst) {
 	return flags;
 }
 
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 std::shared_ptr<VulkanWindow> window(const List& lst)
 {
 	auto scene = std::any_cast<std::shared_ptr<Node>>(lst[0]);
 	return std::make_shared<VulkanWindow>(scene);
 }
+#endif
 
 std::shared_ptr<Node> offscreen(const List& lst)
 {
@@ -113,11 +115,15 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "dvec3", fun_ptr(make_object<glm::dvec3, Number, Number, Number>) });
 	innovator_env->inner.insert({ "count", fun_ptr(count) });
 	innovator_env->inner.insert({ "print", fun_ptr(toString) });
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "window", fun_ptr(window) });
+#endif
 	innovator_env->inner.insert({ "extent", fun_ptr(node<Extent, uint32_t, uint32_t>) });
 	innovator_env->inner.insert({ "offscreen-image", fun_ptr(offscreen) });
 	innovator_env->inner.insert({ "pipeline-bindpoint", fun_ptr(node<PipelineBindpoint, VkPipelineBindPoint>) });
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "acceleration-structure", fun_ptr(node<AccelerationStructure>) });
+#endif
 	innovator_env->inner.insert({ "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) });
 	innovator_env->inner.insert({ "depth-attachment", fun_ptr(node<DepthStencilAttachment, uint32_t, VkImageLayout>) });
 	innovator_env->inner.insert({ "subpass", fun_ptr(shared_from_node_list<SubpassDescription, std::shared_ptr<Node>>) });
@@ -130,7 +136,9 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, glm::dvec3, glm::dvec3>) });
 	innovator_env->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
 	innovator_env->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageUsageFlags, VkImageAspectFlags>) });
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });
+#endif
 	innovator_env->inner.insert({ "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode, float, uint32_t, float, uint32_t, VkCompareOp, float, float, VkBorderColor, uint32_t>) });
 	innovator_env->inner.insert({ "textureimage", fun_ptr(node<TextureImage, std::string>) });
 	innovator_env->inner.insert({ "image", fun_ptr(node<Image, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
@@ -255,12 +263,13 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_GEOMETRY_BIT", VK_SHADER_STAGE_GEOMETRY_BIT });
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_FRAGMENT_BIT", VK_SHADER_STAGE_FRAGMENT_BIT });
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_COMPUTE_BIT", VK_SHADER_STAGE_COMPUTE_BIT });
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_RAYGEN_BIT", VK_SHADER_STAGE_RAYGEN_BIT_KHR });
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_ANY_HIT_BIT", VK_SHADER_STAGE_ANY_HIT_BIT_KHR });
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_CLOSEST_HIT_BIT", VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR });
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_MISS_BIT", VK_SHADER_STAGE_MISS_BIT_KHR });
 	innovator_env->inner.insert({ "VK_SHADER_STAGE_INTERSECTION_BIT", VK_SHADER_STAGE_INTERSECTION_BIT_KHR });
-
+#endif
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_TRANSFER_SRC_BIT", VK_BUFFER_USAGE_TRANSFER_SRC_BIT });
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_TRANSFER_DST_BIT", VK_BUFFER_USAGE_TRANSFER_DST_BIT });
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT", VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT });
@@ -270,9 +279,10 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_INDEX_BUFFER_BIT", VK_BUFFER_USAGE_INDEX_BUFFER_BIT });
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_VERTEX_BUFFER_BIT", VK_BUFFER_USAGE_VERTEX_BUFFER_BIT });
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT", VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT });
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR", VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR });
 	innovator_env->inner.insert({ "VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT", VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT });
-
+#endif
 	innovator_env->inner.insert({ "VK_DESCRIPTOR_TYPE_SAMPLER", VK_DESCRIPTOR_TYPE_SAMPLER });
 	innovator_env->inner.insert({ "VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER", VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER });
 	innovator_env->inner.insert({ "VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE", VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE });
@@ -314,6 +324,7 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "VK_FORMAT_R32G32_SINT", VK_FORMAT_R32G32_SINT });
 	innovator_env->inner.insert({ "VK_FORMAT_R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT });
 	innovator_env->inner.insert({ "VK_FORMAT_B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM });
+	innovator_env->inner.insert({ "VK_FORMAT_R8G8B8A8_UNORM", VK_FORMAT_R8G8B8A8_UNORM });
 	innovator_env->inner.insert({ "VK_FORMAT_B8G8R8A8_UINT", VK_FORMAT_B8G8R8A8_UINT });
 	innovator_env->inner.insert({ "VK_FORMAT_A8B8G8R8_UINT_PACK32", VK_FORMAT_A8B8G8R8_UINT_PACK32 });
 	innovator_env->inner.insert({ "VK_FORMAT_R8G8B8A8_UINT", VK_FORMAT_R8G8B8A8_UINT });

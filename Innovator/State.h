@@ -7,13 +7,13 @@
 
 struct State {
 	VkDescriptorBufferInfo descriptor_buffer_info{
-	  nullptr, 0, 0
+	  0, 0, 0
 	};
-	VkBuffer buffer{ nullptr };
-	class BufferData* bufferdata{ nullptr };
-	class VulkanTextureImage* texture{ nullptr };
-	std::shared_ptr<VulkanRenderpass> renderpass{ nullptr };
-	std::shared_ptr<VulkanFramebuffer> framebuffer{ nullptr };
+	VkBuffer buffer{ 0 };
+	class BufferData* bufferdata{ 0 };
+	class VulkanTextureImage* texture{ 0 };
+	std::shared_ptr<VulkanRenderpass> renderpass{ 0 };
+	std::shared_ptr<VulkanFramebuffer> framebuffer{ 0 };
 
 	VkExtent2D extent{ 0, 0 };
 
@@ -33,13 +33,13 @@ struct State {
 	  1.0f,															// lineWidth
 	};
 
-	VkImage image{ nullptr };
-	VkImage swapchain_source{ nullptr };
+	VkImage image{ 0 };
+	VkImage swapchain_source{ 0 };
 	VkFormat swapchain_format{ VK_FORMAT_UNDEFINED };
-	VkImageView imageView{ nullptr };
+	VkImageView imageView{ 0 };
 	VkImageLayout imageLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
-	VkSampler sampler{ nullptr };
-	VulkanCommandBuffers* command{ nullptr };
+	VkSampler sampler{ 0 };
+	VulkanCommandBuffers* command{ 0 };
 
 	std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
 	std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
@@ -61,7 +61,7 @@ struct State {
 	std::vector<VkAttachmentDescription> attachment_descriptions;
 
 	VkIndexType index_buffer_type;
-	VkBuffer index_buffer{ nullptr };
+	VkBuffer index_buffer{ 0 };
 	uint32_t index_count;
 
 	std::vector<VkBuffer> vertex_attribute_buffers;

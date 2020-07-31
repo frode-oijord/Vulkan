@@ -7,7 +7,9 @@
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
 
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 #include <shaderc/shaderc.hpp>
+#endif
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -615,18 +617,19 @@ public:
 		  VK_WHOLE_SIZE													// range
 		};
 
-		context->state.write_descriptor_sets.push_back({
-		  VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,						// sType
-		  nullptr,														// pNext
-		  nullptr,														// dstSet
-		  this->binding,												// dstBinding
-		  0,															// dstArrayElement
-		  1,															// descriptorCount
-		  this->descriptorType,											// descriptorType
-		  &this->descriptor_image_info,									// pImageInfo
-		  &this->descriptor_buffer_info,								// pBufferInfo
-		  nullptr,														// pTexelBufferView
-		});
+		VkWriteDescriptorSet set{
+				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,						// sType
+				0,														// pNext
+				0,														// dstSet
+				this->binding,												// dstBinding
+				0,															// dstArrayElement
+				1,															// descriptorCount
+				this->descriptorType,											// descriptorType
+				&this->descriptor_image_info,									// pImageInfo
+				&this->descriptor_buffer_info,								// pBufferInfo
+				0,														// pTexelBufferView
+		};
+		context->state.write_descriptor_sets.push_back(set);
 	}
 
 private:
@@ -637,7 +640,7 @@ private:
 	VkDescriptorBufferInfo descriptor_buffer_info{};
 };
 
-
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 class Shader : public Node {
 public:
 	IMPLEMENT_VISITABLE
@@ -734,7 +737,9 @@ public:
 	VkShaderStageFlagBits stage;
 	std::unique_ptr<VulkanShaderModule> shader;
 };
+#endif
 
+#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 class AccelerationStructure : public Node {
 public:
@@ -930,7 +935,7 @@ public:
 		}
 	}
 };
-
+#endif
 
 class Sampler : public Node {
 public:
@@ -1934,7 +1939,7 @@ public:
 		};
 
 		const std::vector<VkClearValue> clearvalues{
-			{ { { 0.0f, 0.0f, 0.0f, 0.0f } } },
+			{ { { 1.0f, 1.0f, 0.0f, 0.0f } } },
 			{ { { 1.0f, 0 } } }
 		};
 
@@ -2049,7 +2054,7 @@ public:
 		VkSurfaceFormatKHR surface_format = 
 			this->surface->getSupportedSurfaceFormat(context->device, context->state.swapchain_format);
 
-		VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : nullptr;
+		VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : 0;
 
 		this->swapchain = std::make_unique<VulkanSwapchain>(
 			context->device,
@@ -2362,7 +2367,7 @@ public:
 	{
 		this->fence->reset();
 		this->get_image_command->submit(
-			context->queue,
+			context->transferqueue,
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			this->fence->fence);
 
@@ -2642,7 +2647,7 @@ public:
 		  signal_semaphores.data(),											// pSignalSemaphores
 		};
 
-		vk.QueueBindSparse(context->queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
+		vk.QueueBindSparse(context->sparsequeue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 
 		if (regions.empty()) {
 			context->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
@@ -2690,7 +2695,7 @@ public:
 			std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
 
 			this->copy_sparse_command->submit(
-				context->queue,
+				context->sparsequeue,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 				VK_NULL_HANDLE,
 				wait_semaphores,
