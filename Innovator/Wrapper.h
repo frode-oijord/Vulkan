@@ -259,24 +259,24 @@ public:
 			});
 
 		VkApplicationInfo application_info{
-			VK_STRUCTURE_TYPE_APPLICATION_INFO,						// sType
-			nullptr,												// pNext
-			application_name.c_str(),								// pApplicationName
-			1,														// applicationVersion
-			"Innovator",											// pEngineName
-			1,														// engineVersion
-			VK_API_VERSION_1_0,										// apiVersion
+			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+			.pNext = nullptr,
+			.pApplicationName = application_name.c_str(),
+			.applicationVersion = 1,
+			.pEngineName = "Innovator",
+			.engineVersion = 1,
+			.apiVersion = VK_API_VERSION_1_0,
 		};
 
 		VkInstanceCreateInfo create_info{
-			VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,					// sType 
-			nullptr,												// pNext 
-			0,														// flags
-			&application_info,										// pApplicationInfo
-			static_cast<uint32_t>(required_layers.size()),			// enabledLayerCount
-			required_layers.data(),									// ppEnabledLayerNames
-			static_cast<uint32_t>(required_extensions.size()),		// enabledExtensionCount
-			required_extensions.data()								// ppEnabledExtensionNames
+			.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.pApplicationInfo = &application_info,
+			.enabledLayerCount = static_cast<uint32_t>(required_layers.size()),
+			.ppEnabledLayerNames = required_layers.data(),
+			.enabledExtensionCount = static_cast<uint32_t>(required_extensions.size()),
+			.ppEnabledExtensionNames = required_extensions.data()
 		};
 
 		THROW_ON_ERROR(vk.CreateInstance(&create_info, nullptr, &this->instance));
@@ -449,13 +449,13 @@ public:
 		std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
 		for (uint32_t queue_index = 0; queue_index < num_queues; queue_index++) {
 			queue_create_infos.push_back({
-			  VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,			// sType
-			  nullptr,												// pNext
-			  0,													// flags
-			  queue_index,											// queueFamilyIndex
-			  static_cast<uint32_t>(priorities.size()),				// queueCount   
-			  priorities.data()										// pQueuePriorities
-				});
+				.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+				.pNext = nullptr,
+				.flags = 0,
+				.queueFamilyIndex = queue_index,
+				.queueCount = static_cast<uint32_t>(priorities.size()),
+				.pQueuePriorities = priorities.data()
+			});
 		}
 
 		if (queue_create_infos.empty()) {
@@ -463,16 +463,16 @@ public:
 		}
 
 		VkDeviceCreateInfo device_create_info{
-		  VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,						// sType
-		  &device_features2,										// pNext
-		  0,														// flags
-		  static_cast<uint32_t>(queue_create_infos.size()),			// queueCreateInfoCount
-		  queue_create_infos.data(),								// pQueueCreateInfos
-		  static_cast<uint32_t>(required_layers.size()),			// enabledLayerCount
-		  required_layers.data(),									// ppEnabledLayerNames
-		  static_cast<uint32_t>(required_extensions.size()),		// enabledExtensionCount
-		  required_extensions.data(),								// ppEnabledExtensionNames
-		  nullptr,													// pEnabledFeatures
+			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+			.pNext = &device_features2,
+			.flags = 0,
+			.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size()),
+			.pQueueCreateInfos = queue_create_infos.data(),
+			.enabledLayerCount = static_cast<uint32_t>(required_layers.size()),
+			.ppEnabledLayerNames = required_layers.data(),
+			.enabledExtensionCount = static_cast<uint32_t>(required_extensions.size()),
+			.ppEnabledExtensionNames = required_extensions.data(),
+			.pEnabledFeatures = nullptr,
 		};
 
 		THROW_ON_ERROR(vk.CreateDevice(this->physical_device.device, &device_create_info, nullptr, &this->device));
@@ -483,10 +483,10 @@ public:
 		}
 
 		VkCommandPoolCreateInfo create_info{
-		  VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,			// sType
-		  nullptr,												// pNext 
-		  VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,		// flags
-		  0,													// queueFamilyIndex 
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			.queueFamilyIndex = 0,
 		};
 
 		THROW_ON_ERROR(vk.CreateCommandPool(this->device, &create_info, nullptr, &this->default_pool));
@@ -592,11 +592,11 @@ public:
 		vulkan(std::move(vulkan))
 	{
 		VkDebugReportCallbackCreateInfoEXT create_info{
-			VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,		// sType
-			nullptr,											// pNext
-			flags,												// flags
-			callback,											// pfnCallback
-			userdata,											// pUserData
+			.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT,
+			.pNext = nullptr,
+			.flags = flags,
+			.pfnCallback = callback,
+			.pUserData = userdata,
 		};
 
 		THROW_ON_ERROR(this->vulkan->vkCreateDebugReportCallbackEXT(this->vulkan->instance, &create_info, nullptr, &this->callback));
@@ -621,9 +621,9 @@ public:
 		: device(std::move(device))
 	{
 		VkSemaphoreCreateInfo create_info{
-			VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,	// sType
-			nullptr,									// pNext
-			0											// flags (reserved for future use)
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0
 		};
 		THROW_ON_ERROR(vk.CreateSemaphore(this->device->device, &create_info, nullptr, &this->semaphore));
 	}
@@ -658,27 +658,27 @@ public:
 		VkPresentModeKHR presentMode,
 		VkBool32 clipped,
 		VkSwapchainKHR oldSwapchain) :
-		device(std::move(device))
+			device(std::move(device))
 	{
 		VkSwapchainCreateInfoKHR create_info{
-			VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,	// sType
-			nullptr,										// pNext
-			0,												// flags (reserved for future use)
-			surface,
-			minImageCount,
-			imageFormat,
-			imageColorSpace,
-			imageExtent,
-			imageArrayLayers,
-			imageUsage,
-			imageSharingMode,
-			static_cast<uint32_t>(queueFamilyIndices.size()),
-			queueFamilyIndices.data(),
-			preTransform,
-			compositeAlpha,
-			presentMode,
-			clipped,
-			oldSwapchain
+			.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.flags = 0,
+			.surface = surface,
+			.minImageCount = minImageCount,
+			.imageFormat = imageFormat,
+			.imageColorSpace = imageColorSpace,
+			.imageExtent = imageExtent,
+			.imageArrayLayers = imageArrayLayers,
+			.imageUsage = imageUsage,
+			.imageSharingMode = imageSharingMode,
+			.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size()),
+			.pQueueFamilyIndices = queueFamilyIndices.data(),
+			.preTransform = preTransform,
+			.compositeAlpha = compositeAlpha,
+			.presentMode = presentMode,
+			.clipped = clipped,
+			.oldSwapchain = oldSwapchain
 		};
 
 		THROW_ON_ERROR(vk.CreateSwapchainKHR(this->device->device, &create_info, nullptr, &this->swapchain));
@@ -704,12 +704,12 @@ public:
 		device(std::move(device))
 	{
 		VkDescriptorPoolCreateInfo create_info{
-			VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,			// sType 
-			nullptr,												// pNext
-			VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,		// flags
-			static_cast<uint32_t>(descriptor_pool_sizes.size()),	// maxSets
-			static_cast<uint32_t>(descriptor_pool_sizes.size()),	// poolSizeCount
-			descriptor_pool_sizes.data()							// pPoolSizes
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+			.maxSets = static_cast<uint32_t>(descriptor_pool_sizes.size()),
+			.poolSizeCount = static_cast<uint32_t>(descriptor_pool_sizes.size()),
+			.pPoolSizes = descriptor_pool_sizes.data()
 		};
 
 		THROW_ON_ERROR(vk.CreateDescriptorPool(this->device->device, &create_info, nullptr, &this->pool));
@@ -735,11 +735,11 @@ public:
 		device(std::move(device))
 	{
 		VkDescriptorSetLayoutCreateInfo create_info{
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,			// sType
-			nullptr,														// pNext
-			0,																// flags
-			static_cast<uint32_t>(descriptor_set_layout_bindings.size()),	// bindingCount
-			descriptor_set_layout_bindings.data()							// pBindings
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.bindingCount = static_cast<uint32_t>(descriptor_set_layout_bindings.size()),
+			.pBindings = descriptor_set_layout_bindings.data()
 		};
 
 		THROW_ON_ERROR(vk.CreateDescriptorSetLayout(this->device->device, &create_info, nullptr, &this->layout));
@@ -767,11 +767,11 @@ public:
 		pool(std::move(pool))
 	{
 		VkDescriptorSetAllocateInfo allocate_info{
-			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,		// sType
-			nullptr,											// pNext
-			this->pool->pool,									// descriptorPool
-			static_cast<uint32_t>(set_layouts.size()),			// descriptorSetCount
-			set_layouts.data()									// pSetLayouts
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.pNext = nullptr,
+			.descriptorPool = this->pool->pool,
+			.descriptorSetCount = static_cast<uint32_t>(set_layouts.size()),
+			.pSetLayouts = set_layouts.data()
 		};
 
 		this->descriptor_sets.resize(set_layouts.size());
@@ -780,16 +780,19 @@ public:
 
 	~VulkanDescriptorSets()
 	{
-		vk.FreeDescriptorSets(this->device->device,
+		vk.FreeDescriptorSets(
+			this->device->device,
 			this->pool->pool,
 			static_cast<uint32_t>(this->descriptor_sets.size()),
 			this->descriptor_sets.data());
 	}
 
-	void update(const std::vector<VkWriteDescriptorSet>& descriptor_writes,
+	void update(
+		const std::vector<VkWriteDescriptorSet>& descriptor_writes,
 		const std::vector<VkCopyDescriptorSet>& descriptor_copies = std::vector<VkCopyDescriptorSet>()) const
 	{
-		vk.UpdateDescriptorSets(this->device->device,
+		vk.UpdateDescriptorSets(
+			this->device->device,
 			static_cast<uint32_t>(descriptor_writes.size()), descriptor_writes.data(),
 			static_cast<uint32_t>(descriptor_copies.size()), descriptor_copies.data());
 	}
@@ -808,9 +811,9 @@ public:
 		device(std::move(device))
 	{
 		VkFenceCreateInfo create_info{
-			VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,	// sType
-			nullptr,								// pNext
-			VK_FENCE_CREATE_SIGNALED_BIT			// flags
+			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = VK_FENCE_CREATE_SIGNALED_BIT
 		};
 
 		THROW_ON_ERROR(vk.CreateFence(this->device->device, &create_info, nullptr, &this->fence));
@@ -858,21 +861,21 @@ public:
 		device(std::move(device))
 	{
 		VkImageCreateInfo create_info{
-			VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,					// sType
-			nullptr,												// pNext
-			flags,													// flags
-			image_type,												// imageType
-			format,													// format
-			extent,													// extent
-			mip_levels,												// mipLevels
-			array_layers,											// arrayLayers
-			samples,												// samples
-			tiling,													// tiling
-			usage,													// usage
-			sharing_mode,											// sharingMode
-			static_cast<uint32_t>(queue_family_indices.size()),		// queueFamilyIndexCount
-			queue_family_indices.data(),							// pQueueFamilyIndices
-			initial_layout,											// initialLayout
+			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = flags,
+			.imageType = image_type,
+			.format = format,
+			.extent = extent,
+			.mipLevels = mip_levels,
+			.arrayLayers = array_layers,
+			.samples = samples,
+			.tiling = tiling,
+			.usage = usage,
+			.sharingMode = sharing_mode,
+			.queueFamilyIndexCount = static_cast<uint32_t>(queue_family_indices.size()),
+			.pQueueFamilyIndices = queue_family_indices.data(),
+			.initialLayout = initial_layout,
 		};
 
 		THROW_ON_ERROR(vk.CreateImage(this->device->device, &create_info, nullptr, &this->image));
@@ -994,14 +997,14 @@ public:
 			device(std::move(device))
 	{
 		VkBufferCreateInfo create_info{
-			VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,				// sType  
-			nullptr,											// pNext  
-			flags,												// flags  
-			size,												// size  
-			usage,												// usage  
-			sharingMode,										// sharingMode  
-			static_cast<uint32_t>(queueFamilyIndices.size()),	// queueFamilyIndexCount  
-			queueFamilyIndices.data(),							// pQueueFamilyIndices  
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = flags,
+			.size = size,
+			.usage = usage,
+			.sharingMode = sharingMode,
+			.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size()),
+			.pQueueFamilyIndices = queueFamilyIndices.data(),
 		};
 
 		THROW_ON_ERROR(vk.CreateBuffer(this->device->device, &create_info, nullptr, &this->buffer));
@@ -1076,10 +1079,10 @@ public:
 			VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR : 0;
 #endif
 		VkMemoryAllocateFlagsInfo allocate_info{
-			VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR,
-			nullptr,
-			allocate_flags,								// flags
-			0,											// deviceMask
+			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR,
+			.pNext = nullptr,
+			.flags = allocate_flags,
+			.deviceMask = 0,
 		};
 
 		this->memory = std::make_shared<VulkanMemory>(
@@ -1185,11 +1188,11 @@ public:
 		device(std::move(device))
 	{
 		VkCommandBufferAllocateInfo allocate_info{
-			VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,		// sType 
-			nullptr,											// pNext 
-			this->device->default_pool,							// commandPool 
-			level,												// level 
-			static_cast<uint32_t>(count),						// commandBufferCount 
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.pNext = nullptr,
+			.commandPool = this->device->default_pool,
+			.level = level,
+			.commandBufferCount = static_cast<uint32_t>(count),
 		};
 
 		this->buffers.resize(count);
@@ -1213,21 +1216,21 @@ public:
 		VkCommandBufferUsageFlags flags = 0)
 	{
 		VkCommandBufferInheritanceInfo inheritance_info{
-			VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,	// sType
-			nullptr,											// pNext
-			renderpass,											// renderPass 
-			subpass,											// subpass 
-			framebuffer,										// framebuffer
-			VK_FALSE,											// occlusionQueryEnable
-			0,													// queryFlags 
-			0,													// pipelineStatistics 
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+			.pNext = nullptr,
+			.renderPass = renderpass,
+			.subpass = subpass,
+			.framebuffer = framebuffer,
+			.occlusionQueryEnable = VK_FALSE,
+			.queryFlags = 0,
+			.pipelineStatistics = 0,
 		};
 
 		VkCommandBufferBeginInfo begin_info{
-			VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,		// sType 
-			nullptr,											// pNext 
-			flags,												// flags 
-			&inheritance_info,									// pInheritanceInfo 
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.pNext = nullptr,
+			.flags = flags,
+			.pInheritanceInfo = &inheritance_info,
 		};
 
 		THROW_ON_ERROR(vk.BeginCommandBuffer(this->buffers[buffer_index], &begin_info));
@@ -1268,15 +1271,15 @@ public:
 		const std::vector<VkSemaphore>& signal_semaphores = std::vector<VkSemaphore>())
 	{
 		VkSubmitInfo submit_info{
-			VK_STRUCTURE_TYPE_SUBMIT_INFO,						// sType 
-			nullptr,											// pNext  
-			static_cast<uint32_t>(wait_semaphores.size()),		// waitSemaphoreCount  
-			wait_semaphores.data(),								// pWaitSemaphores  
-			&flags,												// pWaitDstStageMask  
-			static_cast<uint32_t>(buffers.size()),				// commandBufferCount  
-			buffers.data(),										// pCommandBuffers 
-			static_cast<uint32_t>(signal_semaphores.size()),	// signalSemaphoreCount
-			signal_semaphores.data(),							// pSignalSemaphores
+			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.pNext = nullptr,
+			.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size()),
+			.pWaitSemaphores = wait_semaphores.data(),
+			.pWaitDstStageMask = &flags,
+			.commandBufferCount = static_cast<uint32_t>(buffers.size()),
+			.pCommandBuffers = buffers.data(),
+			.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+			.pSignalSemaphores = signal_semaphores.data(),
 		};
 
 		THROW_ON_ERROR(vk.QueueSubmit(queue, 1, &submit_info, fence));
@@ -1329,10 +1332,10 @@ VulkanMemory::VulkanMemory(
 		device(std::move(device))
 {
 	VkMemoryAllocateInfo allocate_info{
-		VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,		// sType 
-		pNext,										// pNext 
-		size,										// allocationSize 
-		memory_type_index,							// memoryTypeIndex 
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.pNext = pNext,
+		.allocationSize = size,
+		.memoryTypeIndex = memory_type_index,
 	};
 
 	THROW_ON_ERROR(vk.AllocateMemory(this->device->device, &allocate_info, nullptr, &this->memory));
@@ -1398,14 +1401,14 @@ public:
 		device(std::move(device))
 	{
 		VkImageViewCreateInfo create_info{
-			VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,	// sType 
-			nullptr,									// pNext 
-			0,											// flags (reserved for future use)
-			image,										// image 
-			view_type,									// viewType 
-			format,										// format 
-			components,									// components 
-			subresource_range,							// subresourceRange 
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.image = image,
+			.viewType = view_type,
+			.format = format,
+			.components = components,
+			.subresourceRange = subresource_range,
 		};
 
 		THROW_ON_ERROR(vk.CreateImageView(this->device->device, &create_info, nullptr, &this->view));
@@ -1445,24 +1448,24 @@ public:
 			device(std::move(device))
 	{
 		VkSamplerCreateInfo create_info{
-			VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,			// sType
-			nullptr,										// pNext
-			0,												// flags (reserved for future use)
-			magFilter,										// magFilter
-			minFilter,										// minFilter
-			mipmapMode,										// mipmapMode
-			addressModeU,									// addressModeU
-			addressModeV,									// addressModeV
-			addressModeW,									// addressModeW
-			mipLodBias,										// mipLodBias
-			anisotropyEnable,								// anisotropyEnable
-			maxAnisotropy,									// maxAnisotropy
-			compareEnable,									// compareEnable
-			compareOp,										// compareOp
-			minLod,											// minLod
-			maxLod,											// maxLod
-			borderColor,									// borderColor
-			unnormalizedCoordinates,						// unnormalizedCoordinates
+			.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.magFilter = magFilter,
+			.minFilter = minFilter,
+			.mipmapMode = mipmapMode,
+			.addressModeU = addressModeU,
+			.addressModeV = addressModeV,
+			.addressModeW = addressModeW,
+			.mipLodBias = mipLodBias,
+			.anisotropyEnable = anisotropyEnable,
+			.maxAnisotropy = maxAnisotropy,
+			.compareEnable = compareEnable,
+			.compareOp = compareOp,
+			.minLod = minLod,
+			.maxLod = maxLod,
+			.borderColor = borderColor,
+			.unnormalizedCoordinates = unnormalizedCoordinates,
 		};
 
 		THROW_ON_ERROR(vk.CreateSampler(this->device->device, &create_info, nullptr, &this->sampler));
@@ -1488,11 +1491,11 @@ public:
 		device(std::move(device))
 	{
 		VkShaderModuleCreateInfo create_info{
-		VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,			// sType
-			nullptr,											// pNext
-			0,													// flags (reserved for future use)
-			code.size() * sizeof(uint32_t),						// codeSize
-			code.data(),										// pCode
+			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.codeSize = code.size() * sizeof(uint32_t),
+			.pCode = code.data(),
 		};
 
 		THROW_ON_ERROR(vk.CreateShaderModule(this->device->device, &create_info, nullptr, &this->module));
@@ -1517,11 +1520,11 @@ public:
 		device(std::move(device))
 	{
 		VkPipelineCacheCreateInfo create_info{
-			VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,	// sType
-			nullptr,										// pNext
-			0,												// flags (reserved for future use)
-			0,												// initialDataSize
-			nullptr,										// pInitialData
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.initialDataSize = 0,
+			.pInitialData = nullptr,
 		};
 
 		THROW_ON_ERROR(vk.CreatePipelineCache(this->device->device, &create_info, nullptr, &this->cache));
@@ -1549,15 +1552,15 @@ public:
 		device(std::move(device))
 	{
 		VkRenderPassCreateInfo create_info{
-			VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,			// sType
-			nullptr,											// pNext
-			0,													// flags (reserved for future use)
-			static_cast<uint32_t>(attachments.size()),			// attachmentCount
-			attachments.data(),									// pAttachments
-			static_cast<uint32_t>(subpasses.size()),			// subpassCount
-			subpasses.data(),									// pSubpasses
-			static_cast<uint32_t>(dependencies.size()),			// dependencyCount
-			dependencies.data(),								// pDependencies
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.attachmentCount = static_cast<uint32_t>(attachments.size()),
+			.pAttachments = attachments.data(),
+			.subpassCount = static_cast<uint32_t>(subpasses.size()),
+			.pSubpasses = subpasses.data(),
+			.dependencyCount = static_cast<uint32_t>(dependencies.size()),
+			.pDependencies = dependencies.data(),
 		};
 
 		THROW_ON_ERROR(vk.CreateRenderPass(this->device->device, &create_info, nullptr, &this->renderpass));
@@ -1586,13 +1589,13 @@ public:
 		command(command)
 	{
 		VkRenderPassBeginInfo begin_info{
-			VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,			// sType
-			nullptr,											// pNext
-			renderpass,											// renderPass
-			framebuffer,										// framebuffer
-			renderarea,											// renderArea
-			static_cast<uint32_t>(clearvalues.size()),			// clearValueCount
-			clearvalues.data()									// pClearValues
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+			.pNext = nullptr,
+			.renderPass = renderpass,
+			.framebuffer = framebuffer,
+			.renderArea = renderarea,
+			.clearValueCount = static_cast<uint32_t>(clearvalues.size()),
+			.pClearValues = clearvalues.data()
 		};
 
 		vk.CmdBeginRenderPass(
@@ -1624,15 +1627,15 @@ public:
 		renderpass(std::move(renderpass))
 	{
 		VkFramebufferCreateInfo create_info{
-			VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,		// sType
-			nullptr,										// pNext
-			0,												// flags (reserved for future use)
-			this->renderpass->renderpass,					// renderPass
-			static_cast<uint32_t>(attachments.size()),		// attachmentCount
-			attachments.data(),								// pAttachments
-			extent.width,									// width
-			extent.height,									// height
-			layers,											// layers
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.renderPass = this->renderpass->renderpass,
+			.attachmentCount = static_cast<uint32_t>(attachments.size()),
+			.pAttachments = attachments.data(),
+			.width = extent.width,
+			.height = extent.height,
+			.layers = layers,
 		};
 
 		THROW_ON_ERROR(vk.CreateFramebuffer(this->device->device, &create_info, nullptr, &this->framebuffer));
@@ -1660,13 +1663,13 @@ public:
 		device(std::move(device))
 	{
 		VkPipelineLayoutCreateInfo create_info{
-			VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,		// sType
-			nullptr,											// pNext
-			0,													// flags (reserved for future use)
-			static_cast<uint32_t>(setlayouts.size()),			// setLayoutCount
-			setlayouts.data(),									// pSetLayouts
-			static_cast<uint32_t>(pushconstantranges.size()),	// pushConstantRangeCount
-			pushconstantranges.data(),							// pPushConstantRanges
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.setLayoutCount = static_cast<uint32_t>(setlayouts.size()),
+			.pSetLayouts = setlayouts.data(),
+			.pushConstantRangeCount = static_cast<uint32_t>(pushconstantranges.size()),
+			.pPushConstantRanges = pushconstantranges.data(),
 		};
 
 		THROW_ON_ERROR(vk.CreatePipelineLayout(this->device->device, &create_info, nullptr, &this->layout));
@@ -1696,13 +1699,13 @@ public:
 		device(std::move(device))
 	{
 		VkComputePipelineCreateInfo create_info{
-			VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,		// sType
-			nullptr,											// pNext
-			0,													// flags
-			stage,												// stage
-			layout,												// layout
-			basePipelineHandle,									// basePipelineHandle
-			basePipelineIndex,									// basePipelineIndex
+			.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.stage = stage,
+			.layout = layout,
+			.basePipelineHandle = basePipelineHandle,
+			.basePipelineIndex = basePipelineIndex,
 		};
 
 		THROW_ON_ERROR(vk.CreateComputePipelines(this->device->device, pipelineCache, 1, &create_info, nullptr, &this->pipeline));
@@ -1736,120 +1739,120 @@ public:
 		device(std::move(device))
 	{
 		VkPipelineVertexInputStateCreateInfo vertex_input_state{
-			VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,		// sType
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			static_cast<uint32_t>(binding_descriptions.size()),				// vertexBindingDescriptionCount
-			binding_descriptions.data(),									// pVertexBindingDescriptions
-			static_cast<uint32_t>(attribute_descriptions.size()),			// vertexAttributeDescriptionCount
-			attribute_descriptions.data(),									// pVertexAttributeDescriptions
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.vertexBindingDescriptionCount = static_cast<uint32_t>(binding_descriptions.size()),
+			.pVertexBindingDescriptions = binding_descriptions.data(),
+			.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribute_descriptions.size()),
+			.pVertexAttributeDescriptions= attribute_descriptions.data(),
 		};
 
 		VkPipelineInputAssemblyStateCreateInfo input_assembly_state{
-			VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,	// sType
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			primitive_topology,												// topology
-			VK_FALSE,														// primitiveRestartEnable
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.topology = primitive_topology,
+			.primitiveRestartEnable = VK_FALSE,
 		};
 
 		VkPipelineColorBlendAttachmentState blend_attachment_state{
-			VK_FALSE,																									// blendEnable
-			VK_BLEND_FACTOR_SRC_COLOR,																					// srcColorBlendFactor
-			VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,																		// dstColorBlendFactor
-			VK_BLEND_OP_ADD,																							// colorBlendOp
-			VK_BLEND_FACTOR_SRC_ALPHA,																					// srcAlphaBlendFactor
-			VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,																		// dstAlphaBlendFactor
-			VK_BLEND_OP_ADD,																							// alphaBlendOp
-			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,	// colorWriteMask
+			.blendEnable = VK_FALSE,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
 		};
 
 		VkPipelineColorBlendStateCreateInfo color_blend_state{
-			VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,		// sType 
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			VK_FALSE,														// logicOpEnable
-			VK_LOGIC_OP_MAX_ENUM,											// logicOp
-			1,																// attachmentCount
-			&blend_attachment_state,										// pAttachments  
-			{0},															// blendConstants[4]
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.logicOpEnable = VK_FALSE,
+			.logicOp = VK_LOGIC_OP_MAX_ENUM,
+			.attachmentCount = 1,
+			.pAttachments = &blend_attachment_state,
+			.blendConstants = {0},
 		};
 
 		VkPipelineDynamicStateCreateInfo dynamic_state{
-			VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,			// sType
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			static_cast<uint32_t>(dynamic_states.size()),					// dynamicStateCount
-			dynamic_states.data(),											// pDynamicStates
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
+			.pDynamicStates = dynamic_states.data(),
 		};
 
 		VkPipelineViewportStateCreateInfo viewport_state{
-			VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,			// sType
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			1,																// viewportCount
-			nullptr,														// pViewports
-			1,																// scissorCount
-			nullptr,														// pScissors
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.viewportCount = 1,
+			.pViewports = nullptr,
+			.scissorCount = 1,
+			.pScissors = nullptr,
 		};
 
 		const VkStencilOpState stencil_op_state{
-			VK_STENCIL_OP_KEEP,												// failOp
-			VK_STENCIL_OP_KEEP,												// passOp
-			VK_STENCIL_OP_KEEP,												// depthFailOp
-			VK_COMPARE_OP_ALWAYS,											// compareOp
-			0,																// compareMask
-			0,																// writeMask
-			0,																// reference
+			.failOp = VK_STENCIL_OP_KEEP,
+			.passOp = VK_STENCIL_OP_KEEP,
+			.depthFailOp = VK_STENCIL_OP_KEEP,
+			.compareOp = VK_COMPARE_OP_ALWAYS,
+			.compareMask = 0,
+			.writeMask = 0,
+			.reference = 0,
 		};
 
 		VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
-			VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,		// sType
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			VK_TRUE,														// depthTestEnable
-			VK_TRUE,														// depthWriteEnable
-			VK_COMPARE_OP_LESS_OR_EQUAL,									// depthCompareOp
-			VK_FALSE,														// depthBoundsTestEnable
-			VK_FALSE,														// stencilTestEnable
-			stencil_op_state,												// front  
-			stencil_op_state,												// back
-			0,																// minDepthBounds
-			0,																// maxDepthBounds
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.depthTestEnable = VK_TRUE,
+			.depthWriteEnable = VK_TRUE,
+			.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+			.depthBoundsTestEnable = VK_FALSE,
+			.stencilTestEnable = VK_FALSE,
+			.front = stencil_op_state,
+			.back = stencil_op_state,
+			.minDepthBounds = 0,
+			.maxDepthBounds = 0,
 		};
 
 		VkPipelineMultisampleStateCreateInfo multi_sample_state{
-			VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,		// sType 
-			nullptr,														// pNext
-			0,																// flags (reserved for future use)
-			VK_SAMPLE_COUNT_1_BIT,											// rasterizationSamples
-			VK_FALSE,														// sampleShadingEnable
-			0,																// minSampleShading
-			nullptr,														// pSampleMask
-			VK_FALSE,														// alphaToCoverageEnable
-			VK_FALSE,														// alphaToOneEnable
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+			.sampleShadingEnable = VK_FALSE,
+			.minSampleShading = 0,
+			.pSampleMask = nullptr,
+			.alphaToCoverageEnable = VK_FALSE,
+			.alphaToOneEnable = VK_FALSE,
 		};
 
 		VkGraphicsPipelineCreateInfo create_info{
-			VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,				// sType
-			nullptr,														// pNext
-			0,																// flags
-			static_cast<uint32_t>(shaderstages.size()),						// stageCount
-			shaderstages.data(),											// pStages
-			&vertex_input_state,											// pVertexInputState
-			&input_assembly_state,											// pInputAssemblyState
-			nullptr,														// pTessellationState
-			&viewport_state,												// pViewportState
-			&rasterization_state,											// pRasterizationState
-			&multi_sample_state,											// pMultisampleState
-			&depth_stencil_state,											// pDepthStencilState
-			&color_blend_state,												// pColorBlendState
-			&dynamic_state,													// pDynamicState
-			pipeline_layout,												// layout
-			render_pass,													// renderPass
-			0,																// subpass
-			0,																// basePipelineHandle
-			0,																// basePipelineIndex
+			.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.stageCount = static_cast<uint32_t>(shaderstages.size()),
+			.pStages = shaderstages.data(),
+			.pVertexInputState = &vertex_input_state,
+			.pInputAssemblyState = &input_assembly_state,
+			.pTessellationState = nullptr,
+			.pViewportState = &viewport_state,
+			.pRasterizationState = &rasterization_state,
+			.pMultisampleState = &multi_sample_state,
+			.pDepthStencilState = &depth_stencil_state,
+			.pColorBlendState = &color_blend_state,
+			.pDynamicState = &dynamic_state,
+			.layout = pipeline_layout,
+			.renderPass = render_pass,
+			.subpass = 0,
+			.basePipelineHandle = 0,
+			.basePipelineIndex = 0,
 		};
 
 		THROW_ON_ERROR(vk.CreateGraphicsPipelines(this->device->device, pipeline_cache, 1, &create_info, nullptr, &this->pipeline));
@@ -1905,14 +1908,14 @@ public:
 			type(type)
 	{
 		VkAccelerationStructureCreateInfoKHR create_info{
-			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
-			nullptr,
-			compactedSize,
-			this->type,
-			flags,
-			static_cast<uint32_t>(geometryInfos.size()),
-			geometryInfos.data(),
-			deviceAddress
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.compactedSize = compactedSize,
+			.type = this->type,
+			.flags = flags,
+			.maxGeometryCount = static_cast<uint32_t>(geometryInfos.size()),
+			.pGeometryInfos = geometryInfos.data(),
+			.deviceAddress = deviceAddress
 		};
 
 		THROW_ON_ERROR(this->vulkan->vkCreateAccelerationStructureKHR(this->device->device, &create_info, nullptr, &this->as));
@@ -1952,13 +1955,13 @@ public:
 			0);
 
 		VkBindAccelerationStructureMemoryInfoKHR memory_info = {
-			VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_KHR,
-			nullptr,
-			this->as,			// accelerationStructure
-			memory->memory,		// memory
-			0,					// memoryOffset
-			0,					// deviceIndexCount
-			nullptr,			// pDeviceIndices;
+			.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_KHR,
+			.pNext = nullptr,
+			.accelerationStructure = this->as,
+			.memory = memory->memory,
+			.memoryOffset = 0,
+			.deviceIndexCount = 0,
+			.pDeviceIndices = nullptr,
 		};
 
 		this->vulkan->vkBindAccelerationStructureMemoryKHR(this->device->device, 1, &memory_info);
@@ -1974,15 +1977,16 @@ public:
 		VkAccelerationStructureBuildTypeKHR buildType)
 	{
 		VkAccelerationStructureMemoryRequirementsInfoKHR memory_requirements_info{
-			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_KHR,
-			nullptr,
-			type,											// type
-			buildType,										// buildType
-			this->as										// accelerationStructure
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_KHR,
+			.pNext = nullptr,
+			.type = type,
+			.buildType = buildType,
+			.accelerationStructure = this->as
 		};
 
 		VkMemoryRequirements2 memory_requirements2{
-			VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+			.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+			.pNext = nullptr,
 		};
 
 		this->vulkan->vkGetAccelerationStructureMemoryRequirementsKHR(this->device->device, &memory_requirements_info, &memory_requirements2);
@@ -2000,17 +2004,17 @@ public:
 		VkAccelerationStructureGeometryKHR* pGeometries = geometries.data();
 
 		VkAccelerationStructureBuildGeometryInfoKHR build_geometry_info{
-			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
-			nullptr,
-			this->type,													// type
-			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
-			VK_FALSE,													// update
-			VK_NULL_HANDLE,												// srcAccelerationStructure
-			this->as,													// dstAccelerationStructure
-			VK_FALSE,													// geometryArrayOfPointers
-			static_cast<uint32_t>(geometries.size()),					// geometryCount
-			&pGeometries,												// ppGeometries
-			address														// scratchData
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+			.pNext = nullptr,
+			.type = this->type,
+			.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+			.update = VK_FALSE,
+			.srcAccelerationStructure = VK_NULL_HANDLE,
+			.dstAccelerationStructure = this->as,
+			.geometryArrayOfPointers = VK_FALSE,
+			.geometryCount = static_cast<uint32_t>(geometries.size()),
+			.ppGeometries = &pGeometries,
+			.scratchData = address
 		};
 
 		VkAccelerationStructureBuildOffsetInfoKHR* pOffsetInfos = build_offset_infos.data();
@@ -2021,10 +2025,10 @@ public:
 			&pOffsetInfos);
 
 		VkMemoryBarrier barrier{
-			VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-			nullptr,
-			VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,				// srcAccessMask
-			VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,				// dstAccessMask
+			.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+			.pNext = nullptr,
+			.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+			.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
 		};
 
 		vk.CmdPipelineBarrier(

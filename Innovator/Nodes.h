@@ -406,9 +406,9 @@ public:
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		std::vector<VkBufferCopy> regions = { {
-			0,														// srcOffset
-			0,														// dstOffset
-			context->state.bufferdata->size(),						// size
+			.srcOffset = 0,
+			.dstOffset = 0,
+			.size = context->state.bufferdata->size(),
 		} };
 
 		vk.CmdCopyBuffer(
@@ -516,7 +516,10 @@ public:
 		VkFormat format,
 		uint32_t offset) :
 		vertex_input_attribute_description({
-			location, binding, format, offset
+			.location = location,
+			.binding = binding,
+			.format = format,
+			.offset = offset,
 		})
 	{
 		REGISTER_VISITOR(allocvisitor, VertexInputAttributeDescription, update);
@@ -548,9 +551,9 @@ public:
 		uint32_t binding,
 		uint32_t stride,
 		VkVertexInputRate inputRate) :
-		binding(binding),
-		stride(stride),
-		inputRate(inputRate)
+			binding(binding),
+			stride(stride),
+			inputRate(inputRate)
 	{
 		REGISTER_VISITOR(allocvisitor, VertexInputBindingDescription, update);
 		REGISTER_VISITOR(pipelinevisitor, VertexInputBindingDescription, update);
@@ -559,9 +562,9 @@ public:
 	void update(Visitor* context)
 	{
 		context->state.vertex_input_bindings.push_back({
-		  this->binding,
-		  this->stride,
-		  this->inputRate,
+		  .binding = this->binding,
+		  .stride = this->stride,
+		  .inputRate = this->inputRate,
 		});
 	}
 
@@ -593,22 +596,22 @@ public:
 	void pipeline(Visitor* context)
 	{
 		context->state.descriptor_pool_sizes.push_back({
-		  this->descriptorType,											// type 
-		  1,															// descriptorCount
+		  .type = this->descriptorType,
+		  .descriptorCount = 1,
 		});
 
 		context->state.descriptor_set_layout_bindings.push_back({
-		  this->binding,
-		  this->descriptorType,
-		  1,
-		  this->stageFlags,
-		  nullptr,
+		  .binding = this->binding,
+		  .descriptorType = this->descriptorType,
+		  .descriptorCount = 1,
+		  .stageFlags = this->stageFlags,
+		  .pImmutableSamplers = nullptr,
 		});
 
 		this->descriptor_image_info = {
-		  context->state.sampler,
-		  context->state.imageView,
-		  context->state.imageLayout
+		  .sampler = context->state.sampler,
+		  .imageView = context->state.imageView,
+		  .imageLayout = context->state.imageLayout
 		};
 
 		this->descriptor_buffer_info = {
@@ -722,13 +725,13 @@ public:
 	void pipeline(Visitor* context)
 	{
 		context->state.shader_stage_infos.push_back({
-			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// sType
-			nullptr,												// pNext
-			0,														// flags (reserved for future use)
-			this->stage,											// stage
-			this->shader->module,									// module
-			"main",													// pName
-			nullptr,												// pSpecializationInfo
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.stage = this->stage,
+			.module = this->shader->module,
+			.pName = "main",
+			.pSpecializationInfo = nullptr,
 		});
 	}
 
@@ -789,56 +792,56 @@ public:
 			uint32_t maxVertexCount = context->state.vertex_counts[i];
 
 			create_geometry_infos.push_back({
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
-				nullptr,
-				VK_GEOMETRY_TYPE_TRIANGLES_KHR,						// geometryType,
-				maxPrimitiveCount,									// maxPrimitiveCount
-				indexType,											// indexType
-				maxVertexCount,										// maxVertexCount
-				vertexFormat,										// vertexFormat,
-				VK_FALSE											// allowsTransforms
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+				.pNext = nullptr,
+				.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
+				.maxPrimitiveCount = maxPrimitiveCount,
+				.indexType = indexType,
+				.maxVertexCount = maxVertexCount,
+				.vertexFormat = vertexFormat,
+				.allowsTransforms = VK_FALSE
 			});
 
 			VkBuffer vertex_buffer = context->state.vertex_attribute_buffers[i];
 
 			VkBufferDeviceAddressInfo vertex_buffer_address_info{
-				VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-				nullptr,
-				vertex_buffer
+				.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+				.pNext = nullptr,
+				.buffer = vertex_buffer,
 			};
 
 			VkDeviceAddress vertex_address = context->vulkan->vkGetBufferDeviceAddressKHR(context->device->device, &vertex_buffer_address_info);
 			VkDeviceSize vertexStride = context->state.vertex_input_bindings[i].stride;
 
 			VkAccelerationStructureGeometryTrianglesDataKHR geometry_triangles_data{
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
-				nullptr,
-				vertexFormat,										// vertexFormat
-				vertex_address,										// vertexData
-				vertexStride,										// vertexStride
-				indexType,											// indexType
-				index_address,										// indexData
-				{}													// transformData
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+				.pNext = nullptr,
+				.vertexFormat = vertexFormat,
+				.vertexData = vertex_address,
+				.vertexStride = vertexStride,
+				.indexType = indexType,
+				.indexData = index_address,
+				.transformData = {}
 			};
 
 			VkAccelerationStructureGeometryDataKHR geometry_data{};
 			geometry_data.triangles = geometry_triangles_data;
 
 			VkAccelerationStructureGeometryKHR geometry{
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-				nullptr,
-				VK_GEOMETRY_TYPE_TRIANGLES_KHR,						// geometryType
-				geometry_data,										// geometry
-				VK_GEOMETRY_OPAQUE_BIT_KHR,							// flags
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+				.pNext = nullptr,
+				.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
+				.geometry = geometry_data,
+				.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
 			};
 
 			geometries.push_back(geometry);
 
 			VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
-				maxPrimitiveCount,									// primitiveCount
-				0,													// primitiveOffset
-				0,													// firstVertex;
-				0													// transformOffset
+				.primitiveCount = maxPrimitiveCount,
+				.primitiveOffset = 0,
+				.firstVertex = 0,
+				.transformOffset = 0,
 			};
 
 			build_offset_infos.push_back(build_offset_info);
@@ -860,14 +863,14 @@ public:
 
 		{
 			std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos{ {
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
-				nullptr,
-				VK_GEOMETRY_TYPE_INSTANCES_KHR,								// geometryType
-				1,															// maxPrimitiveCount
-				VK_INDEX_TYPE_NONE_KHR,										// indexType
-				0,															// maxVertexCount
-				VK_FORMAT_UNDEFINED,										// vertexFormat,
-				VK_FALSE													// allowsTransforms
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+				.pNext = nullptr,
+				.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+				.maxPrimitiveCount = 1,
+				.indexType = VK_INDEX_TYPE_NONE_KHR,
+				.maxVertexCount = 0,
+				.vertexFormat = VK_FORMAT_UNDEFINED,
+				.allowsTransforms = VK_FALSE,
 			} };
 
 			auto tlas = std::make_shared<VulkanAccelerationStructure>(
@@ -886,46 +889,46 @@ public:
 			} };
 
 			VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-				nullptr,
-				blas->as,													// accelerationStructure
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+				.pNext = nullptr,
+				.accelerationStructure = blas->as,
 			};
 
 			VkDeviceOrHostAddressConstKHR data;
 			data.deviceAddress = context->vulkan->vkGetAccelerationStructureDeviceAddressKHR(context->device->device, &device_address_info);
 
 			VkAccelerationStructureInstanceKHR instance{
-				transform,													// transform
-				0,															// instanceCustomIndex:24
-				1,															// mask:8
-				0,															// instanceShaderBindingTableRecordOffset:24
-				VK_GEOMETRY_OPAQUE_BIT_KHR,									// flags:8
-				data.deviceAddress											// accelerationStructureReference
+				.transform = transform,
+				.instanceCustomIndex = 0,
+				.mask = 1,
+				.instanceShaderBindingTableRecordOffset = 0,
+				.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
+				.accelerationStructureReference = data.deviceAddress,
 			};
 
 			VkAccelerationStructureGeometryInstancesDataKHR geometry_instances_data{
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
-				nullptr,
-				VK_FALSE,													// arrayOfPointers
-				data,														// data
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+				.pNext = nullptr,
+				.arrayOfPointers = VK_FALSE,
+				.data = data,
 			};
 
 			VkAccelerationStructureGeometryDataKHR geometry_data{};
 			geometry_data.instances = geometry_instances_data;
 
 			std::vector<VkAccelerationStructureGeometryKHR> geometries{ {
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-				nullptr,
-				VK_GEOMETRY_TYPE_INSTANCES_KHR,								// geometryType
-				geometry_data,												// geometry
-				VK_GEOMETRY_OPAQUE_BIT_KHR,									// flags
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+				.pNext = nullptr,
+				.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+				.geometry = geometry_data,
+				.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
 			} };
 
 			std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos{ {
-				1,															// primitiveCount
-				0,															// primitiveOffset
-				0,															// firstVertex;
-				0															// transformOffset
+				.primitiveCount = 1,
+				.primitiveOffset = 0,
+				.firstVertex = 0,
+				.transformOffset = 0,
 			} };
 
 			tlas->build(
@@ -1072,24 +1075,19 @@ public:
 		for (uint32_t mip_level = 0; mip_level < texture->levels(); mip_level++) {
 
 			const VkImageSubresourceLayers imageSubresource{
-				texture->subresource_range().aspectMask,				// aspectMask
-				mip_level,												// mipLevel
-				texture->subresource_range().baseArrayLayer,			// baseArrayLayer
-				texture->subresource_range().layerCount,				// layerCount
+				.aspectMask = texture->subresource_range().aspectMask,
+				.mipLevel = mip_level,
+				.baseArrayLayer = texture->subresource_range().baseArrayLayer,
+				.layerCount = texture->subresource_range().layerCount,
 			};
 
-			uint32_t bufferRowLength = 0;
-			uint32_t bufferImageHeight = 0;
-			VkOffset3D imageOffset = { 0, 0, 0 };
-			VkExtent3D imageExtent = texture->extent(mip_level);
-
 			VkBufferImageCopy region{
-			  bufferOffset,
-			  bufferRowLength,
-			  bufferImageHeight,
-			  imageSubresource,
-			  imageOffset,
-			  imageExtent
+			  .bufferOffset = bufferOffset,
+			  .bufferRowLength = 0,
+			  .bufferImageHeight = 0,
+			  .imageSubresource = imageSubresource,
+			  .imageOffset = { 0, 0, 0 },
+			  .imageExtent = texture->extent(mip_level),
 			};
 
 			regions.push_back(region);
@@ -1411,12 +1409,12 @@ public:
 		} };
 
 		std::vector<VkViewport> viewports{ {
-		  0.0f,													// x
-		  0.0f,													// y
-		  static_cast<float>(context->state.extent.width),		// width
-		  static_cast<float>(context->state.extent.height),		// height
-		  0.0f,													// minDepth
-		  1.0f													// maxDepth
+		  .x = 0.0f,
+		  .y = 0.0f,
+		  .width = static_cast<float>(context->state.extent.width),
+		  .height = static_cast<float>(context->state.extent.height),
+		  .minDepth = 0.0f,
+		  .maxDepth = 1.0f
 		} };
 
 		vk.CmdSetScissor(this->command->buffer(),
@@ -1626,10 +1624,10 @@ public:
 	VkImageSubresourceRange subresource_range;
 
 	VkComponentMapping component_mapping {
-		VK_COMPONENT_SWIZZLE_R,
-		VK_COMPONENT_SWIZZLE_G,
-		VK_COMPONENT_SWIZZLE_B,
-		VK_COMPONENT_SWIZZLE_A
+		.r = VK_COMPONENT_SWIZZLE_R,
+		.g = VK_COMPONENT_SWIZZLE_G,
+		.b = VK_COMPONENT_SWIZZLE_B,
+		.a = VK_COMPONENT_SWIZZLE_A,
 	};
 
 public:
@@ -1820,16 +1818,16 @@ public:
 		Group::visit(context);
 
 		context->state.subpass_descriptions.push_back({
-			0,																	// flags
-			context->state.bind_point,											// pipelineBindPoint
-			static_cast<uint32_t>(context->state.input_attachments.size()),		// inputAttachmentCount
-			context->state.input_attachments.data(),							// pInputAttachments
-			static_cast<uint32_t>(context->state.color_attachments.size()),		// colorAttachmentCount
-			context->state.color_attachments.data(),							// pColorAttachments
-			context->state.resolve_attachments.data(),							// pResolveAttachments
-			& context->state.depth_stencil_attachment,							// pDepthStencilAttachment
-			static_cast<uint32_t>(context->state.preserve_attachments.size()),	// preserveAttachmentCount
-			context->state.preserve_attachments.data()							// pPreserveAttachments
+			.flags = 0,
+			.pipelineBindPoint = context->state.bind_point,
+			.inputAttachmentCount = static_cast<uint32_t>(context->state.input_attachments.size()),
+			.pInputAttachments = context->state.input_attachments.data(),
+			.colorAttachmentCount = static_cast<uint32_t>(context->state.color_attachments.size()),
+			.pColorAttachments = context->state.color_attachments.data(),
+			.pResolveAttachments = context->state.resolve_attachments.data(),
+			.pDepthStencilAttachment = &context->state.depth_stencil_attachment,
+			.preserveAttachmentCount = static_cast<uint32_t>(context->state.preserve_attachments.size()),
+			.pPreserveAttachments = context->state.preserve_attachments.data()
 		});
 	}
 };
@@ -1852,15 +1850,15 @@ public:
 		VkImageLayout finalLayout)
 	{
 		this->description = {
-		  0,
-		  format,
-		  samples,
-		  loadOp,
-		  storeOp,
-		  stencilLoadOp,
-		  stencilStoreOp,
-		  initialLayout,
-		  finalLayout
+			.flags = 0,
+			.format = format,
+			.samples = samples,
+			.loadOp = loadOp,
+			.storeOp = storeOp,
+			.stencilLoadOp = stencilLoadOp,
+			.stencilStoreOp = stencilStoreOp,
+			.initialLayout = initialLayout,
+			.finalLayout = finalLayout
 		};
 
 		REGISTER_VISITOR(allocvisitor, RenderpassAttachment, alloc);
@@ -1939,8 +1937,8 @@ public:
 		};
 
 		const std::vector<VkClearValue> clearvalues{
-			{ { { 1.0f, 1.0f, 0.0f, 0.0f } } },
-			{ { { 1.0f, 0 } } }
+			{ .color = { 1.0f, 1.0f, 0.0f, 0.0f } },
+			{ .depthStencil = { 1.0f, 0 } }
 		};
 
 		this->render_command->begin();
@@ -2206,14 +2204,14 @@ public:
 			signal_semaphores);
 
 		VkPresentInfoKHR present_info{
-		  VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,				// sType
-		  nullptr,											// pNext
-		  static_cast<uint32_t>(signal_semaphores.size()),	// waitSemaphoreCount
-		  signal_semaphores.data(),							// pWaitSemaphores
-		  1,												// swapchainCount
-		  & this->swapchain->swapchain,						// pSwapchains
-		  & this->image_index,								// pImageIndices
-		  nullptr											// pResults
+			.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+			.pNext = nullptr,
+			.waitSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+			.pWaitSemaphores = signal_semaphores.data(),
+			.swapchainCount = 1,
+			.pSwapchains = &this->swapchain->swapchain,
+			.pImageIndices = &this->image_index,
+			.pResults = nullptr,
 		};
 
 		THROW_ON_ERROR(vk.QueuePresentKHR(this->present_queue, &present_info));
@@ -2231,7 +2229,11 @@ private:
 	std::unique_ptr<VulkanSemaphore> swap_buffers_finished;
 
 	const VkImageSubresourceRange subresource_range{
-	  VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
+	  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+	  .baseMipLevel = 0,
+	  .levelCount = 1,
+	  .baseArrayLayer = 0,
+	  .layerCount = 1,
 	};
 
 	uint32_t image_index{ 0 };
@@ -2296,10 +2298,10 @@ public:
 	void record(Visitor* context)
 	{
 		const VkImageSubresourceLayers subresource_layers{
-			this->subresource_range.aspectMask,								// aspectMask
-			this->subresource_range.baseMipLevel,							// mipLevel
-			this->subresource_range.baseArrayLayer,							// baseArrayLayer
-			this->subresource_range.layerCount								// layerCount;
+			.aspectMask = this->subresource_range.aspectMask,
+			.mipLevel = this->subresource_range.baseMipLevel,
+			.baseArrayLayer = this->subresource_range.baseArrayLayer,
+			.layerCount = this->subresource_range.layerCount,
 		};
 
 		const VkOffset3D offset = {
@@ -2311,11 +2313,11 @@ public:
 		};
 
 		VkImageCopy image_copy{
-			subresource_layers,												// srcSubresource
-			offset,															// srcOffset
-			subresource_layers,												// dstSubresource
-			offset,															// dstOffset
-			extent3d														// extent
+			.srcSubresource = subresource_layers,
+			.srcOffset = offset,
+			.dstSubresource = subresource_layers,
+			.dstOffset = offset,
+			.extent = extent3d,
 		};
 
 		VulkanCommandBuffers::Scope command_scope(this->get_image_command.get());
@@ -2454,12 +2456,12 @@ public:
 		};
 
 		this->image_memory_bind = {
-		  subresource,										// subresource
-		  imageOffset,										// offset
-		  this->imageExtent,								// extent
-		  this->memory,										// memory
-		  this->memoryOffset,								// memoryOffset
-		  0													// flags
+		  .subresource = subresource,
+		  .offset = imageOffset,
+		  .extent = this->imageExtent,
+		  .memory = this->memory,
+		  .memoryOffset = this->memoryOffset,
+		  .flags = 0,
 		};
 
 		VkDeviceSize mipOffset = 0;
@@ -2477,10 +2479,10 @@ public:
 			static_cast<VkDeviceSize>(brickExtent.depth);
 
 		const VkImageSubresourceLayers imageSubresource{
-			this->texture->subresource_range().aspectMask,				// aspectMask
-			mipLevel,													// mipLevel
-			this->texture->subresource_range().baseArrayLayer,			// baseArrayLayer
-			this->texture->subresource_range().layerCount,				// layerCount
+			.aspectMask = this->texture->subresource_range().aspectMask,
+			.mipLevel = mipLevel,
+			.baseArrayLayer = this->texture->subresource_range().baseArrayLayer,
+			.layerCount = this->texture->subresource_range().layerCount,
 		};
 
 		if (false) {
@@ -2488,12 +2490,12 @@ public:
 			VkDeviceSize height = extent.height / brickExtent.height;
 
 			this->buffer_image_copy = {
-				mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
-				0,
-				0,
-				imageSubresource,
-				imageOffset,
-				this->imageExtent,
+				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
+				.bufferRowLength = 0,
+				.bufferImageHeight = 0,
+				.imageSubresource = imageSubresource,
+				.imageOffset = imageOffset,
+				.imageExtent = this->imageExtent,
 			};
 		}
 		else {
@@ -2504,32 +2506,15 @@ public:
 			VkDeviceSize width = extent.width;
 			VkDeviceSize height = extent.height;
 
-			this->bufferImageCopy(
-				mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
-				width,
-				height,
-				imageSubresource,
-				imageOffset,
-				this->imageExtent);
+			this->buffer_image_copy = {
+				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
+				.bufferRowLength = extent.width,
+				.bufferImageHeight = extent.height,
+				.imageSubresource = imageSubresource,
+				.imageOffset = imageOffset,
+				.imageExtent = this->imageExtent
+			};
 		}
-	}
-
-	void bufferImageCopy(
-		VkDeviceSize bufferOffset,
-		uint32_t bufferRowLength,
-		uint32_t bufferImageHeight,
-		VkImageSubresourceLayers imageSubresource,
-		VkOffset3D imageOffset,
-		VkExtent3D imageExtent)
-	{
-		this->buffer_image_copy = {
-			bufferOffset,										// bufferOffset 
-			bufferRowLength,									// bufferRowLength
-			bufferImageHeight,									// bufferImageHeight
-			imageSubresource,									// imageSubresource
-			imageOffset,										// imageOffset
-			this->imageExtent,									// imageExtent
-		};
 	}
 
 	VkDeviceMemory memory;
@@ -2633,18 +2618,18 @@ public:
 		std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
 
 		VkBindSparseInfo bind_sparse_info = {
-		  VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,								// sType
-		  nullptr,															// pNext
-		  static_cast<uint32_t>(wait_semaphores.size()),					// waitSemaphoreCount
-		  wait_semaphores.data(),											// pWaitSemaphores
-		  static_cast<uint32_t>(buffer_memory_bind_infos.size()),			// bufferBindCount
-		  buffer_memory_bind_infos.data(),									// pBufferBinds;
-		  static_cast<uint32_t>(image_opaque_memory_bind_infos.size()),		// imageOpaqueBindCount
-		  image_opaque_memory_bind_infos.data(),							// pImageOpaqueBinds
-		  static_cast<uint32_t>(image_memory_bind_info.size()),				// imageBindCount
-		  image_memory_bind_info.data(),									// pImageBinds
-		  static_cast<uint32_t>(signal_semaphores.size()),					// signalSemaphoreCount
-		  signal_semaphores.data(),											// pSignalSemaphores
+			.sType = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
+			.pNext = nullptr,
+			.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size()),
+			.pWaitSemaphores = wait_semaphores.data(),
+			.bufferBindCount = static_cast<uint32_t>(buffer_memory_bind_infos.size()),
+			.pBufferBinds = buffer_memory_bind_infos.data(),
+			.imageOpaqueBindCount = static_cast<uint32_t>(image_opaque_memory_bind_infos.size()),
+			.pImageOpaqueBinds = image_opaque_memory_bind_infos.data(),
+			.imageBindCount = static_cast<uint32_t>(image_memory_bind_info.size()),
+			.pImageBinds = image_memory_bind_info.data(),
+			.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+			.pSignalSemaphores = signal_semaphores.data(),
 		};
 
 		vk.QueueBindSparse(context->sparsequeue, 1, &bind_sparse_info, VK_NULL_HANDLE);
