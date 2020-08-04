@@ -64,7 +64,7 @@ public:
 
 	void visit(Visitor* visitor) override
 	{
-		StateScope scope(&visitor->state);
+		StateScope scope(visitor->state.get());
 		Group::visit(visitor);
 	}
 };
@@ -89,8 +89,8 @@ public:
 	void resize(CommandVisitor* context)
 	{
 		this->aspectratio =
-			static_cast<double>(context->state.extent.width) /
-			static_cast<double>(context->state.extent.height);
+			static_cast<double>(context->state->extent.width) /
+			static_cast<double>(context->state->extent.height);
 
 		this->mat = glm::perspective(
 			this->fieldofview,
@@ -101,7 +101,7 @@ public:
 
 	void render(CommandVisitor* context)
 	{
-		context->state.ProjectionMatrix = this->mat;
+		context->state->ProjectionMatrix = this->mat;
 	}
 
 private:
@@ -154,8 +154,8 @@ public:
 
 	void render(CommandVisitor* context)
 	{
-		context->state.ViewMatrix = glm::dmat4(glm::transpose(this->rot));
-		context->state.ViewMatrix = glm::translate(context->state.ViewMatrix, -this->eye);
+		context->state->ViewMatrix = glm::dmat4(glm::transpose(this->rot));
+		context->state->ViewMatrix = glm::translate(context->state->ViewMatrix, -this->eye);
 	}
 
 	void updateOrientation()
@@ -188,7 +188,7 @@ public:
 
 	void render(CommandVisitor* context)
 	{
-		context->state.ModelMatrix *= this->mat;
+		context->state->ModelMatrix *= this->mat;
 	}
 
 	glm::dmat4 mat{ 1.0 };
@@ -211,7 +211,7 @@ public:
 
 	void render(CommandVisitor* context)
 	{
-		context->state.TextureMatrix *= this->mat;
+		context->state->TextureMatrix *= this->mat;
 	}
 
 	glm::dmat4 mat{ 1.0 };
@@ -234,7 +234,7 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.bufferdata = this;
+		context->state->bufferdata = this;
 	}
 };
 
@@ -305,8 +305,8 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.bufferdata = this;
-		context->state.texture = this->texture.get();
+		context->state->bufferdata = this;
+		context->state->texture = this->texture.get();
 	}
 
 private:
@@ -335,23 +335,23 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
-			context->vulkan,
-			context->device,
+			context->state->vulkan,
+			context->state->device,
 			this->create_flags,
-			context->state.bufferdata->size(),
+			context->state->bufferdata->size(),
 			this->usage_flags,
 			VK_SHARING_MODE_EXCLUSIVE,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 		MemoryMap memmap(this->bufferobject->memory.get());
-		context->state.bufferdata->copy(memmap.mem);
+		context->state->bufferdata->copy(memmap.mem);
 
-		context->state.buffer = this->bufferobject->buffer->buffer;
+		context->state->buffer = this->bufferobject->buffer->buffer;
 	}
 
 	void update(Visitor* context)
 	{
-		context->state.buffer = this->bufferobject->buffer->buffer;
+		context->state->buffer = this->bufferobject->buffer->buffer;
 	}
 
 private:
@@ -380,10 +380,10 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
-			context->vulkan,
-			context->device,
+			context->state->vulkan,
+			context->state->device,
 			this->create_flags,
-			context->state.bufferdata->size(),
+			context->state->bufferdata->size(),
 			this->usage_flags,
 			VK_SHARING_MODE_EXCLUSIVE,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -391,12 +391,12 @@ public:
 		std::vector<VkBufferCopy> regions = { {
 			.srcOffset = 0,
 			.dstOffset = 0,
-			.size = context->state.bufferdata->size(),
+			.size = context->state->bufferdata->size(),
 		} };
 
 		vk.CmdCopyBuffer(
-			context->command->buffer(),
-			context->state.buffer,
+			context->state->default_command->buffer(),
+			context->state->buffer,
 			this->bufferobject->buffer->buffer,
 			static_cast<uint32_t>(regions.size()),
 			regions.data());
@@ -404,7 +404,7 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.buffer = this->bufferobject->buffer->buffer;
+		context->state->buffer = this->bufferobject->buffer->buffer;
 	}
 
 private:
@@ -429,8 +429,8 @@ public:
 	void alloc(Visitor* context)
 	{
 		this->buffer = std::make_shared<VulkanBufferObject>(
-			context->vulkan,
-			context->device,
+			context->state->vulkan,
+			context->state->device,
 			0,
 			sizeof(glm::mat4) * 3,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -440,15 +440,15 @@ public:
 
 	void pipeline(Visitor* context)
 	{
-		context->state.buffer = this->buffer->buffer->buffer;
+		context->state->buffer = this->buffer->buffer->buffer;
 	}
 
 	void render(Visitor* context)
 	{
 		std::array<glm::mat4, 3> data = {
-		  glm::mat4(context->state.ViewMatrix * context->state.ModelMatrix),
-		  glm::mat4(context->state.ProjectionMatrix),
-		  glm::mat4(context->state.TextureMatrix)
+		  glm::mat4(context->state->ViewMatrix * context->state->ModelMatrix),
+		  glm::mat4(context->state->ProjectionMatrix),
+		  glm::mat4(context->state->TextureMatrix)
 		};
 
 		MemoryMap map(this->buffer->memory.get());
@@ -474,9 +474,9 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.index_buffer = context->state.buffer;
-		context->state.index_buffer_type = this->type;
-		context->state.index_count = context->state.bufferdata->count();
+		context->state->index_buffer = context->state->buffer;
+		context->state->index_buffer_type = this->type;
+		context->state->index_count = context->state->bufferdata->count();
 	}
 
 private:
@@ -509,10 +509,10 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.vertex_attributes.push_back(this->vertex_input_attribute_description);
-		context->state.vertex_attribute_buffers.push_back(context->state.buffer);
-		context->state.vertex_attribute_buffer_offsets.push_back(0);
-		context->state.vertex_counts.push_back(context->state.bufferdata->count());
+		context->state->vertex_attributes.push_back(this->vertex_input_attribute_description);
+		context->state->vertex_attribute_buffers.push_back(context->state->buffer);
+		context->state->vertex_attribute_buffer_offsets.push_back(0);
+		context->state->vertex_counts.push_back(context->state->bufferdata->count());
 	}
 
 private:
@@ -540,10 +540,10 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.vertex_input_bindings.push_back({
-		  .binding = this->binding,
-		  .stride = this->stride,
-		  .inputRate = this->inputRate,
+		context->state->vertex_input_bindings.push_back({
+			.binding = this->binding,
+			.stride = this->stride,
+			.inputRate = this->inputRate,
 			});
 	}
 
@@ -573,29 +573,29 @@ public:
 
 	void pipeline(Visitor* context)
 	{
-		context->state.descriptor_pool_sizes.push_back({
-		  .type = this->descriptorType,
-		  .descriptorCount = 1,
+		context->state->descriptor_pool_sizes.push_back({
+			.type = this->descriptorType,
+			.descriptorCount = 1,
 			});
 
-		context->state.descriptor_set_layout_bindings.push_back({
-		  .binding = this->binding,
-		  .descriptorType = this->descriptorType,
-		  .descriptorCount = 1,
-		  .stageFlags = this->stageFlags,
-		  .pImmutableSamplers = nullptr,
+		context->state->descriptor_set_layout_bindings.push_back({
+			.binding = this->binding,
+			.descriptorType = this->descriptorType,
+			.descriptorCount = 1,
+			.stageFlags = this->stageFlags,
+			.pImmutableSamplers = nullptr,
 			});
 
 		this->descriptor_image_info = {
-		  .sampler = context->state.sampler,
-		  .imageView = context->state.imageView,
-		  .imageLayout = context->state.imageLayout
+			.sampler = context->state->sampler,
+			.imageView = context->state->imageView,
+			.imageLayout = context->state->imageLayout
 		};
 
 		this->descriptor_buffer_info = {
-		  .buffer = context->state.buffer,
-		  .offset = 0,
-		  .range = VK_WHOLE_SIZE
+			.buffer = context->state->buffer,
+			.offset = 0,
+			.range = VK_WHOLE_SIZE
 		};
 
 		VkWriteDescriptorSet set{
@@ -610,7 +610,7 @@ public:
 			.pBufferInfo = &this->descriptor_buffer_info,
 			.pTexelBufferView = 0,
 		};
-		context->state.write_descriptor_sets.push_back(set);
+		context->state->write_descriptor_sets.push_back(set);
 	}
 
 private:
@@ -696,12 +696,12 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
-		this->shader = std::make_unique<VulkanShaderModule>(context->device, this->spv);
+		this->shader = std::make_unique<VulkanShaderModule>(context->state->device, this->spv);
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state.shader_stage_infos.push_back({
+		context->state->shader_stage_infos.push_back({
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 			.pNext = nullptr,
 			.flags = 0,
@@ -751,21 +751,21 @@ public:
 		VkBufferDeviceAddressInfo index_buffer_address_info{
 			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
 			nullptr,
-			context->state.index_buffer
+			context->state->index_buffer
 		};
-		VkDeviceAddress index_address = context->vulkan->vkGetBufferDeviceAddressKHR(context->device->device, &index_buffer_address_info);
+		VkDeviceAddress index_address = context->state->vulkan->vkGetBufferDeviceAddressKHR(context->state->device->device, &index_buffer_address_info);
 
-		VkIndexType indexType = context->state.index_buffer_type;
-		uint32_t maxPrimitiveCount = context->state.index_count / 3;
+		VkIndexType indexType = context->state->index_buffer_type;
+		uint32_t maxPrimitiveCount = context->state->index_count / 3;
 
 		std::vector<VkAccelerationStructureGeometryKHR> geometries;
 		std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos;
 		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos;
 
-		for (size_t i = 0; i < context->state.vertex_attributes.size(); i++)
+		for (size_t i = 0; i < context->state->vertex_attributes.size(); i++)
 		{
-			VkFormat vertexFormat = context->state.vertex_attributes[i].format;
-			uint32_t maxVertexCount = context->state.vertex_counts[i];
+			VkFormat vertexFormat = context->state->vertex_attributes[i].format;
+			uint32_t maxVertexCount = context->state->vertex_counts[i];
 
 			create_geometry_infos.push_back({
 				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
@@ -778,7 +778,7 @@ public:
 				.allowsTransforms = VK_FALSE
 				});
 
-			VkBuffer vertex_buffer = context->state.vertex_attribute_buffers[i];
+			VkBuffer vertex_buffer = context->state->vertex_attribute_buffers[i];
 
 			VkBufferDeviceAddressInfo vertex_buffer_address_info{
 				.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
@@ -786,8 +786,8 @@ public:
 				.buffer = vertex_buffer,
 			};
 
-			VkDeviceAddress vertex_address = context->vulkan->vkGetBufferDeviceAddressKHR(context->device->device, &vertex_buffer_address_info);
-			VkDeviceSize vertexStride = context->state.vertex_input_bindings[i].stride;
+			VkDeviceAddress vertex_address = context->state->vulkan->vkGetBufferDeviceAddressKHR(context->state->device->device, &vertex_buffer_address_info);
+			VkDeviceSize vertexStride = context->state->vertex_input_bindings[i].stride;
 
 			VkAccelerationStructureGeometryTrianglesDataKHR geometry_triangles_data{
 				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
@@ -824,8 +824,8 @@ public:
 		}
 
 		auto blas = std::make_shared<VulkanAccelerationStructure>(
-			context->vulkan,
-			context->device,
+			context->state->vulkan,
+			context->state->device,
 			0,															// compactedSize
 			VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,			// type
 			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
@@ -833,7 +833,7 @@ public:
 			0);															// deviceAddress
 
 		blas->build(
-			context->command->buffer(),
+			context->state->default_command->buffer(),
 			geometries,
 			build_offset_infos);
 
@@ -850,8 +850,8 @@ public:
 			} };
 
 			auto tlas = std::make_shared<VulkanAccelerationStructure>(
-				context->vulkan,
-				context->device,
+				context->state->vulkan,
+				context->state->device,
 				0,															// compactedSize
 				VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,				// type
 				VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
@@ -871,7 +871,7 @@ public:
 			};
 
 			VkDeviceOrHostAddressConstKHR data;
-			data.deviceAddress = context->vulkan->vkGetAccelerationStructureDeviceAddressKHR(context->device->device, &device_address_info);
+			data.deviceAddress = context->state->vulkan->vkGetAccelerationStructureDeviceAddressKHR(context->state->device->device, &device_address_info);
 
 			VkAccelerationStructureInstanceKHR instance{
 				.transform = transform,
@@ -908,7 +908,7 @@ public:
 			} };
 
 			tlas->build(
-				context->command->buffer(),
+				context->state->default_command->buffer(),
 				geometries,
 				build_offset_infos);
 		}
@@ -956,7 +956,7 @@ public:
 			.maxLod = maxLod,
 			.borderColor = borderColor,
 			.unnormalizedCoordinates = unnormalizedCoordinates
-		})
+			})
 	{
 		REGISTER_VISITOR(allocvisitor, Sampler, alloc);
 		REGISTER_VISITOR(pipelinevisitor, Sampler, pipeline);
@@ -965,13 +965,13 @@ public:
 	void alloc(Visitor* context)
 	{
 		this->sampler = std::make_unique<VulkanSampler>(
-			context->device,
+			context->state->device,
 			this->create_info);
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state.sampler = this->sampler->sampler;
+		context->state->sampler = this->sampler->sampler;
 	}
 
 private:
@@ -1005,12 +1005,12 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->image = std::make_shared<VulkanImageObject>(
-			context->device,
-			context->state.texture->image_type(),
-			context->state.texture->format(),
-			context->state.texture->extent(0),
-			context->state.texture->levels(),
-			context->state.texture->layers(),
+			context->state->device,
+			context->state->texture->image_type(),
+			context->state->texture->format(),
+			context->state->texture->extent(0),
+			context->state->texture->levels(),
+			context->state->texture->layers(),
 			this->sample_count,
 			this->tiling,
 			this->usage_flags,
@@ -1018,7 +1018,7 @@ public:
 			this->create_flags,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VulkanTextureImage* texture = context->state.texture;
+		VulkanTextureImage* texture = context->state->texture;
 
 		std::vector<VkBufferImageCopy> regions;
 
@@ -1033,40 +1033,40 @@ public:
 			};
 
 			VkBufferImageCopy region{
-			  .bufferOffset = bufferOffset,
-			  .bufferRowLength = 0,
-			  .bufferImageHeight = 0,
-			  .imageSubresource = imageSubresource,
-			  .imageOffset = { 0, 0, 0 },
-			  .imageExtent = texture->extent(mip_level),
+				.bufferOffset = bufferOffset,
+				.bufferRowLength = 0,
+				.bufferImageHeight = 0,
+				.imageSubresource = imageSubresource,
+				.imageOffset = { 0, 0, 0 },
+				.imageExtent = texture->extent(mip_level),
 			};
 
 			regions.push_back(region);
 			bufferOffset += texture->size(mip_level);
 		}
 
-		context->command->pipelineBarrier(
+		context->state->default_command->pipelineBarrier(
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,				// don't wait for anything
 			VK_PIPELINE_STAGE_TRANSFER_BIT,					// but block transfer 
 			{
-			  VulkanImage::MemoryBarrier(
-				this->image->image->image,
-				0,
-				0,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				context->state.texture->subresource_range())
+				VulkanImage::MemoryBarrier(
+					this->image->image->image,
+					0,
+					0,
+					VK_IMAGE_LAYOUT_UNDEFINED,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					context->state->texture->subresource_range())
 			});
 
 		vk.CmdCopyBufferToImage(
-			context->command->buffer(),
-			context->state.buffer,
+			context->state->default_command->buffer(),
+			context->state->buffer,
 			this->image->image->image,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			static_cast<uint32_t>(regions.size()),
 			regions.data());
 
-		context->command->pipelineBarrier(
+		context->state->default_command->pipelineBarrier(
 			VK_PIPELINE_STAGE_TRANSFER_BIT,					// wait for transfer
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,			// don't block anything
 			{
@@ -1076,15 +1076,15 @@ public:
 				0,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				this->layout,
-				context->state.texture->subresource_range())
+				context->state->texture->subresource_range())
 			});
 
-		context->state.image = this->image->image->image;
+		context->state->image = this->image->image->image;
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state.imageLayout = this->layout;
+		context->state->imageLayout = this->layout;
 	}
 
 private:
@@ -1117,17 +1117,17 @@ public:
 	void alloc(Visitor* context)
 	{
 		this->view = std::make_unique<VulkanImageView>(
-			context->device,
-			context->state.image,
-			context->state.texture->format(),
-			context->state.texture->image_view_type(),
+			context->state->device,
+			context->state->image,
+			context->state->texture->format(),
+			context->state->texture->image_view_type(),
 			this->component_mapping,
-			context->state.texture->subresource_range());
+			context->state->texture->subresource_range());
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state.imageView = this->view->view;
+		context->state->imageView = this->view->view;
 	}
 
 private:
@@ -1154,7 +1154,7 @@ public:
 
 	void update(Visitor* context)
 	{
-		context->state.extent = this->extent;
+		context->state->extent = this->extent;
 	}
 
 private:
@@ -1176,7 +1176,7 @@ public:
 
 	void pipeline(Visitor* context)
 	{
-		context->state.rasterization_state.cullMode = this->cullmode;
+		context->state->rasterization_state.cullMode = this->cullmode;
 	}
 
 private:
@@ -1201,31 +1201,31 @@ public:
 		REGISTER_VISITOR(pipelinevisitor, ComputeCommand, pipeline);
 	}
 
-	void pipeline(PipelineVisitor* context)
+	void pipeline(Visitor* context)
 	{
 		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
-			context->device,
-			context->state.descriptor_set_layout_bindings);
+			context->state->device,
+			context->state->descriptor_set_layout_bindings);
 
 		this->descriptor_set = std::make_unique<VulkanDescriptorSets>(
-			context->device,
+			context->state->device,
 			this->descriptor_pool,
 			std::vector<VkDescriptorSetLayout>{ this->descriptor_set_layout->layout });
 
 		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
-			context->device,
+			context->state->device,
 			std::vector<VkDescriptorSetLayout>{ this->descriptor_set_layout->layout },
-			context->state.push_constant_ranges);
+			context->state->push_constant_ranges);
 
-		for (auto& write_descriptor_set : context->state.write_descriptor_sets) {
+		for (auto& write_descriptor_set : context->state->write_descriptor_sets) {
 			write_descriptor_set.dstSet = this->descriptor_set->descriptor_sets[0];
 		}
-		this->descriptor_set->update(context->state.write_descriptor_sets);
+		this->descriptor_set->update(context->state->write_descriptor_sets);
 
 		this->compute_pipeline = std::make_unique<VulkanComputePipeline>(
-			context->device,
-			context->pipelinecache->cache,
-			context->state.shader_stage_infos[0],
+			context->state->device,
+			context->state->pipelinecache->cache,
+			context->state->shader_stage_infos[0],
 			this->pipeline_layout->layout);
 	}
 
@@ -1278,60 +1278,60 @@ public:
 	void alloc(Visitor* context)
 	{
 		this->command = std::make_unique<VulkanCommandBuffers>(
-			context->device,
+			context->state->device,
 			1,
 			VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 	}
 
 	virtual void execute(VkCommandBuffer command, Visitor*) = 0;
 
-	void pipeline(PipelineVisitor* context)
+	void pipeline(Visitor* context)
 	{
 		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
-			context->device,
-			context->state.descriptor_pool_sizes);
+			context->state->device,
+			context->state->descriptor_pool_sizes);
 
 		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
-			context->device,
-			context->state.descriptor_set_layout_bindings);
+			context->state->device,
+			context->state->descriptor_set_layout_bindings);
 
 		std::vector<VkDescriptorSetLayout> descriptor_set_layouts{
 			this->descriptor_set_layout->layout
 		};
 
 		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
-			context->device,
+			context->state->device,
 			descriptor_set_layouts,
-			context->state.push_constant_ranges);
+			context->state->push_constant_ranges);
 
 		this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
-			context->device,
+			context->state->device,
 			descriptor_pool,
 			descriptor_set_layouts);
 
-		for (auto& write_descriptor_set : context->state.write_descriptor_sets) {
+		for (auto& write_descriptor_set : context->state->write_descriptor_sets) {
 			write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
 		}
-		this->descriptor_sets->update(context->state.write_descriptor_sets);
+		this->descriptor_sets->update(context->state->write_descriptor_sets);
 
 		this->graphics_pipeline = std::make_unique<VulkanGraphicsPipeline>(
-			context->device,
-			context->state.renderpass->renderpass,
-			context->pipelinecache->cache,
+			context->state->device,
+			context->state->renderpass->renderpass,
+			context->state->pipelinecache->cache,
 			this->pipeline_layout->layout,
 			this->topology,
-			context->state.rasterization_state,
+			context->state->rasterization_state,
 			this->dynamic_states,
-			context->state.shader_stage_infos,
-			context->state.vertex_input_bindings,
-			context->state.vertex_attributes);
+			context->state->shader_stage_infos,
+			context->state->vertex_input_bindings,
+			context->state->vertex_attributes);
 	}
 
 	void record(Visitor* context)
 	{
 		this->command->begin(
 			0,
-			context->state.renderpass->renderpass,
+			context->state->renderpass->renderpass,
 			0,
 			VK_NULL_HANDLE,
 			VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
@@ -1351,14 +1351,14 @@ public:
 
 		std::vector<VkRect2D> scissors{ {
 			{ 0, 0 },
-			context->state.extent
+			context->state->extent
 		} };
 
 		std::vector<VkViewport> viewports{ {
 		  .x = 0.0f,
 		  .y = 0.0f,
-		  .width = static_cast<float>(context->state.extent.width),
-		  .height = static_cast<float>(context->state.extent.height),
+		  .width = static_cast<float>(context->state->extent.width),
+		  .height = static_cast<float>(context->state->extent.height),
 		  .minDepth = 0.0f,
 		  .maxDepth = 1.0f
 		} };
@@ -1375,9 +1375,9 @@ public:
 
 		vk.CmdBindVertexBuffers(this->command->buffer(),
 			0,
-			static_cast<uint32_t>(context->state.vertex_attribute_buffers.size()),
-			context->state.vertex_attribute_buffers.data(),
-			context->state.vertex_attribute_buffer_offsets.data());
+			static_cast<uint32_t>(context->state->vertex_attribute_buffers.size()),
+			context->state->vertex_attribute_buffers.data(),
+			context->state->vertex_attribute_buffer_offsets.data());
 
 		this->execute(this->command->buffer(), context);
 		this->command->end();
@@ -1386,7 +1386,7 @@ public:
 	void render(Visitor* context)
 	{
 		vk.CmdExecuteCommands(
-			context->state.command->buffer(),
+			context->state->command->buffer(),
 			static_cast<uint32_t>(this->command->buffers.size()),
 			this->command->buffers.data());
 	}
@@ -1476,9 +1476,9 @@ private:
 	{
 		vk.CmdBindIndexBuffer(
 			command,
-			context->state.index_buffer,
+			context->state->index_buffer,
 			this->offset,
-			context->state.index_buffer_type);
+			context->state->index_buffer_type);
 
 		vk.CmdDrawIndexed(
 			command,
@@ -1522,13 +1522,13 @@ public:
 	void alloc(Visitor* context)
 	{
 		VkExtent3D extent = {
-			.width = context->state.extent.width,
-			.height = context->state.extent.height,
+			.width = context->state->extent.width,
+			.height = context->state->extent.height,
 			.depth = 1
 		};
 
 		this->image = std::make_shared<VulkanImageObject>(
-			context->device,
+			context->state->device,
 			VK_IMAGE_TYPE_2D,
 			this->format,
 			extent,
@@ -1542,24 +1542,24 @@ public:
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		this->imageview = std::make_shared<VulkanImageView>(
-			context->device,
+			context->state->device,
 			this->image->image->image,
 			this->format,
 			VK_IMAGE_VIEW_TYPE_2D,
 			this->component_mapping,
 			this->subresource_range);
 
-		context->state.framebuffer_attachments.push_back(this->imageview->view);
+		context->state->framebuffer_attachments.push_back(this->imageview->view);
 
 		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-			context->state.swapchain_format = this->format;
+			context->state->swapchain_format = this->format;
 		}
 	}
 
 	void record(Visitor* context)
 	{
 		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-			context->state.swapchain_source = this->image->image->image;
+			context->state->swapchain_source = this->image->image->image;
 		}
 	}
 
@@ -1596,12 +1596,12 @@ public:
 	void do_alloc(CommandVisitor* context)
 	{
 		this->framebuffer = std::make_unique<VulkanFramebuffer>(
-			context->device,
-			context->state.renderpass,
-			context->state.framebuffer_attachments,
-			context->state.extent,
+			context->state->device,
+			context->state->renderpass,
+			context->state->framebuffer_attachments,
+			context->state->extent,
 			1);
-		context->state.framebuffer = this->framebuffer;
+		context->state->framebuffer = this->framebuffer;
 	}
 
 	void alloc(CommandVisitor* context)
@@ -1632,7 +1632,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.input_attachments.push_back(this->attachment);
+		context->state->input_attachments.push_back(this->attachment);
 	}
 
 	VkAttachmentReference attachment;
@@ -1651,7 +1651,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.color_attachments.push_back(this->attachment);
+		context->state->color_attachments.push_back(this->attachment);
 	}
 
 private:
@@ -1671,7 +1671,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.resolve_attachments.push_back(this->attachment);
+		context->state->resolve_attachments.push_back(this->attachment);
 	}
 
 private:
@@ -1691,7 +1691,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.depth_stencil_attachment = this->attachment;
+		context->state->depth_stencil_attachment = this->attachment;
 	}
 
 private:
@@ -1710,7 +1710,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.preserve_attachments.push_back(this->attachment);
+		context->state->preserve_attachments.push_back(this->attachment);
 	}
 
 private:
@@ -1730,7 +1730,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.bind_point = this->bind_point;
+		context->state->bind_point = this->bind_point;
 	}
 
 private:
@@ -1754,17 +1754,17 @@ public:
 	{
 		Group::visit(context);
 
-		context->state.subpass_descriptions.push_back({
+		context->state->subpass_descriptions.push_back({
 			.flags = 0,
-			.pipelineBindPoint = context->state.bind_point,
-			.inputAttachmentCount = static_cast<uint32_t>(context->state.input_attachments.size()),
-			.pInputAttachments = context->state.input_attachments.data(),
-			.colorAttachmentCount = static_cast<uint32_t>(context->state.color_attachments.size()),
-			.pColorAttachments = context->state.color_attachments.data(),
-			.pResolveAttachments = context->state.resolve_attachments.data(),
-			.pDepthStencilAttachment = &context->state.depth_stencil_attachment,
-			.preserveAttachmentCount = static_cast<uint32_t>(context->state.preserve_attachments.size()),
-			.pPreserveAttachments = context->state.preserve_attachments.data()
+			.pipelineBindPoint = context->state->bind_point,
+			.inputAttachmentCount = static_cast<uint32_t>(context->state->input_attachments.size()),
+			.pInputAttachments = context->state->input_attachments.data(),
+			.colorAttachmentCount = static_cast<uint32_t>(context->state->color_attachments.size()),
+			.pColorAttachments = context->state->color_attachments.data(),
+			.pResolveAttachments = context->state->resolve_attachments.data(),
+			.pDepthStencilAttachment = &context->state->depth_stencil_attachment,
+			.preserveAttachmentCount = static_cast<uint32_t>(context->state->preserve_attachments.size()),
+			.pPreserveAttachments = context->state->preserve_attachments.data()
 			});
 	}
 };
@@ -1802,7 +1802,7 @@ public:
 
 	void alloc(Visitor* context)
 	{
-		context->state.attachment_descriptions.push_back(this->description);
+		context->state->attachment_descriptions.push_back(this->description);
 	}
 
 private:
@@ -1836,24 +1836,24 @@ public:
 	{
 		Group::visit(context);
 
-		this->render_command = std::make_unique<VulkanCommandBuffers>(context->device);
-		this->render_queue = context->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
+		this->render_command = std::make_unique<VulkanCommandBuffers>(context->state->device);
+		this->render_queue = context->state->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
 
-		this->renderpass = context->state.renderpass;
-		this->framebuffer = context->state.framebuffer;
+		this->renderpass = context->state->renderpass;
+		this->framebuffer = context->state->framebuffer;
 	}
 
 	void resize(Visitor* context)
 	{
 		Group::visit(context);
-		this->framebuffer = context->state.framebuffer;
+		this->framebuffer = context->state->framebuffer;
 	}
 
-	void render(CommandVisitor* context)
+	void render(Visitor* context)
 	{
 		const VkRect2D renderarea{
 			{ 0, 0 },						// offset
-			context->state.extent			// extent
+			context->state->extent			// extent
 		};
 
 		const std::vector<VkClearValue> clearvalues{
@@ -1870,7 +1870,7 @@ public:
 				clearvalues,
 				this->render_command->buffer());
 
-			context->state.command = this->render_command.get();
+			context->state->command = this->render_command.get();
 
 			Group::visit(context);
 		}
@@ -1907,17 +1907,17 @@ public:
 		Group::visit(context);
 
 		this->renderpass = std::make_shared<VulkanRenderpass>(
-			context->device,
-			context->state.attachment_descriptions,
-			context->state.subpass_descriptions);
+			context->state->device,
+			context->state->attachment_descriptions,
+			context->state->subpass_descriptions);
 
-		context->state.renderpass = this->renderpass;
+		context->state->renderpass = this->renderpass;
 	}
 
 	void visitChildren(Visitor* context)
 	{
 		Group::visit(context);
-		context->state.renderpass = this->renderpass;
+		context->state->renderpass = this->renderpass;
 	}
 
 public:
@@ -1943,30 +1943,30 @@ public:
 		REGISTER_VISITOR(presentvisitor, SwapchainObject, present);
 	}
 
-	void alloc(CommandVisitor* context)
+	void alloc(Visitor* context)
 	{
-		this->surface->checkPresentModeSupport(context->device, this->present_mode);
-		this->present_queue = context->device->getQueue(0, this->surface->surface);
-		this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->device);
-		this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->device);
+		this->surface->checkPresentModeSupport(context->state->device, this->present_mode);
+		this->present_queue = context->state->device->getQueue(0, this->surface->surface);
+		this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->state->device);
+		this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->state->device);
 
 		this->resize(context);
 	}
 
-	void resize(CommandVisitor* context)
+	void resize(Visitor* context)
 	{
 		VkSurfaceFormatKHR surface_format =
-			this->surface->getSupportedSurfaceFormat(context->device, context->state.swapchain_format);
+			this->surface->getSupportedSurfaceFormat(context->state->device, context->state->swapchain_format);
 
 		VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : 0;
 
 		this->swapchain = std::make_unique<VulkanSwapchain>(
-			context->device,
+			context->state->device,
 			this->surface->surface,
 			3,
 			surface_format.format,
 			surface_format.colorSpace,
-			context->state.extent,
+			context->state->extent,
 			1,
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_SHARING_MODE_EXCLUSIVE,
@@ -1979,20 +1979,20 @@ public:
 
 		uint32_t count;
 		THROW_ON_ERROR(vk.GetSwapchainImagesKHR(
-			context->device->device,
+			context->state->device->device,
 			this->swapchain->swapchain,
 			&count,
 			nullptr));
 
 		this->swapchain_images.resize(count);
 		THROW_ON_ERROR(vk.GetSwapchainImagesKHR(
-			context->device->device,
+			context->state->device->device,
 			this->swapchain->swapchain,
 			&count,
 			this->swapchain_images.data()));
 
 		for (uint32_t i = 0; i < count; i++) {
-			context->command->pipelineBarrier(
+			context->state->default_command->pipelineBarrier(
 				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
 					VulkanImage::MemoryBarrier(
@@ -2008,37 +2008,39 @@ public:
 	void record(Visitor* context)
 	{
 		this->swap_buffers_command = std::make_unique<VulkanCommandBuffers>(
-			context->device,
+			context->state->device,
 			this->swapchain_images.size(),
 			VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
 		for (size_t i = 0; i < this->swapchain_images.size(); i++) {
 			const VkImageSubresourceLayers subresource_layers{
-				this->subresource_range.aspectMask,			// aspectMask
-				this->subresource_range.baseMipLevel,		// mipLevel
-				this->subresource_range.baseArrayLayer,		// baseArrayLayer
-				this->subresource_range.layerCount			// layerCount;
+				.aspectMask = this->subresource_range.aspectMask,
+				.mipLevel = this->subresource_range.baseMipLevel,
+				.baseArrayLayer = this->subresource_range.baseArrayLayer,
+				.layerCount = this->subresource_range.layerCount,
 			};
 
-			const VkOffset3D offset = {
-				0, 0, 0
-			};
-
-			VkExtent3D extent3d = {
-				context->state.extent.width, context->state.extent.height, 1
+			VkOffset3D offset = {
+				.x = 0,
+				.y = 0,
+				.z = 0
 			};
 
 			std::vector<VkImageCopy> regions{ {
-				subresource_layers,					// srcSubresource
-				offset,								// srcOffset
-				subresource_layers,					// dstSubresource
-				offset,								// dstOffset
-				extent3d							// extent
+				.srcSubresource = subresource_layers,
+				.srcOffset = offset,
+				.dstSubresource = subresource_layers,
+				.dstOffset = offset,
+				.extent = {
+					.width = context->state->extent.width,
+					.height = context->state->extent.height,
+					.depth = 1
+				}
 			} };
 
 			VulkanCommandBuffers::Scope command_scope(this->swap_buffers_command.get(), i);
 
-			VkImage srcImage = context->state.swapchain_source;
+			VkImage srcImage = context->state->swapchain_source;
 			VkImage dstImage = this->swapchain_images[i];
 
 			this->swap_buffers_command->pipelineBarrier(
@@ -2091,7 +2093,7 @@ public:
 	void present(Visitor* context)
 	{
 		THROW_ON_ERROR(vk.AcquireNextImageKHR(
-			context->device->device,
+			context->state->device->device,
 			this->swapchain->swapchain,
 			UINT64_MAX,
 			this->swapchain_image_ready->semaphore,
@@ -2160,17 +2162,23 @@ public:
 		REGISTER_VISITOR(rendervisitor, OffscreenImage, render);
 	}
 
-	void alloc(CommandVisitor* context)
+	void alloc(Visitor* context)
 	{
-		this->fence = std::make_unique<VulkanFence>(context->device);
-		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->device);
+		this->fence = std::make_unique<VulkanFence>(context->state->device);
+		this->get_image_command = std::make_unique<VulkanCommandBuffers>(context->state->device);
+		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkQueueFlagBits.html
+		// All commands that are allowed on a queue that supports transfer operations are also allowed on a 
+		// queue that supports either graphics or compute operations. Thus, if the capabilities of a queue 
+		// family include VK_QUEUE_GRAPHICS_BIT or VK_QUEUE_COMPUTE_BIT, then reporting the 
+		// VK_QUEUE_TRANSFER_BIT capability separately for that queue family is optional.
+		this->get_image_queue = context->state->device->getQueue(VK_QUEUE_COMPUTE_BIT);
 
 		VkExtent3D extent = {
-		  context->state.extent.width, context->state.extent.height, 1
+		  context->state->extent.width, context->state->extent.height, 1
 		};
 
 		this->image = std::make_shared<VulkanImageObject>(
-			context->device,
+			context->state->device,
 			VK_IMAGE_TYPE_2D,
 			this->color_attachment->format,
 			extent,
@@ -2183,7 +2191,7 @@ public:
 			0,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-		context->command->pipelineBarrier(
+		context->state->default_command->pipelineBarrier(
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
 			this->image->image->memoryBarrier(
@@ -2214,7 +2222,7 @@ public:
 		};
 
 		VkExtent3D extent3d = {
-		  context->state.extent.width, context->state.extent.height, 1
+		  context->state->extent.width, context->state->extent.height, 1
 		};
 
 		VkImageCopy image_copy{
@@ -2274,7 +2282,7 @@ public:
 	{
 		this->fence->reset();
 		this->get_image_command->submit(
-			context->transferqueue,
+			this->get_image_queue,
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			this->fence->fence);
 
@@ -2313,6 +2321,7 @@ public:
 private:
 	std::shared_ptr<FramebufferAttachment> color_attachment;
 	std::unique_ptr<VulkanCommandBuffers> get_image_command;
+	VkQueue get_image_queue{ nullptr };
 	const VkImageSubresourceRange subresource_range{
 		VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1
 	};
@@ -2435,24 +2444,25 @@ public:
 	MemoryPageManager(Visitor* context, std::shared_ptr<VulkanImage> image) :
 		image(std::move(image))
 	{
-		this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
-		this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->device);
-		this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->device);
+		this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->state->device);
+		this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->state->device);
+		this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->state->device);
+		this->copy_sparse_queue = context->state->device->getQueue(VK_QUEUE_SPARSE_BINDING_BIT);
 
 		VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
 
-		uint32_t memory_type_index = context->device->physical_device.getMemoryTypeIndex(
+		uint32_t memory_type_index = context->state->device->physical_device.getMemoryTypeIndex(
 			memory_requirements.memoryTypeBits,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
-			this->image->getSparseMemoryRequirements(context->state.texture->subresource_range().aspectMask);
+			this->image->getSparseMemoryRequirements(context->state->texture->subresource_range().aspectMask);
 
 		uint32_t numTiles = 5000;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
 		this->image_memory = std::make_shared<VulkanMemory>(
-			context->device,
+			context->state->device,
 			numTiles * pageSize,
 			memory_type_index);
 
@@ -2462,7 +2472,7 @@ public:
 			this->reusable_pages.push_back(
 				std::make_shared<MemoryPage>(
 					this->image_memory->memory,
-					context->state.texture,
+					context->state->texture,
 					imageExtent,
 					i * pageSize));
 		}
@@ -2537,10 +2547,10 @@ public:
 			.pSignalSemaphores = signal_semaphores.data(),
 		};
 
-		vk.QueueBindSparse(context->sparsequeue, 1, &bind_sparse_info, VK_NULL_HANDLE);
+		vk.QueueBindSparse(this->copy_sparse_queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 
 		if (regions.empty()) {
-			context->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
+			context->state->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
 		}
 		else {
 			this->copy_sparse_command->begin();
@@ -2555,12 +2565,12 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					context->state.texture->subresource_range())
+					context->state->texture->subresource_range())
 				});
 
 			vk.CmdCopyBufferToImage(
 				this->copy_sparse_command->buffer(),
-				context->state.buffer,
+				context->state->buffer,
 				this->image->image,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				static_cast<uint32_t>(regions.size()),
@@ -2576,7 +2586,7 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					context->state.texture->subresource_range())
+					context->state->texture->subresource_range())
 				});
 
 			this->copy_sparse_command->end();
@@ -2585,13 +2595,13 @@ public:
 			std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
 
 			this->copy_sparse_command->submit(
-				context->sparsequeue,
+				this->copy_sparse_queue,
 				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 				VK_NULL_HANDLE,
 				wait_semaphores,
 				signal_semaphores);
 
-			context->wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
+			context->state->wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
 		}
 	}
 
@@ -2604,6 +2614,7 @@ public:
 	std::unique_ptr<VulkanSemaphore> bind_sparse_finished;
 	std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
 	std::unique_ptr<VulkanCommandBuffers> copy_sparse_command;
+	VkQueue copy_sparse_queue{ nullptr };
 };
 
 
@@ -2643,10 +2654,10 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
-		VulkanTextureImage* texture = context->state.texture;
+		VulkanTextureImage* texture = context->state->texture;
 
 		this->image = std::make_shared<VulkanImage>(
-			context->device,
+			context->state->device,
 			texture->image_type(),
 			texture->format(),
 			texture->extent(0),
@@ -2658,7 +2669,7 @@ public:
 			this->sharing_mode,
 			this->create_flags);
 
-		context->command->pipelineBarrier(
+		context->state->default_command->pipelineBarrier(
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
 			this->image->memoryBarrier(
@@ -2666,15 +2677,15 @@ public:
 			  0,
 			  VK_IMAGE_LAYOUT_UNDEFINED,
 			  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			  context->state.texture->subresource_range()) });
+			  context->state->texture->subresource_range()) });
 
 		this->memory_manager = std::make_unique<MemoryPageManager>(context, this->image);
-		context->state.image = this->image->image;
+		context->state->image = this->image->image;
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state.imageLayout = this->layout;
+		context->state->imageLayout = this->layout;
 	}
 
 	void render(RenderVisitor* context)

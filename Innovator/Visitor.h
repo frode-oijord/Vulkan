@@ -32,22 +32,7 @@ public:
 	void visit(class Node* node);
 
 	std::unordered_map<std::type_index, std::any> callbacks;
-
-	void init(
-		std::shared_ptr<VulkanInstance> vulkan,
-		std::shared_ptr<VulkanDevice> device,
-		std::shared_ptr<VkExtent2D> extent)
-	{
-		this->vulkan = std::move(vulkan);
-		this->device = std::move(device);
-		this->extent = std::move(extent);
-	}
-
-	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
-	std::shared_ptr<VulkanDevice> device{ nullptr };
-
-	State state;
-	std::shared_ptr<VkExtent2D> extent;
+	std::shared_ptr<State> state{ nullptr };
 };
 
 
@@ -120,48 +105,6 @@ class CommandVisitor : public Visitor {
 public:
 	CommandVisitor();
 	void visit(class Node* node);
-
-	void init(
-		std::shared_ptr<VulkanInstance> vulkan,
-		std::shared_ptr<VulkanDevice> device,
-		std::shared_ptr<VkExtent2D> extent)
-	{
-		Visitor::init(vulkan, device, extent);
-		this->fence = std::make_unique<VulkanFence>(this->device);
-		this->command = std::make_unique<VulkanCommandBuffers>(this->device);
-		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkQueueFlagBits.html
-		// All commands that are allowed on a queue that supports transfer operations are also allowed on a 
-		// queue that supports either graphics or compute operations. Thus, if the capabilities of a queue 
-		// family include VK_QUEUE_GRAPHICS_BIT or VK_QUEUE_COMPUTE_BIT, then reporting the 
-		// VK_QUEUE_TRANSFER_BIT capability separately for that queue family is optional.
-		this->graphicsqueue = this->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
-		this->transferqueue = this->graphicsqueue;// this->device->getQueue(VK_QUEUE_TRANSFER_BIT);
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-		this->sparsequeue = this->device->getQueue(VK_QUEUE_SPARSE_BINDING_BIT);
-#endif
-	}
-
-
-	VkQueue graphicsqueue{ nullptr };
-	VkQueue transferqueue{ nullptr };
-	VkQueue sparsequeue{ nullptr };
-	std::shared_ptr<VulkanFence> fence{ nullptr };
-	std::vector<VkSemaphore> wait_semaphores;
-	std::unique_ptr<VulkanCommandBuffers> command{ nullptr };
-};
-
-class PipelineVisitor : public Visitor {
-public:
-	void init(
-		std::shared_ptr<VulkanInstance> vulkan,
-		std::shared_ptr<VulkanDevice> device,
-		std::shared_ptr<VkExtent2D> extent)
-	{
-		Visitor::init(vulkan, device, extent);
-		this->pipelinecache = std::make_shared<VulkanPipelineCache>(this->device);
-	}
-	std::shared_ptr<VulkanPipelineCache> pipelinecache{ nullptr };
 };
 
 
@@ -175,21 +118,7 @@ inline static DeviceVisitor devicevisitor;
 
 inline static CommandVisitor allocvisitor;
 inline static CommandVisitor resizevisitor;
+inline static Visitor pipelinevisitor;
 inline static RenderVisitor rendervisitor;
-inline static PipelineVisitor pipelinevisitor;
 inline static Visitor recordvisitor;
 inline static Visitor presentvisitor;
-
-static void InitVisitors(
-	std::shared_ptr<VulkanInstance> vulkan,
-	std::shared_ptr<VulkanDevice> device,
-	std::shared_ptr<VkExtent2D> extent)
-{
-	allocvisitor.init(vulkan, device, extent);
-	resizevisitor.init(vulkan, device, extent);
-	rendervisitor.init(vulkan, device, extent);
-	pipelinevisitor.init(vulkan, device, extent);
-	recordvisitor.init(vulkan, device, extent);
-	presentvisitor.init(vulkan, device, extent);
-	eventvisitor.init(vulkan, device, extent);
-}

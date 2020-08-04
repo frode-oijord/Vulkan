@@ -6,6 +6,15 @@
 #include <vector>
 
 struct State {
+	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
+	std::shared_ptr<VulkanDevice> device{ nullptr };
+	std::shared_ptr<VulkanPipelineCache> pipelinecache{ nullptr };
+
+	VkQueue queue{ nullptr };
+	std::shared_ptr<VulkanFence> fence{ nullptr };
+	std::vector<VkSemaphore> wait_semaphores;
+	std::shared_ptr<VulkanCommandBuffers> default_command{ nullptr };
+
 	VkDescriptorBufferInfo descriptor_buffer_info{
 	  0, 0, 0
 	};
@@ -18,19 +27,19 @@ struct State {
 	VkExtent2D extent{ 0, 0 };
 
 	VkPipelineRasterizationStateCreateInfo rasterization_state{
-	  VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,	// sType
-	  nullptr,														// pNext
-	  0,															// flags;
-	  VK_FALSE,														// depthClampEnable
-	  VK_FALSE,														// rasterizerDiscardEnable
-	  VK_POLYGON_MODE_FILL,											// polygonMode
-	  VK_CULL_MODE_BACK_BIT,										// cullMode
-	  VK_FRONT_FACE_COUNTER_CLOCKWISE,								// frontFace
-	  VK_FALSE,														// depthBiasEnable
-	  0.0f,															// depthBiasConstantFactor
-	  0.0f,															// depthBiasClamp
-	  0.0f,															// depthBiasSlopeFactor
-	  1.0f,															// lineWidth
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.depthBiasConstantFactor = 0.0f,
+		.depthBiasClamp = 0.0f,
+		.depthBiasSlopeFactor = 0.0f,
+		.lineWidth = 1.0f,
 	};
 
 	VkImage image{ 0 };

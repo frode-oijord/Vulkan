@@ -7,9 +7,7 @@
 void
 Visitor::visit(Node* node)
 {
-	this->state = State();
-	this->state.extent = *this->extent;
-
+	StateScope scope(this->state.get());
 	node->visit(this);
 }
 
@@ -19,22 +17,22 @@ CommandVisitor::CommandVisitor()
 void
 CommandVisitor::visit(Node* node)
 {
-	this->command->begin();
-	this->wait_semaphores.clear();
-	this->state = State();
-	this->state.extent = *this->extent;
+	StateScope scope(this->state.get());
+
+	this->state->default_command->begin();
+	this->state->wait_semaphores.clear();
 
 	node->visit(this);
 
-	this->fence->reset();
-	this->command->end();
-	this->command->submit(
-		this->graphicsqueue,
+	this->state->fence->reset();
+	this->state->default_command->end();
+	this->state->default_command->submit(
+		this->state->queue,
 		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-		this->fence->fence,
-		this->wait_semaphores);
+		this->state->fence->fence,
+		this->state->wait_semaphores);
 
-	this->fence->wait();
+	this->state->fence->wait();
 }
 
 
@@ -55,8 +53,7 @@ EventVisitor::EventVisitor()
 void
 EventVisitor::visit(Node* node)
 {
-	this->state = State();
-	this->state.extent = *this->extent;
+	StateScope scope(this->state.get());
 	node->visit(this);
 }
 
@@ -66,8 +63,8 @@ EventVisitor::visit(ViewMatrix* node)
 {
 	if (this->move && this->press) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
-		dx[0] /= this->state.extent.width;
-		dx[1] /= this->state.extent.height;
+		dx[0] /= this->state->extent.width;
+		dx[1] /= this->state->extent.height;
 		dx *= 20.0;
 		switch (this->button) {
 			// case 0: node->orbit(dx); break;
@@ -119,6 +116,8 @@ EventVisitor::visit(class ModelMatrix* node)
 void
 DeviceVisitor::visit(class Node* node)
 {
+	StateScope scope(this->state.get());
+
 	::memset(&device_features, VK_FALSE, sizeof(VkPhysicalDeviceFeatures));
 	::memset(&device_features2, VK_FALSE, sizeof(VkPhysicalDeviceFeatures2));
 #ifdef VK_USE_PLATFORM_WIN32_KHR
