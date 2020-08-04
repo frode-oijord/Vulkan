@@ -10,7 +10,6 @@
 
 class VulkanSurface {
 public:
-	NO_COPY_OR_ASSIGNMENT(VulkanSurface)
 	VulkanSurface() = delete;
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)

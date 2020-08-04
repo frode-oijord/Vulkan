@@ -7,10 +7,9 @@
 #include <fstream>
 #include <functional>
 
-class VulkanTextureImage {
+class VulkanTextureImage : public NonCopyable {
 public:
-	NO_COPY_OR_ASSIGNMENT(VulkanTextureImage)
-		VulkanTextureImage() = default;
+	VulkanTextureImage() = default;
 	virtual ~VulkanTextureImage() = default;
 
 	virtual VkExtent3D extent(size_t mip_level) const = 0;
@@ -54,9 +53,7 @@ public:
 
 class GliTextureImage : public VulkanTextureImage {
 public:
-	NO_COPY_OR_ASSIGNMENT(GliTextureImage)
-
-		explicit GliTextureImage(const std::string& filename) :
+	explicit GliTextureImage(const std::string& filename) :
 		texture(gli::load(filename))
 	{}
 
@@ -144,7 +141,7 @@ public:
 	gli::texture2d texture;
 };
 
-static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<glm::u8vec4> & texels, glm::u8vec4 texel)
+static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<glm::u8vec4>& texels, glm::u8vec4 texel)
 {
 	for (size_t i = 0; i < 32; i++) {
 		for (size_t j = 0; j < 32; j++) {
@@ -157,9 +154,7 @@ static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vec
 
 class DebugTextureImage : public VulkanTextureImage {
 public:
-	NO_COPY_OR_ASSIGNMENT(DebugTextureImage)
-
-		explicit DebugTextureImage(const std::string& filename)
+	explicit DebugTextureImage(const std::string& filename)
 	{
 		this->lod0_size = 256;
 		this->num_lods = 4;// log2(lod0_size) + 1;
@@ -195,7 +190,7 @@ public:
 
 	VkExtent3D brick_size() const override {
 		return VkExtent3D{
-			1, 1, 1
+		  1, 1, 1
 		};
 	}
 
@@ -275,8 +270,6 @@ public:
 
 class DebugTextureImageBricked : public VulkanTextureImage {
 public:
-	NO_COPY_OR_ASSIGNMENT(DebugTextureImageBricked)
-
 	explicit DebugTextureImageBricked(const std::string& filename)
 	{
 		this->lod0_size = 256;
@@ -316,7 +309,7 @@ public:
 
 	VkExtent3D brick_size() const override {
 		return VkExtent3D{
-			32, 32, 16
+		  32, 32, 16
 		};
 	}
 

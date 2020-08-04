@@ -3,11 +3,15 @@
 #include <stdexcept>
 #include <Innovator/VulkanAPI.h>
 
-#define NO_COPY_OR_ASSIGNMENT(Class)															\
-Class(Class&&) = delete;																		\
-Class(const Class&) = delete;																	\
-Class & operator=(Class&&) = delete;															\
-Class & operator=(const Class&) = delete;														\
+class NonCopyable {
+public:
+	NonCopyable() = default;
+	NonCopyable(NonCopyable&&) = delete;
+	NonCopyable(const NonCopyable&) = delete;
+	NonCopyable& operator=(NonCopyable&&) = delete;
+	NonCopyable& operator=(const NonCopyable&) = delete;
+};
+
 
 #define IMPLEMENT_VISITABLE																		\
 	void visit(Visitor* visitor) override														\
