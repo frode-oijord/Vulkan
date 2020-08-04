@@ -63,8 +63,12 @@ public:
 	LRESULT CALLBACK wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		switch (message) {
-		case WM_PAINT:
+		case WM_PAINT: {
+			PAINTSTRUCT ps;
+			HDC hdc = BeginPaint(hWnd, &ps);
+			EndPaint(hWnd, &ps);
 			this->redraw();
+		}
 			break;
 		case WM_SIZE:
 			this->resize(LOWORD(lParam), HIWORD(lParam));
@@ -215,6 +219,7 @@ public:
 
 	void redraw() override
 	{
+		std::cout << "redraw" << std::endl;
 		try {
 			rendervisitor.visit(this->root.get());
 			presentvisitor.visit(this->root.get());
@@ -250,7 +255,9 @@ public:
 	void mouseMoved(int x, int y)
 	{
 		eventvisitor.mouseMoved(this->root.get(), x, y);
-		this->redraw();
+		if (eventvisitor.press) {
+			this->redraw();
+		}
 	}
 
 	std::shared_ptr<Group> root;

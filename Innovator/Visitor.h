@@ -73,7 +73,6 @@ public:
 		this->move = false;
 	}
 
-private:
 	bool press;
 	bool move;
 	int button;
