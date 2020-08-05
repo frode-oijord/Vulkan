@@ -111,13 +111,3 @@ class RenderVisitor : public CommandVisitor {
 public:
 	class OffscreenImage* image{ nullptr };
 };
-
-inline static EventVisitor eventvisitor;
-inline static DeviceVisitor devicevisitor;
-
-inline static CommandVisitor allocvisitor;
-inline static CommandVisitor resizevisitor;
-inline static Visitor pipelinevisitor;
-inline static RenderVisitor rendervisitor;
-inline static Visitor recordvisitor;
-inline static Visitor presentvisitor;

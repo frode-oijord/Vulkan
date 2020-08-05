@@ -124,6 +124,7 @@ env_ptr innovator_env()
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "acceleration-structure", fun_ptr(node<AccelerationStructure>) });
 #endif
+	innovator_env->inner.insert({ "swapchain", fun_ptr(node<Swapchain, VkPresentModeKHR>) });
 	innovator_env->inner.insert({ "color-attachment", fun_ptr(node<ColorAttachment, uint32_t, VkImageLayout>) });
 	innovator_env->inner.insert({ "depth-attachment", fun_ptr(node<DepthStencilAttachment, uint32_t, VkImageLayout>) });
 	innovator_env->inner.insert({ "subpass", fun_ptr(shared_from_node_list<SubpassDescription, std::shared_ptr<Node>>) });
@@ -161,6 +162,11 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "descriptorsetlayoutbinding", fun_ptr(node<DescriptorSetLayoutBinding, uint32_t, VkDescriptorType, VkShaderStageFlagBits>) });
 	innovator_env->inner.insert({ "vertexinputbindingdescription", fun_ptr(node<VertexInputBindingDescription, uint32_t, uint32_t, VkVertexInputRate>) });
 	innovator_env->inner.insert({ "vertexinputattributedescription", fun_ptr(node<VertexInputAttributeDescription, uint32_t, uint32_t, VkFormat, uint32_t>) });
+
+	innovator_env->inner.insert({ "VK_PRESENT_MODE_IMMEDIATE_KHR", VK_PRESENT_MODE_IMMEDIATE_KHR });
+	innovator_env->inner.insert({ "VK_PRESENT_MODE_MAILBOX_KHR", VK_PRESENT_MODE_MAILBOX_KHR });
+	innovator_env->inner.insert({ "VK_PRESENT_MODE_FIFO_KHR", VK_PRESENT_MODE_FIFO_KHR });
+	innovator_env->inner.insert({ "VK_PRESENT_MODE_FIFO_RELAXED_KHR", VK_PRESENT_MODE_FIFO_RELAXED_KHR });
 
 	innovator_env->inner.insert({ "VK_IMAGE_CREATE_SPARSE_BINDING_BIT", VK_IMAGE_CREATE_SPARSE_BINDING_BIT });
 	innovator_env->inner.insert({ "VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT", VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT });

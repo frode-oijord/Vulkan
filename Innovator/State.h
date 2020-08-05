@@ -1,11 +1,16 @@
 #pragma once
 
-#include <Innovator/Wrapper.h>
+#include <Innovator/VulkanAPI.h>
 
 #include <glm/glm.hpp>
 #include <vector>
 
 struct State {
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+	HWND hWnd;
+	HMODULE hInstance;
+#endif
+
 	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
 	std::shared_ptr<VulkanDevice> device{ nullptr };
 	std::shared_ptr<VulkanPipelineCache> pipelinecache{ nullptr };
@@ -16,7 +21,7 @@ struct State {
 	std::shared_ptr<VulkanCommandBuffers> default_command{ nullptr };
 
 	VkDescriptorBufferInfo descriptor_buffer_info{
-	  0, 0, 0
+		0, 0, 0
 	};
 	VkBuffer buffer{ 0 };
 	class BufferData* bufferdata{ 0 };

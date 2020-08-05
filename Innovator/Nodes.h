@@ -1,11 +1,10 @@
 #pragma once
 
 #include <Innovator/Timer.h>
-#include <Innovator/VulkanSurface.h>
-#include <Innovator/Wrapper.h>
 #include <Innovator/Visitor.h>
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
+#include <Innovator/VulkanRenderer.h>
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 #include <shaderc/shaderc.hpp>
@@ -82,8 +81,8 @@ public:
 		aspectratio(aspectratio),
 		fieldofview(fieldofview)
 	{
-		REGISTER_VISITOR(resizevisitor, ProjMatrix, resize);
-		REGISTER_VISITOR(rendervisitor, ProjMatrix, render);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, ProjMatrix, resize);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, ProjMatrix, render);
 	}
 
 	void resize(CommandVisitor* context)
@@ -123,7 +122,7 @@ public:
 	ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up) :
 		eye(eye), target(target)
 	{
-		REGISTER_VISITOR(rendervisitor, ViewMatrix, render);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, ViewMatrix, render);
 
 		this->rot[1] = up;
 		this->updateOrientation();
@@ -180,7 +179,7 @@ public:
 
 	ModelMatrix(const glm::dvec3& t, const glm::dvec3& s)
 	{
-		REGISTER_VISITOR(rendervisitor, ModelMatrix, render);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, ModelMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
 		this->mat = glm::translate(this->mat, t);
@@ -203,7 +202,7 @@ public:
 
 	TextureMatrix(const glm::dvec3& t, const glm::dvec3& s)
 	{
-		REGISTER_VISITOR(rendervisitor, TextureMatrix, render);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, TextureMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
 		this->mat = glm::translate(this->mat, t);
@@ -249,9 +248,9 @@ public:
 	explicit InlineBufferData(std::vector<T> values) :
 		values(std::move(values))
 	{
-		REGISTER_VISITOR(allocvisitor, InlineBufferData<T>, update);
-		REGISTER_VISITOR(pipelinevisitor, InlineBufferData<T>, update);
-		REGISTER_VISITOR(recordvisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, InlineBufferData<T>, update);
 	}
 
 	void copy(char* dst) const override
@@ -282,10 +281,10 @@ public:
 	explicit TextureImage(const std::string& filename) :
 		texture(VulkanImageFactory::Create(filename))
 	{
-		REGISTER_VISITOR(allocvisitor, TextureImage, update);
-		REGISTER_VISITOR(pipelinevisitor, TextureImage, update);
-		REGISTER_VISITOR(recordvisitor, TextureImage, update);
-		REGISTER_VISITOR(rendervisitor, TextureImage, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, TextureImage, update);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, TextureImage, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, TextureImage, update);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, TextureImage, update);
 	}
 
 	void copy(char* dst) const override
@@ -326,10 +325,10 @@ public:
 		usage_flags(usage_flags),
 		create_flags(create_flags)
 	{
-		REGISTER_VISITOR(allocvisitor, CpuMemoryBuffer, alloc);
-		REGISTER_VISITOR(pipelinevisitor, CpuMemoryBuffer, update);
-		REGISTER_VISITOR(recordvisitor, CpuMemoryBuffer, update);
-		REGISTER_VISITOR(rendervisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, CpuMemoryBuffer, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, CpuMemoryBuffer, update);
 	}
 
 	void alloc(CommandVisitor* context)
@@ -371,10 +370,10 @@ public:
 		usage_flags(usage_flags),
 		create_flags(create_flags)
 	{
-		REGISTER_VISITOR(allocvisitor, GpuMemoryBuffer, alloc);
-		REGISTER_VISITOR(pipelinevisitor, GpuMemoryBuffer, update);
-		REGISTER_VISITOR(recordvisitor, GpuMemoryBuffer, update);
-		REGISTER_VISITOR(rendervisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, GpuMemoryBuffer, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, GpuMemoryBuffer, update);
 	}
 
 	void alloc(CommandVisitor* context)
@@ -421,9 +420,9 @@ public:
 
 	TransformBuffer()
 	{
-		REGISTER_VISITOR(allocvisitor, TransformBuffer, alloc);
-		REGISTER_VISITOR(pipelinevisitor, TransformBuffer, pipeline);
-		REGISTER_VISITOR(rendervisitor, TransformBuffer, render);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, TransformBuffer, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, TransformBuffer, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, TransformBuffer, render);
 	}
 
 	void alloc(Visitor* context)
@@ -468,8 +467,8 @@ public:
 	explicit IndexBufferDescription(VkIndexType type) :
 		type(type)
 	{
-		REGISTER_VISITOR(allocvisitor, IndexBufferDescription, update);
-		REGISTER_VISITOR(recordvisitor, IndexBufferDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, IndexBufferDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, IndexBufferDescription, update);
 	}
 
 	void update(Visitor* context)
@@ -502,9 +501,9 @@ public:
 			.offset = offset,
 			})
 	{
-		REGISTER_VISITOR(allocvisitor, VertexInputAttributeDescription, update);
-		REGISTER_VISITOR(pipelinevisitor, VertexInputAttributeDescription, update);
-		REGISTER_VISITOR(recordvisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, VertexInputAttributeDescription, update);
 	}
 
 	void update(Visitor* context)
@@ -534,8 +533,8 @@ public:
 		stride(stride),
 		inputRate(inputRate)
 	{
-		REGISTER_VISITOR(allocvisitor, VertexInputBindingDescription, update);
-		REGISTER_VISITOR(pipelinevisitor, VertexInputBindingDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, VertexInputBindingDescription, update);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, VertexInputBindingDescription, update);
 	}
 
 	void update(Visitor* context)
@@ -568,7 +567,7 @@ public:
 		descriptorType(descriptorType),
 		stageFlags(stageFlags)
 	{
-		REGISTER_VISITOR(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
 	}
 
 	void pipeline(Visitor* context)
@@ -631,9 +630,9 @@ public:
 	explicit Shader(const VkShaderStageFlagBits stage, std::string glsl) :
 		stage(stage)
 	{
-		REGISTER_VISITOR(devicevisitor, Shader, device);
-		REGISTER_VISITOR(allocvisitor, Shader, alloc);
-		REGISTER_VISITOR(pipelinevisitor, Shader, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::devicevisitor, Shader, device);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Shader, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Shader, pipeline);
 
 		//std::ifstream input(filename, std::ios::in);
 		//std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
@@ -728,8 +727,8 @@ public:
 
 	explicit AccelerationStructure()
 	{
-		REGISTER_VISITOR(devicevisitor, AccelerationStructure, device);
-		REGISTER_VISITOR(allocvisitor, AccelerationStructure, alloc);
+		REGISTER_VISITOR(VulkanRenderer::devicevisitor, AccelerationStructure, device);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, AccelerationStructure, alloc);
 	}
 
 	void device(DeviceVisitor* visitor)
@@ -958,8 +957,8 @@ public:
 			.unnormalizedCoordinates = unnormalizedCoordinates
 			})
 	{
-		REGISTER_VISITOR(allocvisitor, Sampler, alloc);
-		REGISTER_VISITOR(pipelinevisitor, Sampler, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Sampler, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Sampler, pipeline);
 	}
 
 	void alloc(Visitor* context)
@@ -998,8 +997,8 @@ public:
 		create_flags(create_flags),
 		layout(layout)
 	{
-		REGISTER_VISITOR(allocvisitor, Image, alloc);
-		REGISTER_VISITOR(pipelinevisitor, Image, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Image, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Image, pipeline);
 	}
 
 	void alloc(CommandVisitor* context)
@@ -1110,8 +1109,8 @@ public:
 		VkComponentSwizzle a) :
 		component_mapping({ r, g, b, a })
 	{
-		REGISTER_VISITOR(allocvisitor, ImageView, alloc);
-		REGISTER_VISITOR(pipelinevisitor, ImageView, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, ImageView, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, ImageView, pipeline);
 	}
 
 	void alloc(Visitor* context)
@@ -1145,11 +1144,11 @@ public:
 	Extent(uint32_t width, uint32_t height) :
 		extent{ width, height }
 	{
-		REGISTER_VISITOR(allocvisitor, Extent, update);
-		REGISTER_VISITOR(pipelinevisitor, Extent, update);
-		REGISTER_VISITOR(recordvisitor, Extent, update);
-		REGISTER_VISITOR(resizevisitor, Extent, update);
-		REGISTER_VISITOR(rendervisitor, Extent, update);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Extent, update);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Extent, update);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Extent, update);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Extent, update);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, Extent, update);
 	}
 
 	void update(Visitor* context)
@@ -1171,7 +1170,7 @@ public:
 	explicit CullMode(VkCullModeFlags cullmode) :
 		cullmode(cullmode)
 	{
-		REGISTER_VISITOR(pipelinevisitor, CullMode, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, CullMode, pipeline);
 	}
 
 	void pipeline(Visitor* context)
@@ -1198,7 +1197,7 @@ public:
 		group_count_y(group_count_y),
 		group_count_z(group_count_z)
 	{
-		REGISTER_VISITOR(pipelinevisitor, ComputeCommand, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, ComputeCommand, pipeline);
 	}
 
 	void pipeline(Visitor* context)
@@ -1422,10 +1421,10 @@ public:
 		firstvertex(firstvertex),
 		firstinstance(firstinstance)
 	{
-		REGISTER_VISITOR(allocvisitor, DrawCommand, alloc);
-		REGISTER_VISITOR(pipelinevisitor, DrawCommand, pipeline);
-		REGISTER_VISITOR(recordvisitor, DrawCommand, record);
-		REGISTER_VISITOR(rendervisitor, DrawCommand, render);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, DrawCommand, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, DrawCommand, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, DrawCommand, record);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, DrawCommand, render);
 	}
 
 private:
@@ -1465,10 +1464,10 @@ public:
 		firstinstance(firstinstance),
 		offset(0)
 	{
-		REGISTER_VISITOR(allocvisitor, IndexedDrawCommand, alloc);
-		REGISTER_VISITOR(pipelinevisitor, IndexedDrawCommand, pipeline);
-		REGISTER_VISITOR(recordvisitor, IndexedDrawCommand, record);
-		REGISTER_VISITOR(rendervisitor, IndexedDrawCommand, render);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, IndexedDrawCommand, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, IndexedDrawCommand, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, IndexedDrawCommand, record);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, IndexedDrawCommand, render);
 	}
 
 private:
@@ -1514,9 +1513,9 @@ public:
 			aspectMask, 0, 1, 0, 1
 		};
 
-		REGISTER_VISITOR(allocvisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR(resizevisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR(recordvisitor, FramebufferAttachment, record);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, FramebufferAttachment, record);
 	}
 
 	void alloc(Visitor* context)
@@ -1588,9 +1587,9 @@ public:
 	explicit Framebuffer(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(allocvisitor, Framebuffer, alloc);
-		REGISTER_VISITOR(resizevisitor, Framebuffer, alloc);
-		REGISTER_VISITOR(recordvisitor, Framebuffer, record);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Framebuffer, alloc);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Framebuffer, alloc);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Framebuffer, record);
 	}
 
 	void do_alloc(CommandVisitor* context)
@@ -1627,7 +1626,7 @@ public:
 	explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(allocvisitor, InputAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, InputAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1646,7 +1645,7 @@ public:
 	explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(allocvisitor, ColorAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, ColorAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1666,7 +1665,7 @@ public:
 	explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(allocvisitor, ResolveAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, ResolveAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1686,7 +1685,7 @@ public:
 	explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(allocvisitor, DepthStencilAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, DepthStencilAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1705,7 +1704,7 @@ public:
 	explicit PreserveAttachment(uint32_t attachment) :
 		attachment(attachment)
 	{
-		REGISTER_VISITOR(allocvisitor, PreserveAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, PreserveAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1725,7 +1724,7 @@ public:
 	explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
 		bind_point(bind_point)
 	{
-		REGISTER_VISITOR(allocvisitor, PipelineBindpoint, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, PipelineBindpoint, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1747,7 +1746,7 @@ public:
 	SubpassDescription(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(allocvisitor, SubpassDescription, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, SubpassDescription, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1797,7 +1796,7 @@ public:
 			.finalLayout = finalLayout
 		};
 
-		REGISTER_VISITOR(allocvisitor, RenderpassAttachment, alloc);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, RenderpassAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1818,13 +1817,13 @@ public:
 	Renderpass(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(allocvisitor, Renderpass, alloc);
-		REGISTER_VISITOR(resizevisitor, Renderpass, resize);
-		REGISTER_VISITOR(rendervisitor, Renderpass, render);
-		REGISTER_VISITOR(eventvisitor, Renderpass, visitChildren);
-		REGISTER_VISITOR(devicevisitor, Renderpass, visitChildren);
-		REGISTER_VISITOR(pipelinevisitor, Renderpass, visitChildren);
-		REGISTER_VISITOR(recordvisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Renderpass, alloc);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Renderpass, resize);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, Renderpass, render);
+		REGISTER_VISITOR(VulkanRenderer::eventvisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::devicevisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Renderpass, visitChildren);
 	}
 
 	void visitChildren(Visitor* context)
@@ -1896,10 +1895,10 @@ public:
 	RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(allocvisitor, RenderpassDescription, alloc);
-		REGISTER_VISITOR(resizevisitor, RenderpassDescription, visitChildren);
-		REGISTER_VISITOR(pipelinevisitor, RenderpassDescription, visitChildren);
-		REGISTER_VISITOR(recordvisitor, RenderpassDescription, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, RenderpassDescription, alloc);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, RenderpassDescription, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, RenderpassDescription, visitChildren);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, RenderpassDescription, visitChildren);
 	}
 
 	void alloc(Visitor* context)
@@ -1925,32 +1924,49 @@ public:
 };
 
 
-class SwapchainObject : public Node {
+class Swapchain : public Node {
 public:
 	IMPLEMENT_VISITABLE;
-	virtual ~SwapchainObject() = default;
+	virtual ~Swapchain() = default;
 
-	SwapchainObject(
-		std::shared_ptr<VulkanSurface> surface,
-		VkPresentModeKHR present_mode) :
-		surface(std::move(surface)),
+	Swapchain(VkPresentModeKHR present_mode) :
 		present_mode(present_mode),
 		present_queue(nullptr)
 	{
-		REGISTER_VISITOR(allocvisitor, SwapchainObject, alloc);
-		REGISTER_VISITOR(resizevisitor, SwapchainObject, resize);
-		REGISTER_VISITOR(recordvisitor, SwapchainObject, record);
-		REGISTER_VISITOR(presentvisitor, SwapchainObject, present);
+		REGISTER_VISITOR(VulkanRenderer::devicevisitor, Swapchain, device);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Swapchain, alloc);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Swapchain, resize);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Swapchain, record);
+		REGISTER_VISITOR(VulkanRenderer::presentvisitor, Swapchain, present);
 	}
 
 	void alloc(Visitor* context)
 	{
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+		this->surface = std::make_shared<VulkanSurface>(
+			context->state->vulkan,
+			context->state->hWnd,
+			context->state->hInstance);
+#endif
+
+		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(context->state->device);
+		context->state->extent = surface_capabilities.currentExtent;
+
 		this->surface->checkPresentModeSupport(context->state->device, this->present_mode);
 		this->present_queue = context->state->device->getQueue(0, this->surface->surface);
 		this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->state->device);
 		this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->state->device);
 
 		this->resize(context);
+	}
+
+	void device(DeviceVisitor* context)
+	{
+		context->instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+		context->device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+		context->instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#endif
 	}
 
 	void resize(Visitor* context)
@@ -2156,10 +2172,10 @@ public:
 	OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment) :
 		color_attachment(std::move(color_attachment))
 	{
-		REGISTER_VISITOR(allocvisitor, OffscreenImage, alloc);
-		REGISTER_VISITOR(resizevisitor, OffscreenImage, alloc);
-		REGISTER_VISITOR(recordvisitor, OffscreenImage, record);
-		REGISTER_VISITOR(rendervisitor, OffscreenImage, render);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR(VulkanRenderer::resizevisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR(VulkanRenderer::recordvisitor, OffscreenImage, record);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, OffscreenImage, render);
 	}
 
 	void alloc(Visitor* context)
@@ -2195,14 +2211,14 @@ public:
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
 			this->image->image->memoryBarrier(
-			  0,
-			  0,
-			  VK_IMAGE_LAYOUT_UNDEFINED,
-			  VK_IMAGE_LAYOUT_GENERAL,
-			  this->subresource_range) });
+				0,
+				0,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_GENERAL,
+				this->subresource_range) });
 
 		VkImageSubresource image_subresource{
-		  VK_IMAGE_ASPECT_COLOR_BIT, 0, 0
+			VK_IMAGE_ASPECT_COLOR_BIT, 0, 0
 		};
 		VkSubresourceLayout subresource_layout = this->image->image->getSubresourceLayout(image_subresource);
 		this->dataOffset = subresource_layout.offset;
@@ -2218,11 +2234,11 @@ public:
 		};
 
 		const VkOffset3D offset = {
-		  0, 0, 0
+			0, 0, 0
 		};
 
 		VkExtent3D extent3d = {
-		  context->state->extent.width, context->state->extent.height, 1
+			context->state->extent.width, context->state->extent.height, 1
 		};
 
 		VkImageCopy image_copy{
@@ -2239,18 +2255,18 @@ public:
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,				// don't wait for anything, the color attachment was rendered to in preceding render pass
 			VK_PIPELINE_STAGE_TRANSFER_BIT,					// block transfer stage (copy)
 			{
-			  this->color_attachment->image->image->memoryBarrier(
-				0,
-				0,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				this->subresource_range),
-			  this->image->image->memoryBarrier(
-				0,
-				0,
-				VK_IMAGE_LAYOUT_GENERAL,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				this->subresource_range) });
+				this->color_attachment->image->image->memoryBarrier(
+					0,
+					0,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					this->subresource_range),
+				this->image->image->memoryBarrier(
+					0,
+					0,
+					VK_IMAGE_LAYOUT_GENERAL,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					this->subresource_range) });
 
 		vk.CmdCopyImage(
 			this->get_image_command->buffer(),
@@ -2264,18 +2280,18 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			{
-			  this->color_attachment->image->image->memoryBarrier(
-				0,
-				0,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				this->subresource_range),
-			  this->image->image->memoryBarrier(
-				0,
-				0,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				VK_IMAGE_LAYOUT_GENERAL,
-				this->subresource_range) });
+				this->color_attachment->image->image->memoryBarrier(
+					0,
+					0,
+					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					this->subresource_range),
+				this->image->image->memoryBarrier(
+					0,
+					0,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					VK_IMAGE_LAYOUT_GENERAL,
+					this->subresource_range) });
 	}
 
 	std::set<uint32_t> getTiles(CommandVisitor* context)
@@ -2358,24 +2374,24 @@ public:
 		}
 
 		VkOffset3D imageOffset = {
-		  int32_t(i * this->imageExtent.width),
-		  int32_t(j * this->imageExtent.height),
-		  int32_t(k * this->imageExtent.depth)
+			int32_t(i * this->imageExtent.width),
+			int32_t(j * this->imageExtent.height),
+			int32_t(k * this->imageExtent.depth)
 		};
 
 		const VkImageSubresource subresource{
-		  this->texture->subresource_range().aspectMask,
-		  mipLevel,
-		  0
+			this->texture->subresource_range().aspectMask,
+			mipLevel,
+			0
 		};
 
 		this->image_memory_bind = {
-		  .subresource = subresource,
-		  .offset = imageOffset,
-		  .extent = this->imageExtent,
-		  .memory = this->memory,
-		  .memoryOffset = this->memoryOffset,
-		  .flags = 0,
+			.subresource = subresource,
+			.offset = imageOffset,
+			.extent = this->imageExtent,
+			.memory = this->memory,
+			.memoryOffset = this->memoryOffset,
+			.flags = 0,
 		};
 
 		VkDeviceSize mipOffset = 0;
@@ -2521,9 +2537,9 @@ public:
 
 		std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info
 		{ {
-		  this->image->image,
-		  static_cast<uint32_t>(image_memory_binds.size()),
-		  image_memory_binds.data(),
+			this->image->image,
+			static_cast<uint32_t>(image_memory_binds.size()),
+			image_memory_binds.data(),
 		} };
 
 		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
@@ -2638,11 +2654,11 @@ public:
 		create_flags(create_flags),
 		layout(layout)
 	{
-		REGISTER_VISITOR(devicevisitor, SparseImage, device);
-		REGISTER_VISITOR(allocvisitor, SparseImage, alloc);
-		REGISTER_VISITOR(pipelinevisitor, SparseImage, pipeline);
-		REGISTER_VISITOR(rendervisitor, SparseImage, render);
-		REGISTER_VISITOR(devicevisitor, SparseImage, device);
+		REGISTER_VISITOR(VulkanRenderer::devicevisitor, SparseImage, device);
+		REGISTER_VISITOR(VulkanRenderer::allocvisitor, SparseImage, alloc);
+		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, SparseImage, pipeline);
+		REGISTER_VISITOR(VulkanRenderer::rendervisitor, SparseImage, render);
+		REGISTER_VISITOR(VulkanRenderer::devicevisitor, SparseImage, device);
 	}
 
 	void device(DeviceVisitor* context)

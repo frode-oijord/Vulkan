@@ -250,4 +250,5 @@
          ]])
 
          (separator lod-renderpass)
-         (separator main-renderpass))))
+         (separator main-renderpass)
+         (swapchain VK_PRESENT_MODE_FIFO_KHR))))
