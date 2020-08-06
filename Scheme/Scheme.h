@@ -406,3 +406,16 @@ namespace scm {
 		throw std::runtime_error("Parse failed, remaining input: " + std::string(begin, end));
 	}
 }
+
+class Scheme {
+public:
+	Scheme() : env(scm::global_env()) {}
+
+	std::any eval(const std::string input)
+	{
+		std::any exp = scm::read(input.begin(), input.end());
+		return scm::eval(exp, this->env);
+	}
+
+	scm::env_ptr env;
+};
