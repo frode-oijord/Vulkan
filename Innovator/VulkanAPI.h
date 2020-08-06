@@ -775,31 +775,6 @@ public:
 		return devices.front();
 	}
 
-	VkSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilities(VkPhysicalDevice device, VkSurfaceKHR surface)
-	{
-		VkSurfaceCapabilitiesKHR surface_capabilities;
-		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &surface_capabilities));
-		return surface_capabilities;
-	}
-
-	std::vector<VkSurfaceFormatKHR> getPhysicalDeviceSurfaceFormats(VkPhysicalDevice device, VkSurfaceKHR surface)
-	{
-		uint32_t count;
-		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, nullptr));
-		std::vector<VkSurfaceFormatKHR> surface_formats(count);
-		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceFormatsKHR(device, surface, &count, surface_formats.data()));
-		return surface_formats;
-	}
-
-	std::vector<VkPresentModeKHR> getPhysicalDeviceSurfacePresentModes(VkPhysicalDevice device, VkSurfaceKHR surface)
-	{
-		uint32_t count;
-		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, nullptr));
-		std::vector<VkPresentModeKHR> present_modes(count);
-		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfacePresentModesKHR(device, surface, &count, present_modes.data()));
-		return present_modes;
-	}
-
 	// VK_EXT_debug_report
 	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
 	PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT;
@@ -1169,8 +1144,10 @@ public:
 
 	VkSurfaceFormatKHR getSupportedSurfaceFormat(std::shared_ptr<VulkanDevice> device, VkFormat format)
 	{
-		std::vector<VkSurfaceFormatKHR> surface_formats =
-			this->vulkan->getPhysicalDeviceSurfaceFormats(device->physical_device.device, this->surface);
+		uint32_t count;
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceFormatsKHR(device->physical_device.device, surface, &count, nullptr));
+		std::vector<VkSurfaceFormatKHR> surface_formats(count);
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceFormatsKHR(device->physical_device.device, surface, &count, surface_formats.data()));
 
 		for (VkSurfaceFormatKHR surface_format : surface_formats) {
 			if (surface_format.format == format) {
@@ -1182,8 +1159,10 @@ public:
 
 	void checkPresentModeSupport(std::shared_ptr<VulkanDevice> device, VkPresentModeKHR present_mode)
 	{
-		std::vector<VkPresentModeKHR> present_modes =
-			this->vulkan->getPhysicalDeviceSurfacePresentModes(device->physical_device.device, this->surface);
+		uint32_t count;
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfacePresentModesKHR(device->physical_device.device, surface, &count, nullptr));
+		std::vector<VkPresentModeKHR> present_modes(count);
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfacePresentModesKHR(device->physical_device.device, surface, &count, present_modes.data()));
 
 		if (std::find(present_modes.begin(), present_modes.end(), present_mode) == present_modes.end()) {
 			throw std::runtime_error("surface does not support present mode");
@@ -1192,7 +1171,9 @@ public:
 
 	VkSurfaceCapabilitiesKHR getSurfaceCapabilities(std::shared_ptr<VulkanDevice> device)
 	{
-		return this->vulkan->getPhysicalDeviceSurfaceCapabilities(device->physical_device.device, this->surface);
+		VkSurfaceCapabilitiesKHR surface_capabilities;
+		THROW_ON_ERROR(vk.GetPhysicalDeviceSurfaceCapabilitiesKHR(device->physical_device.device, surface, &surface_capabilities));
+		return surface_capabilities;
 	}
 
 

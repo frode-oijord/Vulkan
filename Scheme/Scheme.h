@@ -377,10 +377,10 @@ namespace scm {
 			}
 		} const boolean_;
 
-		auto const number__def = double_;
-		auto const string__def = lexeme['"' >> *(char_ - '"') >> '"'];
-		auto const multi_string__def = lexeme["[[" >> *(char_ - "]]") >> "]]"];
-		auto const symbol__def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
+		const auto number__def = double_;
+		const auto string__def = lexeme['"' >> *(char_ - '"') >> '"'];
+		const auto multi_string__def = lexeme["[[" >> *(char_ - "]]") >> "]]"];
+		const auto symbol__def = lexeme[+(char_("A-Za-z") | char_("0-9") | char_('_') | char_('-') | char_("+*/%~&|^!=<>?"))];
 		const auto list__def = '(' >> *value_ >> ')';
 
 		const auto value__def
@@ -393,7 +393,7 @@ namespace scm {
 
 		BOOST_SPIRIT_DEFINE(value_, number_, string_, multi_string_, symbol_, list_)
 
-			const auto entry_point = x3::skip(x3::space)[value_];
+		const auto entry_point = x3::skip(x3::space)[value_];
 	}
 
 	template <typename Iterator>
