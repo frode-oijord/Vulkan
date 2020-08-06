@@ -45,6 +45,19 @@ std::vector<std::function<bool()>> tests
 	[] { ASSERT("(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))", "struct scm::Function"); },
 	[] { ASSERT("(fact 3)", "6"); },
 	[] { ASSERT("(fact 50)", "3.04141e+64"); },
+	[] { ASSERT("(define abs (lambda (n) ((if (> n 0) + -) 0 n)))", "struct scm::Function"); },
+	[] { ASSERT("(list (abs -3) (abs 0) (abs 3))", "(3 0 3)"); },
+	[] { 
+		std::string input = R"(
+			(define combine (lambda (f)
+				(lambda (x y)
+					(if (null ? x) (quote ())
+						(f (list (car x) (car y))
+							((combine f) (cdr x) (cdr y)))))))
+						)";
+		ASSERT(input, "struct scm::Function");
+	},
+
 };
 
 
