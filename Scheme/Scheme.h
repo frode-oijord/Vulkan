@@ -111,6 +111,11 @@ namespace scm {
 		return Boolean(args[0] < args[1]);
 	};
 
+	fun_ptr lessoreq = [](const List& lst) {
+		std::vector<Number> args = any_cast<Number>(lst);
+		return Boolean(args[0] <= args[1]);
+	};
+
 	fun_ptr equal = [](const List& lst) {
 		std::vector<Number> args = any_cast<Number>(lst);
 		return Boolean(args[0] == args[1]);
@@ -186,6 +191,7 @@ namespace scm {
 				{ Symbol("*"), multiplies },
 				{ Symbol(">"), greater },
 				{ Symbol("<"), less },
+				{ Symbol("<="), lessoreq },
 				{ Symbol("="), equal },
 				{ Symbol("car"), car },
 				{ Symbol("cdr"), cdr },
@@ -203,33 +209,33 @@ namespace scm {
 	const Symbol _define("define");
 
 	template <typename T>
-	bool print(const std::any exp)
+	bool print(const std::any exp, std::ostream& os)
 	{
 		if (exp.type() == typeid(T)) {
-			std::cout << std::any_cast<T>(exp);
+			os << std::any_cast<T>(exp);
 			return true;
 		}
 		return false;
 	}
 
-	void print(const std::any exp)
+	void print(const std::any exp, std::ostream& os)
 	{
-		if (print<Number>(exp) ||
-			print<Symbol>(exp) ||
-			print<String>(exp) ||
-			print<Boolean>(exp)) {
+		if (print<Number>(exp, os) ||
+			print<Symbol>(exp, os) ||
+			print<String>(exp, os) ||
+			print<Boolean>(exp, os)) {
 		}
 		else if (exp.type() == typeid(lst_ptr)) {
 			auto& list = *std::any_cast<lst_ptr>(exp);
-			std::cout << "(";
+			os << "(";
 			for (auto s : list) {
-				print(s);
+				print(s, os);
 				std::cout << " ";
 			}
-			std::cout << ")";
+			os << ")";
 		}
 		else {
-			std::cout << exp.type().name();
+			os << exp.type().name();
 		}
 	}
 
@@ -406,16 +412,3 @@ namespace scm {
 		throw std::runtime_error("Parse failed, remaining input: " + std::string(begin, end));
 	}
 }
-
-class Scheme {
-public:
-	Scheme() : env(scm::global_env()) {}
-
-	std::any eval(const std::string input)
-	{
-		std::any exp = scm::read(input.begin(), input.end());
-		return scm::eval(exp, this->env);
-	}
-
-	scm::env_ptr env;
-};

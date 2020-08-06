@@ -4,48 +4,64 @@
 #include <string>
 
 
-Scheme scheme;
-
-struct test_case {
-	std::string name;
-	std::function<bool()> run;
-};
+scm::env_ptr env = scm::global_env();
 
 
-template <typename T>
-bool ASSERT_EQUAL(std::any exp, T value)
+std::string repl(std::string input)
 {
-	std::cout << "= " << value << ": ";
-	return (exp.type() == typeid(T)) && (std::any_cast<T>(exp) == value);
+	std::any exp = scm::read(input.begin(), input.end());
+	exp = scm::eval(exp, env);
+	std::stringstream ss;
+	scm::print(exp, ss);
+	return ss.str();
 }
 
 
-std::vector<test_case> tests{
-	{ "(+ 1 1)", [] {
-		return ASSERT_EQUAL(scheme.eval("(+ 1 1)"), 2.0);
-	}}, 
-	{ "(define a 2)", [] {
-		return ASSERT_EQUAL(scheme.eval("(define a 2)"), 2.0);
-	}}, 
-	{ "a", [] {
-		return ASSERT_EQUAL(scheme.eval("a"), 2.0);
-	}},
+#define ASSERT(__exp__, __ev__)											\
+	std::string __v__ = repl(__exp__);									\
+	std::cout << __exp__ << " => " << __v__ << " ";						\
+	bool passed = (__ev__ == __v__);									\
+	std::cout << (passed ? "(Pass)" : "(Fail)") << std::endl;			\
+	return passed;
+
+
+std::vector<std::function<bool()>> tests
+{
+	[] { ASSERT("(+ 2 2)", "4"); },
+	[] { ASSERT("(+ (* 2 100) (* 1 10))", "210"); },
+	[] { ASSERT("(if (> 6 5) (+ 1 1) (+ 2 2))", "2"); },
+	[] { ASSERT("(if (< 6 5) (+ 1 1) (+ 2 2))", "4"); },
+	[] { ASSERT("(define x 3)", "3"); },
+	[] { ASSERT("x", "3"); },
+	[] { ASSERT("(+ x x)", "6"); },
+	[] { ASSERT("((lambda (x) (+ x x)) 5)", "10"); },
+	[] { ASSERT("(define twice (lambda (x) (* 2 x)))", "struct scm::Function"); },
+	[] { ASSERT("(twice 5)", "10"); },
+	[] { ASSERT("(define compose (lambda (f g) (lambda (x) (f (g x)))))", "struct scm::Function"); },
+	[] { ASSERT("((compose list twice) 5)", "(10)"); },
+	[] { ASSERT("(define repeat (lambda (f) (compose f f)))", "struct scm::Function"); },
+	[] { ASSERT("((repeat twice) 5)", "20"); },
+	[] { ASSERT("((repeat (repeat twice)) 5)", "80"); },
+	[] { ASSERT("(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))", "struct scm::Function"); },
+	[] { ASSERT("(fact 3)", "6"); },
+	[] { ASSERT("(fact 50)", "3.04141e+64"); },
 };
 
 
 int main(int, char* [])
 {
 	std::vector<bool> results(tests.size());
-	std::transform(tests.begin(), tests.end(), results.begin(), [](test_case& test) {
-		std::cout << test.name << " ";
-		bool success = test.run();
-		std::cout << (success ? "Passed" : "Failed") << std::endl;
-		return success;
-		});
+	std::transform(tests.begin(), tests.end(), results.begin(), [](std::function<bool()> test) {
+		return test();
+	});
 
-	std::cout << std::endl << results.size() << " tests executed. " << std::endl;
-	std::cout << std::count(results.begin(), results.end(), true) << " tests succeeded. " << std::endl;
-	std::cout << std::count(results.begin(), results.end(), false) << " tests failed. " << std::endl;
+	size_t n_exec = results.size();
+	size_t n_fail = std::count(results.begin(), results.end(), false);
+	size_t n_pass = std::count(results.begin(), results.end(), true);
+
+	std::cout << std::endl << n_exec << " tests executed. ";
+	std::cout << "(" << n_pass << " tests passed and ";
+	std::cout << n_fail << " tests failed) " << std::endl;
 
 	return 1;
 }

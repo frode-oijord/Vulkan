@@ -17,7 +17,7 @@ int main(int, char**)
 
 			std::any exp = scm::read(input.begin(), input.end());
 			exp = scm::eval(exp, env);
-			scm::print(exp); std::cout << std::endl;
+			scm::print(exp, std::cout); std::cout << std::endl;
 		}
 		catch (std::exception& e) {
 			std::cerr << e.what() << std::endl;
