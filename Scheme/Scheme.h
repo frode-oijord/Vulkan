@@ -285,7 +285,7 @@ namespace scm {
 					std::bind(eval, std::placeholders::_1, env));
 
 				auto func = call.front();
-				auto args = List(next(call.begin()), call.end());
+				auto args = List(std::next(call.begin()), call.end());
 
 				if (func.type() == typeid(Function)) {
 					auto function = std::any_cast<Function>(func);
@@ -327,19 +327,19 @@ namespace scm {
 						if (list.size() != 2) {
 							throw std::invalid_argument("wrong number of arguments to quote");
 						}
-						return Quote{ list[1] };
+						return Quote{ .exp = list[1] };
 					}
 					if (token == _if) {
 						if (list.size() != 4) {
 							throw std::invalid_argument("wrong number of arguments to if");
 						}
-						return If{ list[1], list[2], list[3] };
+						return If{ .test = list[1], .conseq = list[2], .alt = list[3] };
 					}
 					if (token == _lambda) {
 						if (list.size() != 3) {
 							throw std::invalid_argument("wrong Number of arguments to lambda");
 						}
-						return Lambda{ list[1], list[2] };
+						return Lambda{ .parms = list[1], .body = list[2] };
 					}
 					if (token == _begin) {
 						if (list.size() < 2) {
@@ -355,9 +355,9 @@ namespace scm {
 							throw std::invalid_argument("first argument to define must be a Symbol");
 						}
 						if (list.size() == 3) {
-							return Define{ std::any_cast<Symbol>(list[1]), list[2] };
+							return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = list[2] };
 						}
-						return Define{ std::any_cast<Symbol>(list[1]), Lambda{ list[2], list[3] } };
+						return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = Lambda{ list[2], list[3] } };
 					}
 				}
 			}
