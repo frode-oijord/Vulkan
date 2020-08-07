@@ -26,8 +26,9 @@ std::string repl(std::string input)
 	std::cout << (passed ? GREEN("(Pass)") : RED("(Fail)")) << std::endl;	\
 	return passed;
 
+typedef std::function<bool()> test_case;
 
-std::vector<std::function<bool()>> tests
+std::vector<test_case> tests
 {
 	[] { TEST("(quote ())", "()"); },
 	[] { TEST("(begin (define a 1) (+ 1 2 3))", "6"); },
@@ -68,10 +69,11 @@ std::vector<std::function<bool()>> tests
 
 int main(int, char* [])
 {
-	std::vector<bool> results(tests.size());
-	std::transform(tests.begin(), tests.end(), results.begin(), [](std::function<bool()> test) {
-		return test();
-		});
+	std::vector<bool> results;
+
+	for (auto test : tests) {
+		results.push_back(test());
+	}
 
 	size_t n_exec = results.size();
 	size_t n_fail = std::count(results.begin(), results.end(), false);
