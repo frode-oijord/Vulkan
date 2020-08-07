@@ -228,9 +228,13 @@ namespace scm {
 		else if (exp.type() == typeid(lst_ptr)) {
 			auto& list = *std::any_cast<lst_ptr>(exp);
 			os << "(";
-			for (auto s : list) {
-				print(s, os);
-				std::cout << " ";
+			if (!list.empty()) {
+				for (size_t i = 0; i < list.size(); i++) {
+					print(list[i], os);
+					if (i != list.size() - 1) {
+						os << " ";
+					}
+				}
 			}
 			os << ")";
 		}
