@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
 			else {
 				std::any exp = scm::read(input.begin(), input.end());
 				exp = scm::eval(exp, global_env);
-				scm::print(exp);
+				scm::print(exp, std::cout);
 				std::cout << std::endl;
 			}
 			return 1;
@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
 
 			std::any exp = scm::read(input.begin(), input.end());
 			exp = scm::eval(exp, global_env);
-			scm::print(exp);
+			scm::print(exp, std::cout);
 			std::cout << std::endl;
 		}
 	}
