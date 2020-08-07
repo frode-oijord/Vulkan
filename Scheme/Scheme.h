@@ -273,10 +273,9 @@ namespace scm {
 			}
 			else if (exp.type() == typeid(Begin)) {
 				auto begin = std::any_cast<Begin>(exp);
-				std::transform(next(begin.exps->begin()), begin.exps->end(), begin.exps->begin(),
+				std::transform(begin.exps->begin(), std::prev(begin.exps->end()), begin.exps->begin(),
 					std::bind(eval, std::placeholders::_1, env));
-				begin.exps->pop_back();
-				return begin.exps->back();
+				exp = begin.exps->back();
 			}
 			else {
 				auto list = std::any_cast<lst_ptr>(exp);
@@ -346,7 +345,7 @@ namespace scm {
 						if (list.size() < 2) {
 							throw std::invalid_argument("wrong Number of arguments to begin");
 						}
-						return Begin{ std::make_shared<List>(list) };
+						return Begin{ .exps = std::make_shared<List>(std::next(list.begin()), list.end()) };
 					}
 					if (token == _define) {
 						if (list.size() < 3 || list.size() > 4) {

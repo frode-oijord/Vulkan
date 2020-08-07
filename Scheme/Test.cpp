@@ -28,6 +28,8 @@ std::string repl(std::string input)
 std::vector<std::function<bool()>> tests
 {
 	[] { TEST("(quote ())", "()"); },
+	[] { TEST("(begin (define a 1) (+ 1 2 3))", "6"); },
+	[] { TEST("a", "1"); },
 	[] { TEST("(quote (testing 1 (2) -3.14e+159))", "(testing 1 (2) -3.14e+159)"); },
 	[] { TEST("(+ 2 2)", "4"); },
 	[] { TEST("(+ (* 2 100) (* 1 10))", "210"); },
