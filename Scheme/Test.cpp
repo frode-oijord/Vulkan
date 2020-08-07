@@ -16,12 +16,14 @@ std::string repl(std::string input)
 	return ss.str();
 }
 
+#define GREEN(__text__) "\033[1;32m" + std::string(__text__) + "\033[0m"
+#define RED(__text__) "\033[1;31m" + std::string(__text__) + "\033[0m"
 
-#define TEST(__exp__, __ev__)											\
-	std::string __v__ = repl(__exp__);									\
-	std::cout << __exp__ << " => " << __v__ << " ";						\
-	bool passed = (__ev__ == __v__);									\
-	std::cout << (passed ? "(Pass)" : "(Fail)") << std::endl;			\
+#define TEST(__exp__, __ev__)												\
+	std::string __v__ = repl(__exp__);										\
+	std::cout << __exp__ << " => " << __v__ << " ";							\
+	bool passed = (__ev__ == __v__);										\
+	std::cout << (passed ? GREEN("(Pass)") : RED("(Fail)")) << std::endl;	\
 	return passed;
 
 
@@ -53,12 +55,12 @@ std::vector<std::function<bool()>> tests
 	[] { TEST("(list (abs -3) (abs 0) (abs 3))", "(3 0 3)"); },
 	[] {
 		std::string input = R"(
-			(define combine (lambda (f)
-				(lambda (x y)
-					(if (null ? x) (quote ())
-						(f (list (car x) (car y))
-							((combine f) (cdr x) (cdr y)))))))
-						)";
+(define combine (lambda (f)
+	(lambda (x y)
+		(if (null ? x) (quote ())
+			(f (list (car x) (car y))
+				((combine f) (cdr x) (cdr y)))))))
+			)";
 		TEST(input, "struct scm::Function");
 	},
 };
@@ -75,9 +77,14 @@ int main(int, char* [])
 	size_t n_fail = std::count(results.begin(), results.end(), false);
 	size_t n_pass = std::count(results.begin(), results.end(), true);
 
-	std::cout << std::endl << n_exec << " tests executed. ";
-	std::cout << "(" << n_pass << " tests passed and ";
-	std::cout << n_fail << " tests failed) " << std::endl;
+	std::cout << std::endl << GREEN(std::to_string(n_exec) + " tests executed. ");
+
+	if (n_fail > 0) {
+		std::cout << RED(std::to_string(n_fail) + " tests failed. ") << std::endl;
+	}
+	else {
+		std::cout << GREEN("All tests passed.") << std::endl;
+	}
 
 	return 1;
 }
