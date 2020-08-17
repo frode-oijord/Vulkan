@@ -226,12 +226,12 @@ namespace scm {
 			print<Boolean>(exp, os)) {
 		}
 		else if (exp.type() == typeid(lst_ptr)) {
-			auto& list = *std::any_cast<lst_ptr>(exp);
+			auto list = std::any_cast<lst_ptr>(exp);
 			os << "(";
-			if (!list.empty()) {
-				for (size_t i = 0; i < list.size(); i++) {
-					print(list[i], os);
-					if (i != list.size() - 1) {
+			if (!list->empty()) {
+				for (size_t i = 0; i < list->size(); i++) {
+					print((*list)[i], os);
+					if (i != list->size() - 1) {
 						os << " ";
 					}
 				}
