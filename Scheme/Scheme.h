@@ -378,7 +378,7 @@ namespace scm {
 		x3::rule<struct symbol_class, Symbol> symbol_ = "symbol";
 		x3::rule<struct number_class, Number> number_ = "number";
 		x3::rule<struct string_class, String> string_ = "string";
-		x3::rule<struct value_class, value> const value_ = "value";
+		x3::rule<struct value_class, value> value_ = "value";
 		x3::rule<struct list_class, std::vector<value> > list_ = "list";
 		x3::rule<struct multi_string_class, String> multi_string_ = "multi_string";
 
