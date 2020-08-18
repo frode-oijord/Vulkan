@@ -14,20 +14,77 @@ typedef std::function<bool()> test_case;
 
 std::vector<test_case> tests
 {
-	[] {
-				std::string move("axb3");
-				ast::move value;
-				bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
-				std::visit(ast::visitor, value);
-				return passed;
+	[] { // pawn move
+			std::string move("a4");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
 	},
-	[] {
-				std::string move("a4");
-				ast::move value;
-				bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
-				std::visit(ast::visitor, value);
-				return passed;
+	[] { // pawn capture
+			std::string move("axb3");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
 	},
+	[] { // pawn capture en passant
+			std::string move("axb6ep");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // pawn promotion
+			std::string move("c8Q");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // piece move
+			std::string move("Na3");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // piece move
+			std::string move("Qh5");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // piece capture
+			std::string move("Qxh5");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // piece capture
+			std::string move("Nxa3");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // explicit piece move
+			std::string move("Nba3");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+	[] { // explicit piece move
+			std::string move("N4a3");
+			ast::move value;
+			bool passed = parse(move.begin(), move.end(), parser::entry_point, value);
+			std::visit(ast::visitor, value);
+			return passed;
+	},
+
 };
 
 
