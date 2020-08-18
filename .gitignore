@@ -3,4 +3,5 @@ Scheme/build
 Viewer/build
 Server/build
 Generator/build
+Chess/build
 *.bin
