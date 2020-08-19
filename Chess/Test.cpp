@@ -1,6 +1,7 @@
 
 #include <Chess.h>
 
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -14,38 +15,16 @@ typedef std::function<bool()> test_case;
 
 std::vector<test_case> tests
 {
-	[] { // pawn move
-		return read("a4");
-	},
-	[] { // pawn capture
-		return read("axb3");
-	},
-	[] { // pawn capture en passant
-		return read("axb6ep");
-	},
-	[] { // pawn promotion
-		return read("c8Q");
-	},
-	[] { // piece move
-		return read("Na3");
-	},
-	[] { // piece move
-		return read("Qh5");
-	},
-	[] { // piece capture
-		return read("Qxh5");
-	},
-	[] { // piece capture
-		return read("Nxa3");
-	},
-	[] { // explicit piece move
-		return read("Nba3");
-	},
-	[] { // explicit piece move
-		return read("N4a3");
-	},
-	[] { // game
-		return read("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+	[] {
+			std::ifstream stream("test.pgn", std::ios::in);
+			if (stream.is_open()) {
+				const std::string code{
+					std::istreambuf_iterator<char>(stream),
+					std::istreambuf_iterator<char>()
+				};
+				return read(code);
+			}
+			return false;
 	},
 };
 
