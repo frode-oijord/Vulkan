@@ -6,6 +6,7 @@
 #include <variant>
 #include <iostream>
 
+
 namespace chess {
 	class move {
 	public:
@@ -18,13 +19,7 @@ namespace chess {
 
 
 namespace ast {
-	struct event : std::string {};
-	struct site : std::string {};
-	struct date : std::string {};
-	struct round : std::string {};
-	struct white : std::string {};
-	struct black : std::string {};
-	struct result : std::string {};
+	struct tag : std::string {};
 	struct comment : std::string {};
 	struct move : std::vector<char> {};
 	struct pawn_move : move {};
@@ -40,13 +35,7 @@ namespace ast {
 
 	typedef std::variant<
 		int,
-		event,
-		site,
-		date,
-		round,
-		white,
-		black,
-		result,
+		tag,
 		comment,
 		pawn_move,
 		pawn_capture,
@@ -62,26 +51,8 @@ namespace ast {
 	struct visitor {
 		void operator()(int const& move) {
 		}
-		void operator()(event const& e) {
-			std::cout << "Event: " << e << std::endl;
-		}
-		void operator()(site const& e) {
-			std::cout << "Site: " << e << std::endl;
-		}
-		void operator()(date const& e) {
-			std::cout << "Date: " << e << std::endl;
-		}
-		void operator()(round const& e) {
-			std::cout << "Round: " << e << std::endl;
-		}
-		void operator()(white const& e) {
-			std::cout << "White: " << e << std::endl;
-		}
-		void operator()(black const& e) {
-			std::cout << "Black: " << e << std::endl;
-		}
-		void operator()(result const& e) {
-			std::cout << "Result: " << e << std::endl;
+		void operator()(tag const& e) {
+			std::cout << e << std::endl;
 		}
 		void operator()(comment const& e) {
 			std::cout << "Comment: " << e << std::endl;
@@ -130,72 +101,53 @@ namespace pgn_parser {
 	using x3::lexeme;
 	using x3::alnum;
 
-	const auto file = char_('a', 'h');
-	const auto rank = char_('1', '8');
+	const auto file = char_("a-h");
+	const auto rank = char_("1-8");
 	const auto square = file >> rank;
 	const auto rank8 = char_('8');
 	const auto takes = char_('x');
-	const auto en_passant = ((char_('6') | char_('3')) >> lit("ep"));
+	const auto en_passant = ((char_('6') | char_('3')) >> "ep");
 	const auto officer = (char_('B') | char_('N') | char_('Q') | char_('R'));
 	const auto king = char_('K');
+	const auto quoted_string = lexeme['"' >> *(char_ - '"') >> '"'];
 
-	x3::rule<struct event_class, ast::event> event = "event";
-	x3::rule<struct site_class, ast::site> site = "site";
-	x3::rule<struct date_class, ast::date> date = "date";
-	x3::rule<struct round_class, ast::round> round = "round";
-	x3::rule<struct white_class, ast::white> white = "white";
-	x3::rule<struct black_class, ast::black> black = "black";
-	x3::rule<struct result_class, ast::result> result = "result";
-
+	x3::rule<struct tag, ast::tag> tag = "tag";
 	x3::rule<struct comment_class, ast::comment> comment = "comment";
 
-	x3::rule<struct move_num_class, int> move_num = "move_num";
-	x3::rule<struct pawn_move_class, ast::pawn_move> pawn_move = "pawn_move";
-	x3::rule<struct pawn_capture_class, ast::pawn_capture> pawn_capture = "pawn_capture";
-	x3::rule<struct pawn_capture_ep_class, ast::pawn_capture_ep> pawn_capture_ep = "pawn_capture_ep";
-	x3::rule<struct pawn_promotion_class, ast::pawn_promotion> pawn_promotion = "pawn_promotion";
-	x3::rule<struct pawn_capture_promotion_class, ast::pawn_capture_promotion> pawn_capture_promotion = "pawn_capture_promotion";
-	x3::rule<struct piece_move_class, ast::piece_move> piece_move = "piece_move";
-	x3::rule<struct piece_capture_class, ast::piece_capture> piece_capture = "piece_capture";
-	x3::rule<struct explicit_piece_move_class, ast::explicit_piece_move> explicit_piece_move = "explicit_piece_move";
-	x3::rule<struct castles_kingside_class, ast::castles_kingside> castles_kingside = "castles_kingside";
-	x3::rule<struct castles_queenside_class, ast::castles_queenside> castles_queenside = "castles_queenside";
+	x3::rule<struct move_num, int> move_num = "move_num";
+	x3::rule<struct pawn_move, ast::pawn_move> pawn_move = "pawn_move";
+	x3::rule<struct pawn_capture, ast::pawn_capture> pawn_capture = "pawn_capture";
+	x3::rule<struct pawn_capture_ep, ast::pawn_capture_ep> pawn_capture_ep = "pawn_capture_ep";
+	x3::rule<struct pawn_promotion, ast::pawn_promotion> pawn_promotion = "pawn_promotion";
+	x3::rule<struct pawn_capture_promotion, ast::pawn_capture_promotion> pawn_capture_promotion = "pawn_capture_promotion";
+	x3::rule<struct piece_move, ast::piece_move> piece_move = "piece_move";
+	x3::rule<struct piece_capture, ast::piece_capture> piece_capture = "piece_capture";
+	x3::rule<struct explicit_piece_move, ast::explicit_piece_move> explicit_piece_move = "explicit_piece_move";
+	x3::rule<struct castles_kingside, ast::castles_kingside> castles_kingside = "castles_kingside";
+	x3::rule<struct castles_queenside, ast::castles_queenside> castles_queenside = "castles_queenside";
 
-	x3::rule<struct value_class, ast::value> value = "value";
-	x3::rule<struct game_class, std::vector<ast::value>> game = "game";
+	x3::rule<struct value, ast::value> value = "value";
+	x3::rule<struct game, std::vector<ast::value>> game = "game";
 
-	const auto event_def = lit("[Event") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-	const auto site_def = lit("[Site") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-	const auto date_def = lit("[Date") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-	const auto round_def = lit("[Round") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-	const auto white_def = lit("[White") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-	const auto black_def = lit("[Black") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-	const auto result_def = lit("[Result") >> lexeme['"' >> *(char_ - '"') >> '"'] >> ']';
-
+	const auto tag_def = lexeme['[' >> +(char_ - ']') >> ']'];
 	const auto comment_def = lexeme['{' >> +(char_ - '}') >> '}'];
 
-	const auto move_num_def = int_ >> lit(".");
+	const auto move_num_def = int_ >> ".";
 	const auto pawn_move_def = square >> -char_('+');
 	const auto pawn_capture_def = file >> takes >> square >> -char_('+');
 	const auto pawn_capture_ep_def = file >> takes >> file >> en_passant >> -char_('+');
 	const auto pawn_promotion_def = file >> rank8 >> officer >> -char_('+');
 	const auto pawn_capture_promotion_def = file >> takes >> rank8 >> officer >> -char_('+');
-	const auto piece_move_def = (king | officer) >> file >> rank >> -char_('+');
-	const auto piece_capture_def = (king | officer) >> takes >> file >> rank >> -char_('+');
-	const auto explicit_piece_move_def = officer >> (file | rank) >> file >> rank - char_('+');
+	const auto piece_move_def = (king | officer) >> square >> -char_('+');
+	const auto piece_capture_def = (king | officer) >> takes >> square >> -char_('+');
+	const auto explicit_piece_move_def = officer >> (file | rank) >> square >> -char_('+');
 	const auto castles_kingside_def = +lit("O-O") >> -char_('+');
 	const auto castles_queenside_def = +lit("O-O-O") >> -char_('+');
 
 	const auto game_def = *value;
 
 	const auto value_def
-		= event
-		| site
-		| date
-		| round
-		| white
-		| black
-		| result
+		= tag
 		| comment
 		| move_num
 		| pawn_move
@@ -211,13 +163,7 @@ namespace pgn_parser {
 
 	BOOST_SPIRIT_DEFINE(
 		value,
-		event,
-		site,
-		date,
-		round,
-		white,
-		black,
-		result,
+		tag,
 		comment,
 		move_num,
 		pawn_move,
