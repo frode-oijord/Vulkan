@@ -7,7 +7,7 @@ sudo apt-get update
 sudo apt-get install -y cmake
 
 sudo apt install -y build-essential
-sudo apt-get install libboost-all-dev
+#sudo apt-get install -y libboost-all-dev
 
 wget https://dl.bintray.com/boostorg/release/1.74.0/source/boost_1_74_0.tar.bz2
 tar xvf boost_1_74_0.tar.bz2
