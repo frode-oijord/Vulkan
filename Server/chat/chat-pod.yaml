@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: chat.dgs
+spec:
+  hostNetwork: true
+  restartPolicy: Never
+  containers:
+  - image: eu.gcr.io/foijord-project/chat:latest
+    name: chat-dgs
+    ports:
+    - containerPort: 80
