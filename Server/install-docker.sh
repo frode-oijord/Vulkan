@@ -2,7 +2,7 @@
 
 sudo apt-get update
 
-sudo apt-get install \
+sudo apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
@@ -10,7 +10,7 @@ sudo apt-get install \
     software-properties-common
 
 # Add Docker’s official GPG key:
-$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 
 sudo add-apt-repository \
    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
@@ -18,6 +18,6 @@ sudo add-apt-repository \
    stable"
 
  sudo apt-get update
- sudo apt-get install docker-ce docker-ce-cli containerd.io
+ sudo apt-get install -y docker-ce docker-ce-cli containerd.io
 
 sudo usermod -aG docker $USER
