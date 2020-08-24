@@ -13,8 +13,8 @@ gcloud beta container --project "foijord-project" clusters create "game-cluster"
 --num-nodes "3" \
 --enable-stackdriver-kubernetes \
 --enable-ip-alias \
---network "projects/foijord-project/global/networks/default" \
---subnetwork "projects/foijord-project/regions/europe-west1/subnetworks/default" \
+--network "projects/foijord-project/global/networks/game-network" \
+--subnetwork "projects/foijord-project/regions/europe-west1/subnetworks/game-network" \
 --default-max-pods-per-node "110" \
 --enable-legacy-authorization \
 --no-enable-master-authorized-networks \
@@ -23,3 +23,5 @@ gcloud beta container --project "foijord-project" clusters create "game-cluster"
 --enable-autorepair \
 --max-surge-upgrade 1 \
 --max-unavailable-upgrade 0
+
+gcloud container clusters get-credentials game-cluster
