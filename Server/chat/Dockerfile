@@ -31,6 +31,5 @@ FROM ubuntu:18.04 AS runtime
 WORKDIR /chat
 COPY --from=build /chat/build/server ./
 
-EXPOSE 8080/tcp
-
-CMD ["./server"]
+ENTRYPOINT ["/chat/server"]
+CMD ["--port" "8080"]

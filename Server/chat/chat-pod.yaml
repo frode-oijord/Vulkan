@@ -8,8 +8,4 @@ spec:
   containers:
   - image: eu.gcr.io/foijord-project/chat:latest
     name: chat-dgs
-    ports:
-    - containerPort: 80
-
-
-
+    args: ["--port", "8081"]
