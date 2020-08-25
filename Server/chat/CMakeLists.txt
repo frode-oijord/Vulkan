@@ -5,7 +5,7 @@ add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-find_package(Boost 1.74.0 COMPONENTS program_options)
+find_package(Boost COMPONENTS program_options)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
