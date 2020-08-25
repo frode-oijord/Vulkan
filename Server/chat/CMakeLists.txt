@@ -5,7 +5,8 @@ add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-find_package(Boost COMPONENTS program_options thread)
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost REQUIRED program_options thread chrono date_time atomic)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
