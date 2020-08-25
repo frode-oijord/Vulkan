@@ -5,8 +5,10 @@ add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
 
 include_directories(${PROJECT_SOURCE_DIR})
 
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost REQUIRED program_options thread chrono date_time atomic)
+if (WIN32)
+	set(Boost_USE_STATIC_LIBS ON)
+endif (WIN32)
+find_package(Boost REQUIRED program_options)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
