@@ -4,7 +4,6 @@
 #include <regex>
 #include <vector>
 #include <memory>
-#include <ranges>
 #include <sstream>
 #include <numeric>
 #include <variant>
@@ -300,7 +299,6 @@ namespace scm {
 					auto function = std::any_cast<fun_ptr>(func);
 					return function(args);
 				}
-				throw std::runtime_error("internal eval error");
 			}
 		}
 	}
@@ -312,7 +310,9 @@ namespace scm {
 		using base_type::variant;
 	};
 
-	struct {
+	std::any expand(value const& v);
+
+	struct visitor {
 		template <typename T>
 		std::any operator()(T const& v) const { return v; }
 
@@ -324,9 +324,7 @@ namespace scm {
 			}
 
 			List list(v.size());
-			std::transform(v.begin(), v.end(), list.begin(), [](value const& v) {
-				return std::visit(expander, v); 
-			});
+			std::transform(v.begin(), v.end(), list.begin(), expand);
 
 			if (list[0].type() == typeid(Symbol)) {
 				auto token = std::any_cast<Symbol>(list[0]);
@@ -370,9 +368,14 @@ namespace scm {
 			}
 			return std::make_shared<List>(list);
 		}
-	} expander;
+	};
 
-	
+	std::any expand(value const& v)
+	{	
+		visitor expander;
+		return std::visit(expander, v);
+	}
+
 	namespace parser {
 		namespace x3 = boost::spirit::x3;
 		using x3::char_;
@@ -416,6 +419,8 @@ namespace scm {
 	std::any read(Iterator begin, Iterator end)
 	{
 		value val;
+		visitor expander;
+
 		if (parse(begin, end, parser::entry_point, val)) {
 			return std::visit(expander, val);
 		}
