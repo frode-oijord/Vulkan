@@ -4,9 +4,11 @@
 #include <regex>
 #include <vector>
 #include <memory>
+#include <ranges>
 #include <sstream>
 #include <numeric>
 #include <variant>
+#include <numbers>
 #include <iostream>
 #include <typeinfo>
 #include <algorithm>
@@ -81,24 +83,34 @@ namespace scm {
 		return args;
 	}
 
-	fun_ptr plus = [](const List& lst) {
+	template <typename Op>
+	Number operation(const List& lst) {
 		std::vector<Number> args = any_cast<Number>(lst);
-		return std::accumulate(next(args.begin()), args.end(), args.front(), std::plus<Number>());
+		return std::accumulate(next(args.begin()), args.end(), args.front(), Op());
+	}
+
+	template <typename Op>
+	fun_ptr op = [](const List& lst) {
+		std::vector<Number> args = any_cast<Number>(lst);
+		return std::accumulate(next(args.begin()), args.end(), args.front(), Op());
+	};
+
+	//fun_ptr plus = op<std::plus<Number>>;
+
+	fun_ptr plus = [](const List& lst) {
+		return operation<std::plus<Number>>(lst);
 	};
 
 	fun_ptr minus = [](const List& lst) {
-		std::vector<Number> args = any_cast<Number>(lst);
-		return std::accumulate(next(args.begin()), args.end(), args.front(), std::minus<Number>());
+		return operation<std::minus<Number>>(lst);
 	};
 
 	fun_ptr divides = [](const List& lst) {
-		std::vector<Number> args = any_cast<Number>(lst);
-		return std::accumulate(next(args.begin()), args.end(), args.front(), std::divides<Number>());
+		return operation<std::divides<Number>>(lst);
 	};
 
 	fun_ptr multiplies = [](const List& lst) {
-		std::vector<Number> args = any_cast<Number>(lst);
-		return std::accumulate(next(args.begin()), args.end(), args.front(), std::multiplies<Number>());
+		return operation<std::multiplies<Number>>(lst);
 	};
 
 	fun_ptr greater = [](const List& lst) {
@@ -132,7 +144,7 @@ namespace scm {
 	};
 
 	fun_ptr list = [](const List& lst) {
-		return std::make_shared<List>(lst.begin(), lst.end());
+		return std::make_shared<List>(lst);
 	};
 
 	fun_ptr length = [](const List& lst) {
@@ -167,7 +179,7 @@ namespace scm {
 
 		std::any get(Symbol sym)
 		{
-			if (this->inner.find(sym) != this->inner.end()) {
+			if (this->inner.contains(sym)) {
 				return this->inner.at(sym);
 			}
 			if (this->outer) {
@@ -184,7 +196,7 @@ namespace scm {
 	{
 		return std::make_shared<Env>(
 			std::unordered_map<std::string, std::any>{
-				{ Symbol("pi"), Number(3.14159265358979323846) },
+				{ Symbol("pi"), Number(std::numbers::pi) },
 				{ Symbol("+"), plus },
 				{ Symbol("-"), minus },
 				{ Symbol("/"), divides },
@@ -199,14 +211,6 @@ namespace scm {
 				{ Symbol("length"), length }
 		});
 	}
-
-	const Symbol _if("if");
-	const Symbol _true("#t");
-	const Symbol _false("#f");
-	const Symbol _quote("quote");
-	const Symbol _begin("begin");
-	const Symbol _lambda("lambda");
-	const Symbol _define("define");
 
 	template <typename T>
 	bool print(const std::any exp, std::ostream& os)
@@ -292,10 +296,11 @@ namespace scm {
 					exp = function.body;
 					env = std::make_shared<Env>(function.parms, args, function.env);
 				}
-				else {
+				else if (func.type() == typeid(fun_ptr)) {
 					auto function = std::any_cast<fun_ptr>(func);
 					return function(args);
 				}
+				throw std::runtime_error("internal eval error");
 			}
 		}
 	}
@@ -307,8 +312,6 @@ namespace scm {
 		using base_type::variant;
 	};
 
-	std::any expand(value const& v);
-
 	struct {
 		template <typename T>
 		std::any operator()(T const& v) const { return v; }
@@ -316,59 +319,60 @@ namespace scm {
 		template <typename T>
 		std::any operator()(std::vector<T> const& v) const
 		{
+			if (v.empty()) {
+				return std::make_shared<List>();
+			}
+
 			List list(v.size());
-			std::transform(v.begin(), v.end(), list.begin(), expand);
+			std::transform(v.begin(), v.end(), list.begin(), [](value const& v) {
+				return std::visit(expander, v); 
+			});
 
-			if (!list.empty()) {
-				if (list[0].type() == typeid(Symbol)) {
-					auto token = std::any_cast<Symbol>(list[0]);
+			if (list[0].type() == typeid(Symbol)) {
+				auto token = std::any_cast<Symbol>(list[0]);
 
-					if (token == _quote) {
-						if (list.size() != 2) {
-							throw std::invalid_argument("wrong number of arguments to quote");
-						}
-						return Quote{ .exp = list[1] };
+				if (token == "quote") {
+					if (list.size() != 2) {
+						throw std::invalid_argument("wrong number of arguments to quote");
 					}
-					if (token == _if) {
-						if (list.size() != 4) {
-							throw std::invalid_argument("wrong number of arguments to if");
-						}
-						return If{ .test = list[1], .conseq = list[2], .alt = list[3] };
+					return Quote{ .exp = list[1] };
+				}
+				if (token == "if") {
+					if (list.size() != 4) {
+						throw std::invalid_argument("wrong number of arguments to if");
 					}
-					if (token == _lambda) {
-						if (list.size() != 3) {
-							throw std::invalid_argument("wrong Number of arguments to lambda");
-						}
-						return Lambda{ .parms = list[1], .body = list[2] };
+					return If{ .test = list[1], .conseq = list[2], .alt = list[3] };
+				}
+				if (token == "lambda") {
+					if (list.size() != 3) {
+						throw std::invalid_argument("wrong Number of arguments to lambda");
 					}
-					if (token == _begin) {
-						if (list.size() < 2) {
-							throw std::invalid_argument("wrong Number of arguments to begin");
-						}
-						return Begin{ .exps = std::make_shared<List>(std::next(list.begin()), list.end()) };
+					return Lambda{ .parms = list[1], .body = list[2] };
+				}
+				if (token == "begin") {
+					if (list.size() < 2) {
+						throw std::invalid_argument("wrong Number of arguments to begin");
 					}
-					if (token == _define) {
-						if (list.size() < 3 || list.size() > 4) {
-							throw std::invalid_argument("wrong number of arguments to define");
-						}
-						if (list[1].type() != typeid(Symbol)) {
-							throw std::invalid_argument("first argument to define must be a Symbol");
-						}
-						if (list.size() == 3) {
-							return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = list[2] };
-						}
-						return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = Lambda{ list[2], list[3] } };
+					return Begin{ .exps = std::make_shared<List>(std::next(list.begin()), list.end()) };
+				}
+				if (token == "define") {
+					if (list.size() < 3 || list.size() > 4) {
+						throw std::invalid_argument("wrong number of arguments to define");
 					}
+					if (list[1].type() != typeid(Symbol)) {
+						throw std::invalid_argument("first argument to define must be a Symbol");
+					}
+					if (list.size() == 3) {
+						return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = list[2] };
+					}
+					return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = Lambda{ list[2], list[3] } };
 				}
 			}
 			return std::make_shared<List>(list);
 		}
 	} expander;
 
-	std::any expand(value const& v) {
-		return std::visit(expander, v);
-	}
-
+	
 	namespace parser {
 		namespace x3 = boost::spirit::x3;
 		using x3::char_;
@@ -384,7 +388,7 @@ namespace scm {
 
 		struct bool_table : x3::symbols<bool> {
 			bool_table() {
-				add(_true, true) (_false, false);
+				add("#t", true) ("#f", false);
 			}
 		} const boolean_;
 
@@ -407,12 +411,13 @@ namespace scm {
 		const auto entry_point = x3::skip(x3::space)[value_];
 	}
 
+
 	template <typename Iterator>
 	std::any read(Iterator begin, Iterator end)
 	{
 		value val;
 		if (parse(begin, end, parser::entry_point, val)) {
-			return expand(val);
+			return std::visit(expander, val);
 		}
 		throw std::runtime_error("Parse failed, remaining input: " + std::string(begin, end));
 	}
