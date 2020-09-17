@@ -12,7 +12,7 @@ find_package(Boost REQUIRED program_options)
 include_directories(${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-add_executable(server main.cpp)
+add_executable(server main.cpp json.hpp)
 target_link_libraries (server ${Boost_LIBRARIES})
 
 set_target_properties(server PROPERTIES CXX_STANDARD 20)

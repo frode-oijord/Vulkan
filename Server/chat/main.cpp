@@ -4,6 +4,7 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/program_options.hpp>
 
+#include <queue>
 #include <memory>
 #include <string>
 #include <iostream>
@@ -87,7 +88,7 @@ public:
 			id_message["type"] = "id";
 			id_message["id"] = self->connectionid;
 
-			self->write(std::make_shared<std::string>(id_message.dump()));
+			self->write(id_message.dump());
 
 			self->state->join(self.get());
 			self->read();
@@ -117,7 +118,7 @@ public:
 				broadcast = false;
 				for (auto session : self->state->sessions) {
 					if (session->username == json_message["target"]) {
-						session->write(std::make_shared<std::string>(json_message.dump()));
+						session->write(json_message.dump());
 					}
 				}
 				self->read();
@@ -145,42 +146,48 @@ public:
 				message_string = json_users.dump();
 			}
 
-			self->broadcast(std::make_shared<std::string>(message_string));
+			self->broadcast(message_string);
 			self->read();
 		});
 	}
 
-	void write(std::shared_ptr<const std::string> message)
+	void write(const std::string& message)
 	{
-		this->queue.push_back(message);
-		// are we already writing?
-		if (this->queue.size() > 1) {
-			return;
-		}
+		this->write(std::make_shared<std::string>(message));
+	}
 
+	void write(std::shared_ptr<std::string> message)
+	{
+		this->queue.push(message);
+		if (this->queue.size() == 1) {
+			this->write();
+		}
+	}
+
+	void write()
+	{
 		auto self = shared_from_this();
 		this->stream.async_write(net::buffer(*this->queue.front()), [self](error_code ec, std::size_t bytes) {
 			RETURN_ON_ERROR(ec);
-			self->queue.erase(self->queue.begin());
+			self->queue.pop();
 
 			if (!self->queue.empty()) {
-				auto message = self->queue.front();
-				self->queue.erase(self->queue.begin());
-				self->write(message);
+				self->write();
 			}
 		});
 	}
 
-	void broadcast(std::shared_ptr<std::string> message)
+	void broadcast(const std::string& message)
 	{
+		auto ss = std::make_shared<std::string>(message);
 		for (auto session : this->state->sessions) {
-			session->write(message);
+			session->write(ss);
 		}
 	}
 
 	std::shared_ptr<shared_state> state;
 	websocket::stream<tcp::socket> stream;
-	std::vector<std::shared_ptr<std::string const>> queue;
+	std::queue<std::shared_ptr<std::string>> queue;
 	std::string username;
 	int connectionid;
 };
