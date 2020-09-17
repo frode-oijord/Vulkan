@@ -65,10 +65,9 @@ public:
 
 class websocket_session : public std::enable_shared_from_this<websocket_session> {
 public:
-	websocket_session(tcp::socket socket, std::shared_ptr<shared_state> state, int connectionid) :
+	websocket_session(tcp::socket socket, std::shared_ptr<shared_state> state) :
 		stream(std::move(socket)),
-		state(std::move(state)),
-		connectionid(connectionid)
+		state(std::move(state))
 	{}
 
 	~websocket_session()
@@ -83,13 +82,6 @@ public:
 
 		this->stream.async_accept(*request, [self](error_code ec) {
 			RETURN_ON_ERROR(ec);
-
-			json id_message;
-			id_message["type"] = "id";
-			id_message["id"] = self->connectionid;
-
-			self->write(id_message.dump());
-
 			self->state->join(self.get());
 			self->read();
 		});
@@ -107,15 +99,12 @@ public:
 
 			json json_message = json::parse(message_string);
 
-			bool broadcast = true;
-
 			if (json_message.is_null()) {
 				std::cout << "invalid message, disconnecting..." << std::endl;
 				return;
 			}
 
 			if (json_message.find("target") != json_message.end()) {
-				broadcast = false;
 				for (auto session : self->state->sessions) {
 					if (session->username == json_message["target"]) {
 						session->write(json_message.dump());
@@ -189,7 +178,6 @@ public:
 	websocket::stream<tcp::socket> stream;
 	std::queue<std::shared_ptr<std::string>> queue;
 	std::string username;
-	int connectionid;
 };
 
 
@@ -197,8 +185,7 @@ class http_session : public std::enable_shared_from_this<http_session> {
 public:
 	http_session(tcp::socket socket, std::shared_ptr<shared_state> state) :
 		socket(std::move(socket)),
-		state(std::move(state)),
-		connectionid(0)
+		state(std::move(state))
 	{}
 
 	void read()
@@ -251,7 +238,7 @@ private:
 		if (websocket::is_upgrade(*request)) {
 			// Create a WebSocket session by transferring the socket
 			std::cout << "Requested websocket upgrade..." << std::endl;
-			std::make_shared<websocket_session>(std::move(this->socket), this->state, this->connectionid++)->accept(request);
+			std::make_shared<websocket_session>(std::move(this->socket), this->state)->accept(request);
 			return;
 		}
 
@@ -295,7 +282,6 @@ private:
 
 	tcp::socket socket;
 	std::shared_ptr<shared_state> state;
-	int connectionid;
 };
 
 

@@ -12,6 +12,5 @@ set_target_properties(test PROPERTIES CXX_STANDARD 20)
 
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
-link_directories(${Boost_LIBRARY_DIRS})
 
 include_directories(${PROJECT_SOURCE_DIR})

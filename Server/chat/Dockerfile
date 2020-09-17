@@ -21,7 +21,7 @@ RUN apk update && apk add --no-cache \
     libstdc++
 
 WORKDIR /chat
-COPY webrtc-from-chat ./webrtc-from-chat
+COPY client ./client
 COPY --from=build /chat/build/server ./
 COPY --from=build /usr/lib/libboost_program_options.so.1.72.0 ./lib/
 ENV LD_LIBRARY_PATH=./lib

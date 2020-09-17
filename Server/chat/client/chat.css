@@ -62,7 +62,6 @@
   width: 500px;
   height: 375px;
   border: 1px solid black;
-  vertical-align: top;
   display: block;
   position:relative;
   overflow:auto;

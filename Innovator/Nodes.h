@@ -2500,8 +2500,8 @@ public:
 
 		// gather reusable tiles
 		for (auto [key, page] : this->used_image_memory_pages) {
-			if (tiles.find(key) == tiles.end()) {
-				if (this->unique_reusable_pages.find(key) == this->unique_reusable_pages.end()) {
+			if (tiles.contains(key)) {
+				if (!this->unique_reusable_pages.contains(key)) {
 					this->unique_reusable_pages.insert(key);
 					this->reusable_pages.push_back(page);
 				}
@@ -2517,7 +2517,7 @@ public:
 
 		// bind new tiles or reuse tiles
 		for (auto& key : tiles) {
-			if (this->used_image_memory_pages.find(key) == this->used_image_memory_pages.end()) {
+			if (!this->used_image_memory_pages.contains(key)) {
 				auto page = this->reusable_pages.front();
 				this->reusable_pages.pop_front();
 				this->unique_reusable_pages.erase(key);
