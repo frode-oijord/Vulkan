@@ -2,6 +2,7 @@
 
 var connection = null;
 var videocall = null;
+var datachannel = null;
 
 function sendToServer(msg) {
   var msgJSON = JSON.stringify(msg);
@@ -19,6 +20,29 @@ function openVideoCall(event) {
     if (targetUsername != myUsername) {
       videocall = VideoCall(myUsername, targetUsername);
     }
+  }
+}
+
+
+function openDataChannel(event) {
+  if (datachannel) {
+    alert("You can't start a channel you already have one open!");
+  } else {
+    var targetUsername = event.target.textContent;
+    var myUsername = document.getElementById("name").value;
+
+    if (targetUsername != myUsername) {
+      datachannel = DataChannel(myUsername, targetUsername);
+      datachannel.createRTCOffer();
+    }
+  }
+}
+
+
+function closeDataChannel() {
+  if (datachannel) {
+    datachannel.destroy();
+    datachannel = null;
   }
 }
 
@@ -49,7 +73,7 @@ function handleUserlistMsg(msg) {
 function handleSendButton() {
   var input = document.getElementById("text");
 
-  sendToServer({
+  datachannel.send({
     text: input.value,
     type: "message",
   });
@@ -111,29 +135,150 @@ function connect() {
         handleUserlistMsg(msg);
         break;
 
-      case "video-offer":
+      case "rtc-offer":
         if (!videocall) {
           var myUsername = document.getElementById("name").value;
           videocall = VideoCall(myUsername, msg.name);
         }
-        videocall.handleVideoOffer(msg.sdp);
+        videocall.handleRTCOffer(msg.sdp);
         break;
 
-      case "video-answer":
-        videocall.handleVideoAnswer(msg.sdp);
+      case "rtc-answer":
+        videocall.handleRTCAnswer(msg.sdp);
         break;
 
       case "ice-candidate":
         videocall.handleICECandidate(msg.candidate);
         break;
 
-      case "hang-up":
-        videocall.destroy();
-        videocall = null;
-        break;
-
       default:
         console.log("Unknown message received:" + msg);
+    }
+  };
+}
+
+
+function DataChannel(myUsername, targetUsername) {
+  var pc = new RTCPeerConnection({
+    iceServers: [{ "urls": "stun:stun.l.google.com:19302" }]
+  });
+
+  var channel = pc.createDataChannel("chat", { negotiated: true, id: 0 });
+
+  channel.onopen = () => {
+    updateChatBox("Data channel is open", "");
+  };
+
+  channel.onmessage = function (event) {
+    var message = JSON.parse(event.data);
+    updateChatBox("got message on datachannel", message.text);
+  }
+
+  pc.onicecandidate = (event) => {
+    if (event.candidate) {
+      sendToServer({
+        type: "ice-candidate",
+        target: targetUsername,
+        candidate: event.candidate
+      });
+    }
+  };
+
+  pc.oniceconnectionstatechange = (event) => {
+    updateChatBox("ICE connection state: ", pc.iceConnectionState);
+    switch (pc.iceConnectionState) {
+      case "closed":
+      case "failed":
+      case "disconnected":
+        closeVideoCall();
+        break;
+    }
+  };
+
+  pc.onicegatheringstatechange = (event) => {
+    updateChatBox("ICE gathering state: ", pc.iceGatheringState);
+  };
+
+  pc.onsignalingstatechange = (event) => {
+    updateChatBox("signaling state: ", pc.iceConnectionState);
+    switch (pc.signalingState) {
+      case "closed":
+        destroy();
+        break;
+    }
+  };
+
+  // pc.onnegotiationneeded = () => {
+  //   updateChatBox("creating offer");
+  //   pc.createOffer().then(offer => {
+  //     return pc.setLocalDescription(offer);
+  //   }).then(() => {
+  //     sendToServer({
+  //       name: myUsername,
+  //       target: targetUsername,
+  //       type: "rtc-offer",
+  //       sdp: pc.localDescription
+  //     });
+  //   }).catch(console.log);
+  // };
+
+  return {
+
+    destroy: () => {
+      pc.onnicecandidate = null;
+      pc.oniceconnectionstatechange = null;
+      pc.onsignalingstatechange = null;
+      pc.onicegatheringstatechange = null;
+      pc.onnotificationneeded = null;
+
+      pc.close();
+    },
+
+    send: (msg) => {
+      channel.send(JSON.stringify(msg));
+    },
+
+    createRTCOffer: () => {
+      pc.createOffer().then(offer => {
+        return pc.setLocalDescription(offer);
+      }).then(() => {
+        sendToServer({
+          name: myUsername,
+          target: targetUsername,
+          type: "rtc-offer",
+          sdp: pc.localDescription
+        });
+      }).catch(console.log);
+    },
+
+    handleRTCOffer: (sdp) => {
+      updateChatBox("handleRTCOffer");
+      pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
+      if (pc.signalingState != "stable") {
+        return pc.setLocalDescription({ type: "rollback" });
+      }
+
+      pc.createAnswer().then(answer => {
+        pc.setLocalDescription(answer).then(() => {
+          sendToServer({
+            name: myUsername,
+            target: targetUsername,
+            type: "rtc-answer",
+            sdp: pc.localDescription
+          });
+        });
+      });
+    },
+
+    handleRTCAnswer: (sdp) => {
+      updateChatBox("handleRTCAnswer");
+      pc.setRemoteDescription(new RTCSessionDescription(sdp)).catch(console.log);
+    },
+
+    handleICECandidate: (candidate) => {
+      updateChatBox("handleICECandidate");
+      pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.log);
     }
   };
 }
@@ -163,7 +308,7 @@ function VideoCall(myUsername, targetUsername) {
       case "closed":
       case "failed":
       case "disconnected":
-        destroy();
+        closeVideoCall();
         break;
     }
   };
@@ -182,20 +327,21 @@ function VideoCall(myUsername, targetUsername) {
   };
 
   pc.onnegotiationneeded = () => {
+    updateChatBox("creating offer");
     pc.createOffer().then(offer => {
       return pc.setLocalDescription(offer);
     }).then(() => {
       sendToServer({
         name: myUsername,
         target: targetUsername,
-        type: "video-offer",
+        type: "rtc-offer",
         sdp: pc.localDescription
       });
     }).catch(console.log);
   };
 
   pc.ontrack = (event) => {
-    console.log("ontrack event");
+    updateChatBox("ontrack event");
     document.getElementById("received_video").srcObject = event.streams[0];
     document.getElementById("hangup-button").disabled = false;
   };
@@ -246,13 +392,24 @@ function VideoCall(myUsername, targetUsername) {
       }
 
       pc.close();
-      pc = null;
-
       document.getElementById("hangup-button").disabled = true;
-      targetUsername = null;
     },
 
-    handleVideoOffer: (sdp) => {
+    createRTCOffer: () => {
+      pc.createOffer().then(offer => {
+        return pc.setLocalDescription(offer);
+      }).then(() => {
+        sendToServer({
+          name: myUsername,
+          target: targetUsername,
+          type: "rtc-offer",
+          sdp: pc.localDescription
+        });
+      }).catch(console.log);
+    },
+
+    handleRTCOffer: (sdp) => {
+      updateChatBox("handleRTCOffer");
       pc.setRemoteDescription(new RTCSessionDescription(sdp));
 
       if (pc.signalingState != "stable") {
@@ -264,18 +421,20 @@ function VideoCall(myUsername, targetUsername) {
           sendToServer({
             name: myUsername,
             target: targetUsername,
-            type: "video-answer",
+            type: "rtc-answer",
             sdp: pc.localDescription
           });
         });
       });
     },
 
-    handleVideoAnswer: (sdp) => {
+    handleRTCAnswer: (sdp) => {
+      updateChatBox("handleRTCAnswer");
       pc.setRemoteDescription(new RTCSessionDescription(sdp)).catch(console.log);
     },
 
     handleICECandidate: (candidate) => {
+      updateChatBox("handleICECandidate");
       pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.log);
     }
   };
