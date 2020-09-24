@@ -84,7 +84,7 @@ public:
 			RETURN_ON_ERROR(ec);
 			self->state->join(self.get());
 			self->read();
-		});
+			});
 	}
 
 	void read()
@@ -104,40 +104,64 @@ public:
 				return;
 			}
 
-			if (json_message.find("target") != json_message.end()) {
-				for (auto session : self->state->sessions) {
-					if (session->username == json_message["target"]) {
-						session->write(json_message.dump());
-					}
-				}
-				self->read();
+			if (!json_message.contains("type")) {
+				std::cout << "message must contain type..." << std::endl;
 				return;
 			}
 
-			if (json_message["type"] == "message") {
-				std::cout << "received message type message" << std::endl;
-				json_message["name"] = self->username;
-				message_string = json_message.dump();
+			if (!json_message.contains("username")) {
+				std::cout << "message must contain username..." << std::endl;
+				return;
 			}
 
 			if (json_message["type"] == "username") {
-				std::cout << "received username type message" << std::endl;
-				self->username = json_message["name"];
+				self->username = json_message["username"];
 
 				std::vector<std::string> userlist;
 				for (auto session : self->state->sessions) {
-					userlist.push_back(session->username);
+					if (session->username != self->username) {
+						userlist.push_back(session->username);
+					}
+					else {
+						json new_user;
+						new_user["type"] = "new-user";
+						new_user["username"] = self->username;
+					}
 				}
 
-				json json_users;
-				json_users["type"] = "userlist";
-				json_users["users"] = userlist;
-				message_string = json_users.dump();
+				json json_userlist;
+				json_userlist["type"] = "userlist";
+				json_userlist["users"] = userlist;
+
+				self->write(json_userlist.dump());
+			}
+			else {
+				std::string receiver_name = json_message["username"];
+				json_message["username"] = self->username;
+
+				auto receiver_session = [receiver_name, self]() {
+					for (auto session : self->state->sessions) {
+						if (session->username == receiver_name) {
+							return session;
+						}
+					}
+					throw std::runtime_error("receiver session not found!");
+				}();
+
+				if (!self->connections.contains(receiver_name)) {
+					if (receiver_session->connections.contains(self->username)) {
+						throw std::runtime_error("receiver session should not contain out username!");
+					}
+					self->connections[receiver_name] = false;
+					receiver_session->connections[self->username] = true;
+				}
+
+				json_message["polite"] = receiver_session->connections.at(self->username);
+				receiver_session->write(json_message.dump());
 			}
 
-			self->broadcast(message_string);
 			self->read();
-		});
+			});
 	}
 
 	void write(const std::string& message)
@@ -163,7 +187,7 @@ public:
 			if (!self->queue.empty()) {
 				self->write();
 			}
-		});
+			});
 	}
 
 	void broadcast(const std::string& message)
@@ -177,6 +201,7 @@ public:
 	std::shared_ptr<shared_state> state;
 	websocket::stream<tcp::socket> stream;
 	std::queue<std::shared_ptr<std::string>> queue;
+	std::map<std::string, bool> connections;
 	std::string username;
 };
 
@@ -198,7 +223,7 @@ public:
 
 		http::async_read(this->socket, *buffer, *request, [self, buffer, request](error_code ec, std::size_t bytes) {
 			self->on_read(request, bytes, ec);
-		});
+			});
 	}
 
 private:
@@ -210,15 +235,15 @@ private:
 		auto self = shared_from_this();
 
 		http::async_write(this->socket, *response, [self, response](error_code ec, std::size_t)
-		{
-			RETURN_ON_ERROR(ec);
-			if (response->need_eof()) {
-				self->socket.shutdown(tcp::socket::shutdown_send, ec);
-			}
-			else {
-				self->read();
-			}
-		});
+			{
+				RETURN_ON_ERROR(ec);
+				if (response->need_eof()) {
+					self->socket.shutdown(tcp::socket::shutdown_send, ec);
+				}
+				else {
+					self->read();
+				}
+			});
 	}
 
 	void on_read(std::shared_ptr<http::request<http::string_body>> request, std::size_t, error_code ec)
@@ -310,7 +335,7 @@ public:
 			std::make_shared<http_session>(std::move(self->socket), self->state)->read();
 			std::cout << "http session created and initiated..." << std::endl;
 			self->run();
-		});
+			});
 	}
 
 	tcp::socket socket;
@@ -321,39 +346,45 @@ public:
 
 int main(int argc, char* argv[])
 {
-	bpo::options_description desc("Allowed options");
-	desc.add_options()
-		("help", "produce help message")
-		("port", bpo::value<uint16_t>(), "set port number")
-		("root", bpo::value<std::string>(), "public folder");
+	try {
+		bpo::options_description desc("Allowed options");
+		desc.add_options()
+			("help", "produce help message")
+			("port", bpo::value<uint16_t>(), "set port number")
+			("root", bpo::value<std::string>(), "public folder");
 
-	bpo::variables_map vm;
-	bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
-	bpo::notify(vm);
+		bpo::variables_map vm;
+		bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
+		bpo::notify(vm);
 
-	if (!vm.count("port")) {
-		std::cerr << "port number was not set!" << std::endl;
+		if (!vm.count("port")) {
+			std::cerr << "port number was not set!" << std::endl;
+			return EXIT_FAILURE;
+		}
+		if (!vm.count("root")) {
+			std::cerr << "root folder was not set!" << std::endl;
+			return EXIT_FAILURE;
+		}
+
+		auto state = std::make_shared<shared_state>();
+		state->port = vm["port"].as<uint16_t>();
+		state->root = vm["root"].as<std::string>();
+
+		net::io_context ioc;
+		std::make_shared<listener>(ioc, state)->run();
+
+		// Capture SIGINT and SIGTERM to perform a clean shutdown
+		net::signal_set signals(ioc, SIGINT, SIGTERM);
+		signals.async_wait([&ioc](error_code const&, int) {
+			ioc.stop();
+			});
+
+		ioc.run();
+	}
+	catch (std::exception e) {
+		std::cerr << e.what();
 		return EXIT_FAILURE;
 	}
-	if (!vm.count("root")) {
-		std::cerr << "root folder was not set!" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-	auto state = std::make_shared<shared_state>();
-	state->port = vm["port"].as<uint16_t>();
-	state->root = vm["root"].as<std::string>();
-
-	net::io_context ioc;
-	std::make_shared<listener>(ioc, state)->run();
-
-	// Capture SIGINT and SIGTERM to perform a clean shutdown
-	net::signal_set signals(ioc, SIGINT, SIGTERM);
-	signals.async_wait([&ioc](error_code const&, int) {
-		ioc.stop();
-		});
-
-	ioc.run();
 
 	return EXIT_SUCCESS;
 }
