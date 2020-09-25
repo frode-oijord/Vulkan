@@ -117,15 +117,15 @@ public:
 			if (json_message["type"] == "username") {
 				self->username = json_message["username"];
 
+				json new_user;
+				new_user["type"] = "new-user";
+				new_user["username"] = self->username;
+
 				std::vector<std::string> userlist;
 				for (auto session : self->state->sessions) {
 					if (session->username != self->username) {
+						session->write(new_user.dump());
 						userlist.push_back(session->username);
-					}
-					else {
-						json new_user;
-						new_user["type"] = "new-user";
-						new_user["username"] = self->username;
 					}
 				}
 
@@ -135,7 +135,7 @@ public:
 
 				self->write(json_userlist.dump());
 			}
-			else {
+			else if (json_message["type"] == "create-call") {
 				std::string receiver_name = json_message["username"];
 				json_message["username"] = self->username;
 
@@ -158,6 +158,16 @@ public:
 
 				json_message["polite"] = receiver_session->connections.at(self->username);
 				receiver_session->write(json_message.dump());
+			}
+			else {
+				std::string receiver= json_message["username"];
+				json_message["username"] = self->username;
+
+				for (auto session : self->state->sessions) {
+					if (session->username == receiver) {
+						session->write(json_message.dump());
+					}
+				}
 			}
 
 			self->read();

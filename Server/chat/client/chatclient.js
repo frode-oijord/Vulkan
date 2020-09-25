@@ -54,15 +54,10 @@ let connect = () => {
   let signaler = SignalingConnection();
 
   let call = (event) => {
-    // signaler.send({
-    //   type: "create-call",
-    //   username: event.target.textContent
-    // });
-    let username = event.target.textContent;
-    if (!videocalls[username]) {
-      videocalls[username] = VideoCall(username, constraints, signaler);
-      videocalls[username].open();
-    }
+    signaler.send({
+      type: "create-call",
+      username: event.target.textContent
+    });
   };
 
   let appenduser = (username) => {
@@ -82,17 +77,14 @@ let connect = () => {
   };
 
   signaler.onmessage["create-call"] = (message) => {
-    if (videocalls[username]) {
-      alert("videocall exists, wtf!");
-    }
-    videocalls[username] = VideoCall(username, constraints, signaler);
+    let username = message.username;
+    videocalls[username] = VideoCall(username, constraints, signaler, message.polite);
     videocalls[username].open();
   };
 
   signaler.onmessage["rtc-offer"] = (message) => {
     if (!videocalls[message.username]) {
-      // alert("videocall not created, wtf?");
-      videocalls[message.username] = VideoCall(message.username, constraints, signaler);
+      videocalls[message.username] = VideoCall(message.username, constraints, signaler, message.polite);
       videocalls[message.username].open();
     }
     videocalls[message.username].handleMessage(message);
@@ -103,6 +95,10 @@ let connect = () => {
 };
 
 let VideoCall = (username, constraints, signaler, polite) => {
+
+  console.log("VideoCall, polite: ", polite);
+  let makingoffer = false;
+
   let video = document.createElement("video");
   video.autoplay = true;
   video.controls = true;
@@ -142,12 +138,14 @@ let VideoCall = (username, constraints, signaler, polite) => {
     };
 
     pc.onnegotiationneeded = () => {
+      makingoffer = true;
       pc.setLocalDescription().then(() => {
         signaler.send({
           type: "rtc-offer",
           username: username,
           sdp: pc.localDescription
         });
+        makingoffer = false;
       }).catch(console.log);
     };
 
@@ -181,6 +179,11 @@ let VideoCall = (username, constraints, signaler, polite) => {
 
   self.handleMessage = async (message) => {
     if (message.type == "rtc-offer") {
+      let collision = (makingoffer || pc.signalingState != "stable");
+      if (!polite && collision) {
+        return; // we're currently making and offer ourselves, and we're not polite, so ignore the offer
+      }
+
       pc.setRemoteDescription(new RTCSessionDescription(message.sdp));
 
       pc.setLocalDescription().then(() => {
