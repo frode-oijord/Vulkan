@@ -117,14 +117,13 @@ public:
 			if (json_message["type"] == "username") {
 				self->username = json_message["username"];
 
-				json new_user;
-				new_user["type"] = "new-user";
-				new_user["username"] = self->username;
+				json_message["type"] = "new-user";
+				json_message["username"] = self->username;
 
 				std::vector<std::string> userlist;
 				for (auto session : self->state->sessions) {
 					if (session->username != self->username) {
-						session->write(new_user.dump());
+						session->write(json_message.dump());
 						userlist.push_back(session->username);
 					}
 				}
@@ -160,11 +159,14 @@ public:
 				receiver_session->write(json_message.dump());
 			}
 			else {
-				std::string receiver= json_message["username"];
+				std::string receiver = json_message["username"];
 				json_message["username"] = self->username;
 
 				for (auto session : self->state->sessions) {
 					if (session->username == receiver) {
+						if (json_message["type"] == "rtc-offer") {
+							json_message["polite"] = session->connections.at(self->username);
+						}
 						session->write(json_message.dump());
 					}
 				}
