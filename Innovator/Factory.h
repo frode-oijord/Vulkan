@@ -141,16 +141,6 @@ public:
 	gli::texture2d texture;
 };
 
-static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<glm::u8vec4>& texels, glm::u8vec4 texel)
-{
-	for (size_t i = 0; i < 32; i++) {
-		for (size_t j = 0; j < 32; j++) {
-			for (size_t k = 0; k < 16; k++) {
-				texels.push_back(texel);
-			}
-		}
-	}
-}
 
 class DebugTextureImage : public VulkanTextureImage {
 public:
@@ -267,6 +257,19 @@ public:
 	size_t lod0_size;
 	size_t num_lods;
 };
+
+
+static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<glm::u8vec4>& texels, glm::u8vec4 texel)
+{
+	for (size_t i = 0; i < 32; i++) {
+		for (size_t j = 0; j < 32; j++) {
+			for (size_t k = 0; k < 16; k++) {
+				texels.push_back(texel);
+			}
+		}
+	}
+}
+
 
 class DebugTextureImageBricked : public VulkanTextureImage {
 public:

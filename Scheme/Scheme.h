@@ -30,6 +30,9 @@ namespace scm {
 	typedef double Number;
 	typedef std::string String;
 
+	template <typename Iterator>
+	std::any read(Iterator begin, Iterator end);
+
 	struct Symbol : public std::string {
 		Symbol() = default;
 		explicit Symbol(const String& s) : std::string(s) {}
@@ -59,6 +62,10 @@ namespace scm {
 	struct Function {
 		std::any parms, body;
 		env_ptr env;
+	};
+
+	struct Import {
+		String code;
 	};
 
 	template <typename T>
@@ -270,6 +277,11 @@ namespace scm {
 				auto quote = std::any_cast<Quote>(exp);
 				return quote.exp;
 			}
+			if (exp.type() == typeid(Import)) {
+				auto import = std::any_cast<Import>(exp);
+				std::any exp = read(import.code.begin(), import.code.end());
+				return eval(exp, env);
+			}
 			if (exp.type() == typeid(If)) {
 				auto if_ = std::any_cast<If>(exp);
 				exp = std::any_cast<Boolean>(eval(if_.test, env)) ? if_.conseq : if_.alt;
@@ -364,6 +376,20 @@ namespace scm {
 						return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = list[2] };
 					}
 					return Define{ .sym = std::any_cast<Symbol>(list[1]), .exp = Lambda{ list[2], list[3] } };
+				}
+				if (token == "import") {
+					if (list.size() != 2) {
+						throw std::invalid_argument("wrong number of arguments to import");
+					}
+					if (list[1].type() != typeid(String)) {
+						throw std::invalid_argument("Argument to import must be a String");
+					}
+					String filename = std::any_cast<String>(list[1]);
+					std::ifstream stream(filename, std::ios::in);
+					return Import{ std::string{
+						std::istreambuf_iterator<char>(stream),
+						std::istreambuf_iterator<char>()
+					} };
 				}
 			}
 			return std::make_shared<List>(list);

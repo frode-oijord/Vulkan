@@ -2415,7 +2415,7 @@ public:
 			.layerCount = this->texture->subresource_range().layerCount,
 		};
 
-		if (false) {
+		if (true) {
 			VkDeviceSize width = extent.width / brickExtent.width;
 			VkDeviceSize height = extent.height / brickExtent.height;
 
