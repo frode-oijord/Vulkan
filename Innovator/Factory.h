@@ -25,7 +25,45 @@ public:
 	virtual VkFormat format() const = 0;
 	virtual VkImageType image_type() const = 0;
 	virtual VkImageViewType image_view_type() const = 0;
-	virtual VkImageSubresourceRange subresource_range() const = 0;
+	virtual VkImageAspectFlags aspect_mask() const = 0;
+	VkImageSubresourceRange subresource_range() const
+	{
+		return {
+		  this->aspect_mask(),        // aspectMask 
+		  this->base_level(),         // baseMipLevel 
+		  this->levels(),             // levelCount 
+		  this->base_layer(),         // baseArrayLayer 
+		  this->layers()              // layerCount 
+		};
+	}
+
+	std::vector<VkBufferImageCopy> get_regions()
+	{
+		std::vector<VkBufferImageCopy> regions(this->levels());
+
+		VkDeviceSize bufferOffset = 0;
+		for (uint32_t mip_level = 0; mip_level < this->levels(); mip_level++) {
+
+			const VkImageSubresourceLayers imageSubresource{
+				.aspectMask = this->aspect_mask(),
+				.mipLevel = mip_level,
+				.baseArrayLayer = this->base_layer(),
+				.layerCount = this->layers()
+			};
+
+			regions[mip_level] = {
+				.bufferOffset = bufferOffset,
+				.bufferRowLength = 0,
+				.bufferImageHeight = 0,
+				.imageSubresource = imageSubresource,
+				.imageOffset = { 0, 0, 0 },
+				.imageExtent = this->extent(mip_level),
+			};
+
+			bufferOffset += this->size(mip_level);
+		}
+		return regions;
+	}
 };
 
 class VulkanImageFactory {
@@ -127,15 +165,9 @@ public:
 		return VK_IMAGE_VIEW_TYPE_2D;
 	}
 
-	VkImageSubresourceRange subresource_range() const override
+	VkImageAspectFlags aspect_mask() const override
 	{
-		return {
-		  VK_IMAGE_ASPECT_COLOR_BIT,  // aspectMask 
-		  this->base_level(),         // baseMipLevel 
-		  this->levels(),             // levelCount 
-		  this->base_layer(),         // baseArrayLayer 
-		  this->layers()              // layerCount 
-		};
+		return VK_IMAGE_ASPECT_COLOR_BIT;
 	}
 
 	gli::texture2d texture;
@@ -241,16 +273,11 @@ public:
 		return VK_IMAGE_VIEW_TYPE_3D;
 	}
 
-	VkImageSubresourceRange subresource_range() const override
+	VkImageAspectFlags aspect_mask() const override
 	{
-		return {
-		  VK_IMAGE_ASPECT_COLOR_BIT,  // aspectMask 
-		  this->base_level(),         // baseMipLevel 
-		  this->levels(),             // levelCount 
-		  this->base_layer(),         // baseArrayLayer 
-		  this->layers()              // layerCount 
-		};
+		return VK_IMAGE_ASPECT_COLOR_BIT;
 	}
+
 
 	boost::iostreams::mapped_file mapped_file;
 
@@ -373,15 +400,9 @@ public:
 		return VK_IMAGE_VIEW_TYPE_3D;
 	}
 
-	VkImageSubresourceRange subresource_range() const override
+	VkImageAspectFlags aspect_mask() const override
 	{
-		return {
-		  VK_IMAGE_ASPECT_COLOR_BIT,  // aspectMask 
-		  this->base_level(),         // baseMipLevel 
-		  this->levels(),             // levelCount 
-		  this->base_layer(),         // baseArrayLayer 
-		  this->layers()              // layerCount 
-		};
+		return VK_IMAGE_ASPECT_COLOR_BIT;
 	}
 
 	boost::iostreams::mapped_file mapped_file;

@@ -89,6 +89,9 @@ public:
 	VkPhysicalDeviceBufferDeviceAddressFeatures device_address_features{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR
 	};
+	VkPhysicalDeviceRayTracingFeaturesKHR ray_tracing_features{
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_FEATURES_KHR
+	};
 #endif
 	VkPhysicalDeviceFeatures2 device_features2{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR
@@ -111,3 +114,12 @@ class RenderVisitor : public CommandVisitor {
 public:
 	class OffscreenImage* image{ nullptr };
 };
+
+inline static EventVisitor eventvisitor;
+inline static DeviceVisitor devicevisitor;
+inline static CommandVisitor allocvisitor;
+inline static CommandVisitor resizevisitor;
+inline static Visitor pipelinevisitor;
+inline static RenderVisitor rendervisitor;
+inline static Visitor recordvisitor;
+inline static Visitor presentvisitor;

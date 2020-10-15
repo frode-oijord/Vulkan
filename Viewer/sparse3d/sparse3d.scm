@@ -138,6 +138,5 @@
                   ]])
 
                   (sparse-texture "sparse3d/noise256.bin")
-                  (slice 0))))
+                  (slice 0)))))))
 
-         (swapchain VK_PRESENT_MODE_FIFO_KHR))))

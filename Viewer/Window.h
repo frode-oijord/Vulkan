@@ -2,7 +2,6 @@
 
 #include <Innovator/Nodes.h>
 #include <Innovator/Defines.h>
-#include <Innovator/VulkanRenderer.h>
 
 #include <glm/glm.hpp>
 
@@ -12,29 +11,38 @@
 
 class Window {
 public:
+	static inline TCHAR szWindowClass[] = _T("DesktopApp");
+	
+	class Init {
+	public:
+		Init()
+		{
+			HINSTANCE hInstance = GetModuleHandle(NULL);
+
+			WNDCLASSEX wcex;
+			wcex.cbSize = sizeof(WNDCLASSEX);
+			wcex.style = CS_HREDRAW | CS_VREDRAW;
+			wcex.lpfnWndProc = WndProc;
+			wcex.cbClsExtra = 0;
+			wcex.cbWndExtra = 0;
+			wcex.hInstance = hInstance;
+			wcex.hIcon = LoadIcon(hInstance, IDI_APPLICATION);
+			wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+			wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+			wcex.lpszMenuName = NULL;
+			wcex.lpszClassName = szWindowClass;
+			wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
+
+			if (!RegisterClassEx(&wcex)) {
+				throw std::runtime_error("unable to register window class");
+			}
+		}
+	};
+
 	Window()
 	{
+		static Init init;
 		this->hInstance = GetModuleHandle(NULL);
-		TCHAR szWindowClass[] = _T("DesktopApp");
-		TCHAR szTitle[] = _T("Vulkan Window");
-
-		WNDCLASSEX wcex;
-		wcex.cbSize = sizeof(WNDCLASSEX);
-		wcex.style = CS_HREDRAW | CS_VREDRAW;
-		wcex.lpfnWndProc = WndProc;
-		wcex.cbClsExtra = 0;
-		wcex.cbWndExtra = 0;
-		wcex.hInstance = hInstance;
-		wcex.hIcon = LoadIcon(hInstance, IDI_APPLICATION);
-		wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
-		wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-		wcex.lpszMenuName = NULL;
-		wcex.lpszClassName = szWindowClass;
-		wcex.hIconSm = LoadIcon(wcex.hInstance, IDI_APPLICATION);
-
-		if (!RegisterClassEx(&wcex)) {
-			throw std::runtime_error("unable to register window class");
-		}
 
 		this->hWnd = CreateWindow(
 			szWindowClass,
@@ -44,7 +52,7 @@ public:
 			1920, 1080,
 			NULL,
 			NULL,
-			hInstance,
+			this->hInstance,
 			this);
 
 		if (!this->hWnd) {
@@ -124,7 +132,6 @@ public:
 		ShowWindow(this->hWnd, SW_SHOWDEFAULT);
 		UpdateWindow(this->hWnd);
 
-		// Main message loop:
 		MSG msg;
 		while (GetMessage(&msg, NULL, 0, 0)) {
 			TranslateMessage(&msg);
@@ -143,35 +150,117 @@ class VulkanWindow : public Window {
 public:
 	virtual ~VulkanWindow() = default;
 
-	VulkanWindow(std::shared_ptr<Node> scene) :
-		renderer(std::make_unique<VulkanRenderer>(scene, hWnd, hInstance))
-	{}
+	VulkanWindow(std::shared_ptr<Node> scene)
+	{
+		devicevisitor.instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+		devicevisitor.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+		devicevisitor.instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+		devicevisitor.instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#ifdef DEBUG
+		devicevisitor.device_layers.push_back("VK_LAYER_KHRONOS_validation");
+		devicevisitor.instance_layers.push_back("VK_LAYER_KHRONOS_validation");
+		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
+		this->state = std::make_shared<State>();
 
+		allocvisitor.state = this->state;
+		resizevisitor.state = this->state;
+		rendervisitor.state = this->state;
+		pipelinevisitor.state = this->state;
+		recordvisitor.state = this->state;
+		presentvisitor.state = this->state;
+		eventvisitor.state = this->state;
+		devicevisitor.state = this->state;
+
+		devicevisitor.visit(this->scene.get());
+
+		this->state->vulkan = std::make_shared<VulkanInstance>(
+			"Innovator",
+			devicevisitor.instance_layers,
+			devicevisitor.instance_extensions);
+
+		auto surface = std::make_shared<VulkanSurface>(
+			this->state->vulkan,
+			this->hWnd,
+			this->hInstance);
+
+		this->scene = std::make_shared<Group>();
+		this->scene->children = {
+			scene,
+			std::make_shared<Swapchain>(surface, VK_PRESENT_MODE_FIFO_KHR)
+		};
+
+#ifdef DEBUG
+		auto debugcb = std::make_unique<VulkanDebugCallback>(
+			this->state->vulkan,
+			VK_DEBUG_REPORT_WARNING_BIT_EXT |
+			VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+			VK_DEBUG_REPORT_ERROR_BIT_EXT |
+			VK_DEBUG_REPORT_DEBUG_BIT_EXT);
+#endif
+
+		this->state->device = std::make_shared<VulkanDevice>(
+			this->state->vulkan,
+			devicevisitor.device_features2,
+			devicevisitor.device_layers,
+			devicevisitor.device_extensions);
+
+		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(this->state->device);
+		this->state->extent = surface_capabilities.currentExtent;
+
+		this->state->pipelinecache = std::make_shared<VulkanPipelineCache>(this->state->device);
+		this->state->fence = std::make_shared<VulkanFence>(this->state->device);
+		this->state->default_command = std::make_shared<VulkanCommandBuffers>(this->state->device);
+		this->state->queue = this->state->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+
+		allocvisitor.visit(this->scene.get());
+		pipelinevisitor.visit(this->scene.get());
+		recordvisitor.visit(this->scene.get());
+	}
 
 	void redraw() override
 	{
-		this->renderer->redraw();
+		try {
+			rendervisitor.visit(this->scene.get());
+			presentvisitor.visit(this->scene.get());
+		}
+		catch (VkException& e) {
+			std::cerr << e.what() << std::endl;
+			// recreate swapchain, try again next frame
+		}
 	}
 
 	void resize(int width, int height) override
 	{
-		this->renderer->resize(width, height);
+		this->state->extent = VkExtent2D{
+			static_cast<uint32_t>(width),
+			static_cast<uint32_t>(height)
+		};
+
+		resizevisitor.visit(this->scene.get());
+		recordvisitor.visit(this->scene.get());
+		this->redraw();
 	}
 
 	void mousePressed(int x, int y, int button) override
 	{
-		this->renderer->mousePressed(x, y, button);
+		eventvisitor.mousePressed(this->scene.get(), x, y, button);
 	}
 
 	void mouseReleased() override
 	{
-		this->renderer->mouseReleased();
+		eventvisitor.mouseReleased(this->scene.get());
 	}
 
 	void mouseMoved(int x, int y)
 	{
-		this->renderer->mouseMoved(x, y);
+		eventvisitor.mouseMoved(this->scene.get(), x, y);
+		if (eventvisitor.press) {
+			this->redraw();
+		}
 	}
 
-	std::unique_ptr<VulkanRenderer> renderer;
+	std::shared_ptr<Group> scene;
+	std::shared_ptr<State> state{ nullptr };
 };

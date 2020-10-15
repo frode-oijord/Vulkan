@@ -6,11 +6,6 @@
 #include <vector>
 
 struct State {
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-	HWND hWnd;
-	HMODULE hInstance;
-#endif
-
 	std::shared_ptr<VulkanInstance> vulkan{ nullptr };
 	std::shared_ptr<VulkanDevice> device{ nullptr };
 	std::shared_ptr<VulkanPipelineCache> pipelinecache{ nullptr };
@@ -54,6 +49,7 @@ struct State {
 	VkImageLayout imageLayout{ VK_IMAGE_LAYOUT_UNDEFINED };
 	VkSampler sampler{ 0 };
 	VulkanCommandBuffers* command{ 0 };
+	VkAccelerationStructureKHR blas{ 0 };
 
 	std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
 	std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;

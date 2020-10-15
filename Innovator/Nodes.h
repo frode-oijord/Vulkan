@@ -4,7 +4,6 @@
 #include <Innovator/Visitor.h>
 #include <Innovator/Defines.h>
 #include <Innovator/Factory.h>
-#include <Innovator/VulkanRenderer.h>
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 #include <shaderc/shaderc.hpp>
@@ -81,8 +80,8 @@ public:
 		aspectratio(aspectratio),
 		fieldofview(fieldofview)
 	{
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, ProjMatrix, resize);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, ProjMatrix, render);
+		REGISTER_VISITOR(resizevisitor, ProjMatrix, resize);
+		REGISTER_VISITOR(rendervisitor, ProjMatrix, render);
 	}
 
 	void resize(CommandVisitor* context)
@@ -122,7 +121,7 @@ public:
 	ViewMatrix(glm::dvec3 eye, glm::dvec3 target, glm::dvec3 up) :
 		eye(eye), target(target)
 	{
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, ViewMatrix, render);
+		REGISTER_VISITOR(rendervisitor, ViewMatrix, render);
 
 		this->rot[1] = up;
 		this->updateOrientation();
@@ -179,7 +178,7 @@ public:
 
 	ModelMatrix(const glm::dvec3& t, const glm::dvec3& s)
 	{
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, ModelMatrix, render);
+		REGISTER_VISITOR(rendervisitor, ModelMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
 		this->mat = glm::translate(this->mat, t);
@@ -202,7 +201,7 @@ public:
 
 	TextureMatrix(const glm::dvec3& t, const glm::dvec3& s)
 	{
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, TextureMatrix, render);
+		REGISTER_VISITOR(rendervisitor, TextureMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
 		this->mat = glm::translate(this->mat, t);
@@ -248,9 +247,9 @@ public:
 	explicit InlineBufferData(std::vector<T> values) :
 		values(std::move(values))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, InlineBufferData<T>, update);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, InlineBufferData<T>, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(allocvisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(pipelinevisitor, InlineBufferData<T>, update);
+		REGISTER_VISITOR(recordvisitor, InlineBufferData<T>, update);
 	}
 
 	void copy(char* dst) const override
@@ -272,19 +271,19 @@ public:
 };
 
 
-class TextureImage : public BufferData {
+class TextureData : public BufferData {
 public:
 	IMPLEMENT_VISITABLE;
-	TextureImage() = delete;
-	virtual ~TextureImage() = default;
+	TextureData() = delete;
+	virtual ~TextureData() = default;
 
-	explicit TextureImage(const std::string& filename) :
+	explicit TextureData(const std::string& filename) :
 		texture(VulkanImageFactory::Create(filename))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, TextureImage, update);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, TextureImage, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, TextureImage, update);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, TextureImage, update);
+		REGISTER_VISITOR(allocvisitor, TextureData, update);
+		REGISTER_VISITOR(pipelinevisitor, TextureData, update);
+		REGISTER_VISITOR(recordvisitor, TextureData, update);
+		REGISTER_VISITOR(rendervisitor, TextureData, update);
 	}
 
 	void copy(char* dst) const override
@@ -325,10 +324,10 @@ public:
 		usage_flags(usage_flags),
 		create_flags(create_flags)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, CpuMemoryBuffer, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, CpuMemoryBuffer, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, CpuMemoryBuffer, update);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(allocvisitor, CpuMemoryBuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(recordvisitor, CpuMemoryBuffer, update);
+		REGISTER_VISITOR(rendervisitor, CpuMemoryBuffer, update);
 	}
 
 	void alloc(CommandVisitor* context)
@@ -370,10 +369,10 @@ public:
 		usage_flags(usage_flags),
 		create_flags(create_flags)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, GpuMemoryBuffer, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, GpuMemoryBuffer, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, GpuMemoryBuffer, update);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(allocvisitor, GpuMemoryBuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(recordvisitor, GpuMemoryBuffer, update);
+		REGISTER_VISITOR(rendervisitor, GpuMemoryBuffer, update);
 	}
 
 	void alloc(CommandVisitor* context)
@@ -420,9 +419,9 @@ public:
 
 	TransformBuffer()
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, TransformBuffer, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, TransformBuffer, pipeline);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, TransformBuffer, render);
+		REGISTER_VISITOR(allocvisitor, TransformBuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, TransformBuffer, pipeline);
+		REGISTER_VISITOR(rendervisitor, TransformBuffer, render);
 	}
 
 	void alloc(Visitor* context)
@@ -456,6 +455,7 @@ public:
 
 private:
 	std::shared_ptr<VulkanBufferObject> buffer;
+	VkDescriptorBufferInfo descriptor_buffer_info{};
 };
 
 class IndexBufferDescription : public Node {
@@ -467,8 +467,8 @@ public:
 	explicit IndexBufferDescription(VkIndexType type) :
 		type(type)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, IndexBufferDescription, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, IndexBufferDescription, update);
+		REGISTER_VISITOR(allocvisitor, IndexBufferDescription, update);
+		REGISTER_VISITOR(recordvisitor, IndexBufferDescription, update);
 	}
 
 	void update(Visitor* context)
@@ -501,9 +501,9 @@ public:
 			.offset = offset,
 			})
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, VertexInputAttributeDescription, update);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, VertexInputAttributeDescription, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(allocvisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(pipelinevisitor, VertexInputAttributeDescription, update);
+		REGISTER_VISITOR(recordvisitor, VertexInputAttributeDescription, update);
 	}
 
 	void update(Visitor* context)
@@ -533,8 +533,8 @@ public:
 		stride(stride),
 		inputRate(inputRate)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, VertexInputBindingDescription, update);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, VertexInputBindingDescription, update);
+		REGISTER_VISITOR(allocvisitor, VertexInputBindingDescription, update);
+		REGISTER_VISITOR(pipelinevisitor, VertexInputBindingDescription, update);
 	}
 
 	void update(Visitor* context)
@@ -567,7 +567,7 @@ public:
 		descriptorType(descriptorType),
 		stageFlags(stageFlags)
 	{
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
+		REGISTER_VISITOR(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
 	}
 
 	void pipeline(Visitor* context)
@@ -585,6 +585,7 @@ public:
 			.pImmutableSamplers = nullptr,
 			});
 
+		// only one of these is used, according to the descriptor type
 		this->descriptor_image_info = {
 			.sampler = context->state->sampler,
 			.imageView = context->state->imageView,
@@ -630,12 +631,9 @@ public:
 	explicit Shader(const VkShaderStageFlagBits stage, std::string glsl) :
 		stage(stage)
 	{
-		REGISTER_VISITOR(VulkanRenderer::devicevisitor, Shader, device);
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Shader, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Shader, pipeline);
-
-		//std::ifstream input(filename, std::ios::in);
-		//std::string glsl(std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{});
+		REGISTER_VISITOR(devicevisitor, Shader, device);
+		REGISTER_VISITOR(allocvisitor, Shader, alloc);
+		REGISTER_VISITOR(pipelinevisitor, Shader, pipeline);
 
 		shaderc_shader_kind kind = [stage]()
 		{
@@ -727,80 +725,65 @@ public:
 
 	explicit AccelerationStructure()
 	{
-		REGISTER_VISITOR(VulkanRenderer::devicevisitor, AccelerationStructure, device);
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, AccelerationStructure, alloc);
+		REGISTER_VISITOR(allocvisitor, AccelerationStructure, alloc);
 	}
 
-	void device(DeviceVisitor* visitor)
+	void device(DeviceVisitor* context)
 	{
-		visitor->instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-		visitor->device_address_features.bufferDeviceAddress = VK_TRUE;
-		visitor->device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
-		visitor->device_extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
-		visitor->device_extensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-		visitor->device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-		visitor->device_extensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
-		visitor->device_extensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-		visitor->device_extensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
+		context->device_address_features.bufferDeviceAddress = VK_TRUE;
 	}
 
 	void alloc(CommandVisitor* context)
 	{
 		VkBufferDeviceAddressInfo index_buffer_address_info{
-			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-			nullptr,
-			context->state->index_buffer
+			.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+			.pNext = nullptr,
+			.buffer = context->state->index_buffer,
 		};
-		VkDeviceAddress index_address = context->state->vulkan->vkGetBufferDeviceAddressKHR(context->state->device->device, &index_buffer_address_info);
+
+		VkDeviceOrHostAddressConstKHR indexData{
+			.deviceAddress = context->state->vulkan->vkGetBufferDeviceAddressKHR(
+				context->state->device->device, &index_buffer_address_info)
+		};
 
 		VkIndexType indexType = context->state->index_buffer_type;
 		uint32_t maxPrimitiveCount = context->state->index_count / 3;
 
 		std::vector<VkAccelerationStructureGeometryKHR> geometries;
-		std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos;
-		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos;
+		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_type_infos;
 
 		for (size_t i = 0; i < context->state->vertex_attributes.size(); i++)
 		{
 			VkFormat vertexFormat = context->state->vertex_attributes[i].format;
-			uint32_t maxVertexCount = context->state->vertex_counts[i];
-
-			create_geometry_infos.push_back({
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
-				.pNext = nullptr,
-				.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
-				.maxPrimitiveCount = maxPrimitiveCount,
-				.indexType = indexType,
-				.maxVertexCount = maxVertexCount,
-				.vertexFormat = vertexFormat,
-				.allowsTransforms = VK_FALSE
-				});
-
-			VkBuffer vertex_buffer = context->state->vertex_attribute_buffers[i];
+			uint32_t maxVertexCount = context->state->vertex_counts[i] / 3;
 
 			VkBufferDeviceAddressInfo vertex_buffer_address_info{
 				.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
 				.pNext = nullptr,
-				.buffer = vertex_buffer,
+				.buffer = context->state->vertex_attribute_buffers[i],
 			};
 
-			VkDeviceAddress vertex_address = context->state->vulkan->vkGetBufferDeviceAddressKHR(context->state->device->device, &vertex_buffer_address_info);
+			VkDeviceOrHostAddressConstKHR vertexData{
+				.deviceAddress = context->state->vulkan->vkGetBufferDeviceAddressKHR(
+					context->state->device->device, &vertex_buffer_address_info)
+			};
+
 			VkDeviceSize vertexStride = context->state->vertex_input_bindings[i].stride;
 
 			VkAccelerationStructureGeometryTrianglesDataKHR geometry_triangles_data{
 				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
 				.pNext = nullptr,
 				.vertexFormat = vertexFormat,
-				.vertexData = vertex_address,
+				.vertexData = vertexData,
 				.vertexStride = vertexStride,
 				.indexType = indexType,
-				.indexData = index_address,
+				.indexData = indexData,
 				.transformData = {}
 			};
 
-			VkAccelerationStructureGeometryDataKHR geometry_data{};
-			geometry_data.triangles = geometry_triangles_data;
+			VkAccelerationStructureGeometryDataKHR geometry_data{
+				.triangles = geometry_triangles_data
+			};
 
 			VkAccelerationStructureGeometryKHR geometry{
 				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
@@ -812,106 +795,524 @@ public:
 
 			geometries.push_back(geometry);
 
-			VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
-				.primitiveCount = maxPrimitiveCount,
-				.primitiveOffset = 0,
-				.firstVertex = 0,
-				.transformOffset = 0,
-			};
-
-			build_offset_infos.push_back(build_offset_info);
+			create_geometry_type_infos.push_back({
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+				.pNext = nullptr,
+				.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
+				.maxPrimitiveCount = maxPrimitiveCount,
+				.indexType = indexType,
+				.maxVertexCount = maxVertexCount,
+				.vertexFormat = vertexFormat,
+				.allowsTransforms = VK_FALSE
+				});
 		}
 
-		auto blas = std::make_shared<VulkanAccelerationStructure>(
+		this->as = std::make_shared<VulkanAccelerationStructure>(
 			context->state->vulkan,
 			context->state->device,
 			0,															// compactedSize
 			VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,			// type
 			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
-			create_geometry_infos,										// geometryInfos
+			create_geometry_type_infos,									// geometryInfos
 			0);															// deviceAddress
 
-		blas->build(
+		VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
+			.primitiveCount = maxPrimitiveCount,
+			.primitiveOffset = 0,
+			.firstVertex = 0,
+			.transformOffset = 0,
+		};
+
+		std::vector<VkAccelerationStructureBuildOffsetInfoKHR*> build_offset_infos{
+			&build_offset_info
+		};
+
+		this->as->build(
 			context->state->default_command->buffer(),
 			geometries,
 			build_offset_infos);
 
-		{
-			std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos{ {
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
-				.pNext = nullptr,
-				.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-				.maxPrimitiveCount = 1,
-				.indexType = VK_INDEX_TYPE_NONE_KHR,
-				.maxVertexCount = 0,
-				.vertexFormat = VK_FORMAT_UNDEFINED,
-				.allowsTransforms = VK_FALSE,
-			} };
-
-			auto tlas = std::make_shared<VulkanAccelerationStructure>(
-				context->state->vulkan,
-				context->state->device,
-				0,															// compactedSize
-				VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,				// type
-				VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
-				create_geometry_infos,										// geometryInfos
-				0);															// deviceAddress
-
-			VkTransformMatrixKHR transform{ {
-				{ 1, 0, 0, 0 },
-				{ 0, 1, 0, 0 },
-				{ 0, 0, 1, 0 }
-			} };
-
-			VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-				.pNext = nullptr,
-				.accelerationStructure = blas->as,
-			};
-
-			VkDeviceOrHostAddressConstKHR data;
-			data.deviceAddress = context->state->vulkan->vkGetAccelerationStructureDeviceAddressKHR(context->state->device->device, &device_address_info);
-
-			VkAccelerationStructureInstanceKHR instance{
-				.transform = transform,
-				.instanceCustomIndex = 0,
-				.mask = 1,
-				.instanceShaderBindingTableRecordOffset = 0,
-				.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
-				.accelerationStructureReference = data.deviceAddress,
-			};
-
-			VkAccelerationStructureGeometryInstancesDataKHR geometry_instances_data{
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
-				.pNext = nullptr,
-				.arrayOfPointers = VK_FALSE,
-				.data = data,
-			};
-
-			VkAccelerationStructureGeometryDataKHR geometry_data{};
-			geometry_data.instances = geometry_instances_data;
-
-			std::vector<VkAccelerationStructureGeometryKHR> geometries{ {
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-				.pNext = nullptr,
-				.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-				.geometry = geometry_data,
-				.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
-			} };
-
-			std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos{ {
-				.primitiveCount = 1,
-				.primitiveOffset = 0,
-				.firstVertex = 0,
-				.transformOffset = 0,
-			} };
-
-			tlas->build(
-				context->state->default_command->buffer(),
-				geometries,
-				build_offset_infos);
-		}
+		context->state->blas = this->as->as;
 	}
+
+	std::shared_ptr<VulkanAccelerationStructure> as{ nullptr };
+};
+
+
+class RTXImage : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~RTXImage() = default;
+	RTXImage(
+		VkImageType image_type,
+		VkFormat format,
+		VkExtent3D extent,
+		uint32_t levels,
+		uint32_t layers,
+		VkSampleCountFlagBits samples,
+		VkImageTiling tiling,
+		VkImageUsageFlags usage,
+		VkSharingMode mode,
+		VkImageCreateFlags flags,
+		VkMemoryPropertyFlags memoryFlags,
+		VkImageLayout imageLayout) :
+		image_type(image_type),
+		format(format),
+		extent(extent),
+		levels(levels),
+		layers(layers),
+		samples(samples),
+		tiling(tiling),
+		usage(usage),
+		mode(mode),
+		flags(flags),
+		memoryFlags(memoryFlags),
+		imageLayout(imageLayout)
+	{
+		REGISTER_VISITOR(allocvisitor, RTXImage, alloc);
+		REGISTER_VISITOR(recordvisitor, RTXImage, record);
+		REGISTER_VISITOR(pipelinevisitor, RTXImage, pipeline);
+	}
+
+	void alloc(CommandVisitor* context)
+	{
+		VkExtent3D extent = {
+			context->state->extent.width,
+			context->state->extent.height,
+			1
+		};
+
+		this->image = std::make_shared<VulkanImageObject>(
+			context->state->device,
+			image_type,
+			format,
+			extent,
+			levels,
+			layers,
+			samples,
+			tiling,
+			usage,
+			mode,
+			flags,
+			memoryFlags);
+
+		VkImageSubresourceRange subresource_range{
+			VK_IMAGE_ASPECT_COLOR_BIT,			// aspectMask
+			0,									// baseMipLevel
+			1,									// levelCount
+			0,									// baseArrayLayer
+			1									// layerCount
+		};
+
+		VkComponentMapping components{
+			.r = VK_COMPONENT_SWIZZLE_R,
+			.g = VK_COMPONENT_SWIZZLE_G,
+			.b = VK_COMPONENT_SWIZZLE_B,
+			.a = VK_COMPONENT_SWIZZLE_A,
+		};
+
+		this->imageview = std::make_shared<VulkanImageView>(
+			context->state->device,
+			this->image->image->image,
+			format,
+			VK_IMAGE_VIEW_TYPE_2D,
+			components,
+			subresource_range);
+
+		context->state->default_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+			this->image->image->memoryBarrier(
+				0,
+				0,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				this->imageLayout,
+				subresource_range) });
+
+		context->state->swapchain_format = this->format;
+	}
+
+	void pipeline(Visitor* context)
+	{
+		context->state->image = this->image->image->image;
+		context->state->imageLayout = this->imageLayout;
+		context->state->imageView = this->imageview->view;
+	}
+
+	void record(Visitor* context)
+	{
+		context->state->swapchain_source = this->image->image->image;
+	}
+
+
+	std::shared_ptr<VulkanImageObject> image;
+	std::shared_ptr<VulkanImageView> imageview;
+
+	VkImageType image_type;
+	VkFormat format;
+	VkExtent3D extent;
+	uint32_t levels;
+	uint32_t layers;
+	VkSampleCountFlagBits samples;
+	VkImageTiling tiling;
+	VkImageUsageFlags usage;
+	VkSharingMode mode;
+	VkImageCreateFlags flags;
+	VkMemoryPropertyFlags memoryFlags;
+	VkImageLayout imageLayout;
+};
+
+
+class RayTraceCommand : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~RayTraceCommand() = default;
+
+	explicit RayTraceCommand()
+	{
+		REGISTER_VISITOR(devicevisitor, RayTraceCommand, device);
+		REGISTER_VISITOR(allocvisitor, RayTraceCommand, alloc);
+		REGISTER_VISITOR(pipelinevisitor, RayTraceCommand, pipeline);
+		REGISTER_VISITOR(recordvisitor, RayTraceCommand, record);
+		REGISTER_VISITOR(rendervisitor, RayTraceCommand, render);
+	}
+
+	void device(DeviceVisitor* visitor)
+	{
+		visitor->ray_tracing_features.rayTracing = VK_TRUE;
+		visitor->device_address_features.bufferDeviceAddress = VK_TRUE;
+
+		visitor->device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+		visitor->device_extensions.push_back(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
+	}
+
+	void alloc(CommandVisitor* context)
+	{
+		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos{ {
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+			.pNext = nullptr,
+			.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+			.maxPrimitiveCount = 1,
+			.indexType = VK_INDEX_TYPE_NONE_KHR,
+			.maxVertexCount = 0,
+			.vertexFormat = VK_FORMAT_UNDEFINED,
+			.allowsTransforms = VK_FALSE,
+		} };
+
+		this->tlas = std::make_shared<VulkanAccelerationStructure>(
+			context->state->vulkan,
+			context->state->device,
+			0,															// compactedSize
+			VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,				// type
+			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
+			create_geometry_infos,										// geometryInfos
+			0);															// deviceAddress
+
+		VkTransformMatrixKHR transform{ {
+			{ 1, 0, 0, 0 },
+			{ 0, 1, 0, 0 },
+			{ 0, 0, 1, 0 }
+		} };
+
+		VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+			.pNext = nullptr,
+			.accelerationStructure = context->state->blas,
+		};
+
+		VkDeviceAddress blas_address = context->state->vulkan->vkGetAccelerationStructureDeviceAddressKHR(
+			context->state->device->device, &device_address_info);
+
+		VkAccelerationStructureInstanceKHR instance{
+			.transform = transform,
+			.instanceCustomIndex = 0,
+			.mask = 0xFF,
+			.instanceShaderBindingTableRecordOffset = 0,
+			.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
+			.accelerationStructureReference = blas_address,
+		};
+
+		this->instance_buffer = std::make_shared<VulkanBufferObject>(
+			context->state->vulkan,
+			context->state->device,
+			0,
+			sizeof(instance),
+			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+		this->instance_buffer->memory->memcpy(&instance, sizeof(instance), 0);
+
+		VkDeviceOrHostAddressConstKHR instance_data_device_address{
+			.deviceAddress = this->instance_buffer->buffer->getDeviceAddress()
+		};
+
+		VkAccelerationStructureGeometryInstancesDataKHR acceleration_structure_geometry_instances_data{
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+			.pNext = nullptr,
+			.arrayOfPointers = VK_FALSE,
+			.data = instance_data_device_address,
+		};
+
+		VkAccelerationStructureGeometryDataKHR acceleration_structure_geometry_data{
+			.instances = acceleration_structure_geometry_instances_data
+		};
+
+		VkAccelerationStructureGeometryKHR acceleration_structure_geometry{
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+			.pNext = nullptr,
+			.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+			.geometry = acceleration_structure_geometry_data,
+			.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
+		};
+
+		std::vector<VkAccelerationStructureGeometryKHR> acceleration_structure_geometries{
+			acceleration_structure_geometry
+		};
+
+		VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
+			.primitiveCount = 1,
+			.primitiveOffset = 0,
+			.firstVertex = 0,
+			.transformOffset = 0,
+		};
+
+		std::vector<VkAccelerationStructureBuildOffsetInfoKHR*> build_offset_infos{
+			&build_offset_info
+		};
+
+		this->tlas->build(
+			context->state->default_command->buffer(),
+			acceleration_structure_geometries,
+			build_offset_infos);
+	}
+
+	void pipeline(Visitor* context)
+	{
+		context->state->descriptor_pool_sizes.push_back({
+			.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+			.descriptorCount = 1,
+			});
+
+		context->state->descriptor_set_layout_bindings.push_back({
+			.binding = 2,
+			.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+			.pImmutableSamplers = nullptr,
+			});
+
+		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
+			context->state->device,
+			context->state->descriptor_pool_sizes);
+
+		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
+			context->state->device,
+			context->state->descriptor_set_layout_bindings);
+
+		std::vector<VkDescriptorSetLayout> descriptor_set_layouts{
+			this->descriptor_set_layout->layout
+		};
+
+		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
+			context->state->device,
+			descriptor_set_layouts,
+			context->state->push_constant_ranges);
+
+		this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
+			context->state->device,
+			descriptor_pool,
+			descriptor_set_layouts);
+
+		for (auto& write_descriptor_set : context->state->write_descriptor_sets) {
+			write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
+		}
+
+		VkWriteDescriptorSetAccelerationStructureKHR descriptor_acceleration_structure_info{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+			.pNext = nullptr,
+			.accelerationStructureCount = 1,
+			.pAccelerationStructures = &this->tlas->as,
+		};
+
+		VkWriteDescriptorSet acceleration_structure_write{
+			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			.pNext = &descriptor_acceleration_structure_info,
+			.dstSet = this->descriptor_sets->descriptor_sets[0],
+			.dstBinding = 2,
+			.descriptorCount = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+		};
+
+		context->state->write_descriptor_sets.push_back(acceleration_structure_write);
+
+		this->descriptor_sets->update(context->state->write_descriptor_sets);
+
+		std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
+
+		VkRayTracingShaderGroupCreateInfoKHR raygen_group_ci{
+			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+			.generalShader = 0,
+			.closestHitShader = VK_SHADER_UNUSED_KHR,
+			.anyHitShader = VK_SHADER_UNUSED_KHR,
+			.intersectionShader = VK_SHADER_UNUSED_KHR,
+		};
+
+		shader_groups.push_back(raygen_group_ci);
+
+		VkRayTracingShaderGroupCreateInfoKHR miss_group_ci{
+			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+			.generalShader = 1,
+			.closestHitShader = VK_SHADER_UNUSED_KHR,
+			.anyHitShader = VK_SHADER_UNUSED_KHR,
+			.intersectionShader = VK_SHADER_UNUSED_KHR,
+		};
+
+		shader_groups.push_back(miss_group_ci);
+
+		VkRayTracingShaderGroupCreateInfoKHR closes_hit_group_ci{
+			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
+			.generalShader = VK_SHADER_UNUSED_KHR,
+			.closestHitShader = 2,
+			.anyHitShader = VK_SHADER_UNUSED_KHR,
+			.intersectionShader = VK_SHADER_UNUSED_KHR,
+		};
+
+		shader_groups.push_back(closes_hit_group_ci);
+
+		VkPipelineLibraryCreateInfoKHR libraries{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
+		};
+
+		VkRayTracingPipelineCreateInfoKHR raytracing_pipeline_create_info{
+			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.stageCount = static_cast<uint32_t>(context->state->shader_stage_infos.size()),
+			.pStages = context->state->shader_stage_infos.data(),
+			.groupCount = static_cast<uint32_t>(shader_groups.size()),
+			.pGroups = shader_groups.data(),
+			.maxRecursionDepth = 1,
+			.libraries = libraries,
+			.pLibraryInterface = nullptr,
+			.layout = this->pipeline_layout->layout,
+		};
+
+		THROW_ON_ERROR(context->state->vulkan->vkCreateRayTracingPipelinesKHR(
+			context->state->device->device, VK_NULL_HANDLE, 1, &raytracing_pipeline_create_info, nullptr, &this->rtx_pipeline));
+
+		VkPhysicalDeviceRayTracingPropertiesKHR ray_tracing_properties = context->state->device->physical_device.ray_tracing_properties;
+
+		const uint32_t group_count = 3;
+		const uint32_t shader_binding_table_size = ray_tracing_properties.shaderGroupBaseAlignment * group_count;
+
+		this->shader_binding_table = std::make_shared<VulkanBufferObject>(
+			context->state->vulkan,
+			context->state->device,
+			0,
+			shader_binding_table_size,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+		std::vector<uint8_t> shader_handle_storage(shader_binding_table_size);
+		THROW_ON_ERROR(context->state->vulkan->vkGetRayTracingShaderGroupHandlesKHR(
+			context->state->device->device, this->rtx_pipeline, 0, group_count, shader_binding_table_size, shader_handle_storage.data()));
+
+		uint8_t* data = reinterpret_cast<uint8_t*>(shader_binding_table->memory->map(VK_WHOLE_SIZE, 0, 0));
+		// This part is required, as the alignment and handle size may differ
+		for (uint32_t i = 0; i < group_count; i++) {
+			memcpy(data, shader_handle_storage.data() + i * ray_tracing_properties.shaderGroupHandleSize, ray_tracing_properties.shaderGroupHandleSize);
+			data += ray_tracing_properties.shaderGroupBaseAlignment;
+		}
+		shader_binding_table->memory->unmap();
+	}
+
+	void record(Visitor* context)
+	{
+		this->command = std::make_unique<VulkanCommandBuffers>(context->state->device);
+		this->queue = context->state->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
+
+		VkPhysicalDeviceRayTracingPropertiesKHR ray_tracing_properties = context->state->device->physical_device.ray_tracing_properties;
+
+		this->command->begin();
+
+		const uint32_t shader_binding_table_size = ray_tracing_properties.shaderGroupBaseAlignment * 3;
+
+		VkStridedBufferRegionKHR raygen_shader_sbt_entry{
+			.buffer = this->shader_binding_table->buffer->buffer,
+			.offset = static_cast<VkDeviceSize>(ray_tracing_properties.shaderGroupBaseAlignment * 0),
+			.stride = ray_tracing_properties.shaderGroupBaseAlignment,
+			.size = shader_binding_table_size,
+		};
+
+		VkStridedBufferRegionKHR miss_shader_sbt_entry{
+			.buffer = this->shader_binding_table->buffer->buffer,
+			.offset = static_cast<VkDeviceSize>(ray_tracing_properties.shaderGroupBaseAlignment * 1),
+			.stride = ray_tracing_properties.shaderGroupBaseAlignment,
+			.size = shader_binding_table_size,
+		};
+
+		VkStridedBufferRegionKHR hit_shader_sbt_entry{
+			.buffer = this->shader_binding_table->buffer->buffer,
+			.offset = static_cast<VkDeviceSize>(ray_tracing_properties.shaderGroupBaseAlignment * 2),
+			.stride = ray_tracing_properties.shaderGroupBaseAlignment,
+			.size = shader_binding_table_size,
+		};
+
+		VkStridedBufferRegionKHR callable_shader_sbt_entry{};
+
+		vk.CmdBindPipeline(this->command->buffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, this->rtx_pipeline);
+
+		vk.CmdBindDescriptorSets(
+			this->command->buffer(),
+			VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+			this->pipeline_layout->layout,
+			0,
+			static_cast<uint32_t>(this->descriptor_sets->descriptor_sets.size()),
+			this->descriptor_sets->descriptor_sets.data(),
+			0,
+			nullptr);
+
+		context->state->vulkan->vkCmdTraceRaysKHR(
+			this->command->buffer(),
+			&raygen_shader_sbt_entry,
+			&miss_shader_sbt_entry,
+			&hit_shader_sbt_entry,
+			&callable_shader_sbt_entry,
+			context->state->extent.width,
+			context->state->extent.height,
+			1);
+
+
+		this->command->end();
+	}
+
+	void render(Visitor* context)
+	{
+		this->command->submit(this->queue, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+	}
+
+	VkPipeline rtx_pipeline;
+	std::shared_ptr<VulkanAccelerationStructure> tlas{ nullptr };
+	std::shared_ptr<VulkanDescriptorSetLayout> descriptor_set_layout{ nullptr };
+	std::shared_ptr<VulkanDescriptorSets> descriptor_sets{ nullptr };
+	std::shared_ptr<VulkanPipelineLayout> pipeline_layout{ nullptr };
+	std::shared_ptr<VulkanBufferObject> shader_binding_table{ nullptr };
+	std::shared_ptr<VulkanBufferObject> instance_buffer{ nullptr };
+	std::unique_ptr<VulkanCommandBuffers> command;
+	VkQueue queue{ nullptr };
+
 };
 #endif
 
@@ -957,8 +1358,8 @@ public:
 			.unnormalizedCoordinates = unnormalizedCoordinates
 			})
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Sampler, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Sampler, pipeline);
+		REGISTER_VISITOR(allocvisitor, Sampler, alloc);
+		REGISTER_VISITOR(pipelinevisitor, Sampler, pipeline);
 	}
 
 	void alloc(Visitor* context)
@@ -979,11 +1380,11 @@ private:
 };
 
 
-class Image : public Node {
+class TextureImage : public Node {
 public:
 	IMPLEMENT_VISITABLE;
-	virtual ~Image() = default;
-	Image(
+	virtual ~TextureImage() = default;
+	TextureImage(
 		VkSampleCountFlagBits sample_count,
 		VkImageTiling tiling,
 		VkImageUsageFlags usage_flags,
@@ -995,10 +1396,10 @@ public:
 		usage_flags(usage_flags),
 		sharing_mode(sharing_mode),
 		create_flags(create_flags),
-		layout(layout)
+		imageLayout(layout)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Image, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Image, pipeline);
+		REGISTER_VISITOR(allocvisitor, TextureImage, alloc);
+		REGISTER_VISITOR(pipelinevisitor, TextureImage, pipeline);
 	}
 
 	void alloc(CommandVisitor* context)
@@ -1017,32 +1418,7 @@ public:
 			this->create_flags,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VulkanTextureImage* texture = context->state->texture;
-
-		std::vector<VkBufferImageCopy> regions;
-
-		VkDeviceSize bufferOffset = 0;
-		for (uint32_t mip_level = 0; mip_level < texture->levels(); mip_level++) {
-
-			const VkImageSubresourceLayers imageSubresource{
-				.aspectMask = texture->subresource_range().aspectMask,
-				.mipLevel = mip_level,
-				.baseArrayLayer = texture->subresource_range().baseArrayLayer,
-				.layerCount = texture->subresource_range().layerCount,
-			};
-
-			VkBufferImageCopy region{
-				.bufferOffset = bufferOffset,
-				.bufferRowLength = 0,
-				.bufferImageHeight = 0,
-				.imageSubresource = imageSubresource,
-				.imageOffset = { 0, 0, 0 },
-				.imageExtent = texture->extent(mip_level),
-			};
-
-			regions.push_back(region);
-			bufferOffset += texture->size(mip_level);
-		}
+		std::vector<VkBufferImageCopy> regions = context->state->texture->get_regions();
 
 		context->state->default_command->pipelineBarrier(
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,				// don't wait for anything
@@ -1070,12 +1446,12 @@ public:
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,			// don't block anything
 			{
 				VulkanImage::MemoryBarrier(
-				this->image->image->image,
-				0,
-				0,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				this->layout,
-				context->state->texture->subresource_range())
+					this->image->image->image,
+					0,
+					0,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+					this->imageLayout,
+					context->state->texture->subresource_range())
 			});
 
 		context->state->image = this->image->image->image;
@@ -1083,7 +1459,8 @@ public:
 
 	void pipeline(Visitor* context)
 	{
-		context->state->imageLayout = this->layout;
+		context->state->imageLayout = this->imageLayout;
+		context->state->image = this->image->image->image;
 	}
 
 private:
@@ -1094,7 +1471,7 @@ private:
 	VkImageUsageFlags usage_flags;
 	VkSharingMode sharing_mode;
 	VkImageCreateFlags create_flags;
-	VkImageLayout layout;
+	VkImageLayout imageLayout;
 };
 
 
@@ -1109,8 +1486,8 @@ public:
 		VkComponentSwizzle a) :
 		component_mapping({ r, g, b, a })
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, ImageView, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, ImageView, pipeline);
+		REGISTER_VISITOR(allocvisitor, ImageView, alloc);
+		REGISTER_VISITOR(pipelinevisitor, ImageView, pipeline);
 	}
 
 	void alloc(Visitor* context)
@@ -1144,11 +1521,11 @@ public:
 	Extent(uint32_t width, uint32_t height) :
 		extent{ width, height }
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Extent, update);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Extent, update);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Extent, update);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Extent, update);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, Extent, update);
+		REGISTER_VISITOR(allocvisitor, Extent, update);
+		REGISTER_VISITOR(pipelinevisitor, Extent, update);
+		REGISTER_VISITOR(recordvisitor, Extent, update);
+		REGISTER_VISITOR(resizevisitor, Extent, update);
+		REGISTER_VISITOR(rendervisitor, Extent, update);
 	}
 
 	void update(Visitor* context)
@@ -1170,7 +1547,7 @@ public:
 	explicit CullMode(VkCullModeFlags cullmode) :
 		cullmode(cullmode)
 	{
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, CullMode, pipeline);
+		REGISTER_VISITOR(pipelinevisitor, CullMode, pipeline);
 	}
 
 	void pipeline(Visitor* context)
@@ -1197,7 +1574,7 @@ public:
 		group_count_y(group_count_y),
 		group_count_z(group_count_z)
 	{
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, ComputeCommand, pipeline);
+		REGISTER_VISITOR(pipelinevisitor, ComputeCommand, pipeline);
 	}
 
 	void pipeline(Visitor* context)
@@ -1354,12 +1731,12 @@ public:
 		} };
 
 		std::vector<VkViewport> viewports{ {
-		  .x = 0.0f,
-		  .y = 0.0f,
-		  .width = static_cast<float>(context->state->extent.width),
-		  .height = static_cast<float>(context->state->extent.height),
-		  .minDepth = 0.0f,
-		  .maxDepth = 1.0f
+			.x = 0.0f,
+			.y = 0.0f,
+			.width = static_cast<float>(context->state->extent.width),
+			.height = static_cast<float>(context->state->extent.height),
+			.minDepth = 0.0f,
+			.maxDepth = 1.0f
 		} };
 
 		vk.CmdSetScissor(this->command->buffer(),
@@ -1421,10 +1798,10 @@ public:
 		firstvertex(firstvertex),
 		firstinstance(firstinstance)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, DrawCommand, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, DrawCommand, pipeline);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, DrawCommand, record);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, DrawCommand, render);
+		REGISTER_VISITOR(allocvisitor, DrawCommand, alloc);
+		REGISTER_VISITOR(pipelinevisitor, DrawCommand, pipeline);
+		REGISTER_VISITOR(recordvisitor, DrawCommand, record);
+		REGISTER_VISITOR(rendervisitor, DrawCommand, render);
 	}
 
 private:
@@ -1464,10 +1841,10 @@ public:
 		firstinstance(firstinstance),
 		offset(0)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, IndexedDrawCommand, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, IndexedDrawCommand, pipeline);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, IndexedDrawCommand, record);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, IndexedDrawCommand, render);
+		REGISTER_VISITOR(allocvisitor, IndexedDrawCommand, alloc);
+		REGISTER_VISITOR(pipelinevisitor, IndexedDrawCommand, pipeline);
+		REGISTER_VISITOR(recordvisitor, IndexedDrawCommand, record);
+		REGISTER_VISITOR(rendervisitor, IndexedDrawCommand, render);
 	}
 
 private:
@@ -1497,6 +1874,9 @@ private:
 };
 
 
+
+
+
 class FramebufferAttachment : public Node {
 public:
 	IMPLEMENT_VISITABLE;
@@ -1513,9 +1893,9 @@ public:
 			aspectMask, 0, 1, 0, 1
 		};
 
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, FramebufferAttachment, record);
+		REGISTER_VISITOR(allocvisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(resizevisitor, FramebufferAttachment, alloc);
+		REGISTER_VISITOR(recordvisitor, FramebufferAttachment, record);
 	}
 
 	void alloc(Visitor* context)
@@ -1587,9 +1967,9 @@ public:
 	explicit Framebuffer(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Framebuffer, alloc);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Framebuffer, alloc);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Framebuffer, record);
+		REGISTER_VISITOR(allocvisitor, Framebuffer, alloc);
+		REGISTER_VISITOR(resizevisitor, Framebuffer, alloc);
+		REGISTER_VISITOR(recordvisitor, Framebuffer, record);
 	}
 
 	void do_alloc(CommandVisitor* context)
@@ -1626,7 +2006,7 @@ public:
 	explicit InputAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, InputAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, InputAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1645,7 +2025,7 @@ public:
 	explicit ColorAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, ColorAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, ColorAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1665,7 +2045,7 @@ public:
 	explicit ResolveAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, ResolveAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, ResolveAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1685,7 +2065,7 @@ public:
 	explicit DepthStencilAttachment(uint32_t attachment, VkImageLayout layout) :
 		attachment({ attachment, layout })
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, DepthStencilAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, DepthStencilAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1704,7 +2084,7 @@ public:
 	explicit PreserveAttachment(uint32_t attachment) :
 		attachment(attachment)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, PreserveAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, PreserveAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1724,7 +2104,7 @@ public:
 	explicit PipelineBindpoint(VkPipelineBindPoint bind_point) :
 		bind_point(bind_point)
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, PipelineBindpoint, alloc);
+		REGISTER_VISITOR(allocvisitor, PipelineBindpoint, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1746,7 +2126,7 @@ public:
 	SubpassDescription(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, SubpassDescription, alloc);
+		REGISTER_VISITOR(allocvisitor, SubpassDescription, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1796,7 +2176,7 @@ public:
 			.finalLayout = finalLayout
 		};
 
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, RenderpassAttachment, alloc);
+		REGISTER_VISITOR(allocvisitor, RenderpassAttachment, alloc);
 	}
 
 	void alloc(Visitor* context)
@@ -1817,13 +2197,13 @@ public:
 	Renderpass(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Renderpass, alloc);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Renderpass, resize);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, Renderpass, render);
-		REGISTER_VISITOR(VulkanRenderer::eventvisitor, Renderpass, visitChildren);
-		REGISTER_VISITOR(VulkanRenderer::devicevisitor, Renderpass, visitChildren);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, Renderpass, visitChildren);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(allocvisitor, Renderpass, alloc);
+		REGISTER_VISITOR(resizevisitor, Renderpass, resize);
+		REGISTER_VISITOR(rendervisitor, Renderpass, render);
+		REGISTER_VISITOR(eventvisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(devicevisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(pipelinevisitor, Renderpass, visitChildren);
+		REGISTER_VISITOR(recordvisitor, Renderpass, visitChildren);
 	}
 
 	void visitChildren(Visitor* context)
@@ -1895,10 +2275,10 @@ public:
 	RenderpassDescription(std::vector<std::shared_ptr<Node>> children) :
 		Group(std::move(children))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, RenderpassDescription, alloc);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, RenderpassDescription, visitChildren);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, RenderpassDescription, visitChildren);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, RenderpassDescription, visitChildren);
+		REGISTER_VISITOR(allocvisitor, RenderpassDescription, alloc);
+		REGISTER_VISITOR(resizevisitor, RenderpassDescription, visitChildren);
+		REGISTER_VISITOR(pipelinevisitor, RenderpassDescription, visitChildren);
+		REGISTER_VISITOR(recordvisitor, RenderpassDescription, visitChildren);
 	}
 
 	void alloc(Visitor* context)
@@ -1929,44 +2309,25 @@ public:
 	IMPLEMENT_VISITABLE;
 	virtual ~Swapchain() = default;
 
-	Swapchain(VkPresentModeKHR present_mode) :
+	Swapchain(std::shared_ptr<VulkanSurface> surface, VkPresentModeKHR present_mode) :
+		surface(surface),
 		present_mode(present_mode),
 		present_queue(nullptr)
 	{
-		REGISTER_VISITOR(VulkanRenderer::devicevisitor, Swapchain, device);
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, Swapchain, alloc);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, Swapchain, resize);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, Swapchain, record);
-		REGISTER_VISITOR(VulkanRenderer::presentvisitor, Swapchain, present);
+		REGISTER_VISITOR(allocvisitor, Swapchain, alloc);
+		REGISTER_VISITOR(resizevisitor, Swapchain, resize);
+		REGISTER_VISITOR(recordvisitor, Swapchain, record);
+		REGISTER_VISITOR(presentvisitor, Swapchain, present);
 	}
 
 	void alloc(Visitor* context)
 	{
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-		this->surface = std::make_shared<VulkanSurface>(
-			context->state->vulkan,
-			context->state->hWnd,
-			context->state->hInstance);
-#endif
-
-		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(context->state->device);
-		context->state->extent = surface_capabilities.currentExtent;
-
 		this->surface->checkPresentModeSupport(context->state->device, this->present_mode);
 		this->present_queue = context->state->device->getQueue(0, this->surface->surface);
 		this->swapchain_image_ready = std::make_unique<VulkanSemaphore>(context->state->device);
 		this->swap_buffers_finished = std::make_unique<VulkanSemaphore>(context->state->device);
 
 		this->resize(context);
-	}
-
-	void device(DeviceVisitor* context)
-	{
-		context->instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-		context->device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-		context->instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#endif
 	}
 
 	void resize(Visitor* context)
@@ -2067,7 +2428,7 @@ public:
 					srcImage,
 					VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,			// srcAccessMask
 					0,												// dstAccessMask 
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,		// oldLayout
+					VK_IMAGE_LAYOUT_GENERAL,		// oldLayout
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,			// newLayout
 					this->subresource_range),
 				  VulkanImage::MemoryBarrier(
@@ -2093,7 +2454,7 @@ public:
 					0,												// srcAccessMask
 					0,												// dstAccessMask 
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					VK_IMAGE_LAYOUT_GENERAL,
 					this->subresource_range),
 				  VulkanImage::MemoryBarrier(
 					dstImage,
@@ -2172,10 +2533,10 @@ public:
 	OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment) :
 		color_attachment(std::move(color_attachment))
 	{
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, OffscreenImage, alloc);
-		REGISTER_VISITOR(VulkanRenderer::resizevisitor, OffscreenImage, alloc);
-		REGISTER_VISITOR(VulkanRenderer::recordvisitor, OffscreenImage, record);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, OffscreenImage, render);
+		REGISTER_VISITOR(allocvisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR(resizevisitor, OffscreenImage, alloc);
+		REGISTER_VISITOR(recordvisitor, OffscreenImage, record);
+		REGISTER_VISITOR(rendervisitor, OffscreenImage, render);
 	}
 
 	void alloc(Visitor* context)
@@ -2415,7 +2776,7 @@ public:
 			.layerCount = this->texture->subresource_range().layerCount,
 		};
 
-		if (true) {
+		if (false) {
 			VkDeviceSize width = extent.width / brickExtent.width;
 			VkDeviceSize height = extent.height / brickExtent.height;
 
@@ -2654,11 +3015,11 @@ public:
 		create_flags(create_flags),
 		layout(layout)
 	{
-		REGISTER_VISITOR(VulkanRenderer::devicevisitor, SparseImage, device);
-		REGISTER_VISITOR(VulkanRenderer::allocvisitor, SparseImage, alloc);
-		REGISTER_VISITOR(VulkanRenderer::pipelinevisitor, SparseImage, pipeline);
-		REGISTER_VISITOR(VulkanRenderer::rendervisitor, SparseImage, render);
-		REGISTER_VISITOR(VulkanRenderer::devicevisitor, SparseImage, device);
+		REGISTER_VISITOR(devicevisitor, SparseImage, device);
+		REGISTER_VISITOR(allocvisitor, SparseImage, alloc);
+		REGISTER_VISITOR(pipelinevisitor, SparseImage, pipeline);
+		REGISTER_VISITOR(rendervisitor, SparseImage, render);
+		REGISTER_VISITOR(devicevisitor, SparseImage, device);
 	}
 
 	void device(DeviceVisitor* context)
@@ -2670,15 +3031,13 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
-		VulkanTextureImage* texture = context->state->texture;
-
 		this->image = std::make_shared<VulkanImage>(
 			context->state->device,
-			texture->image_type(),
-			texture->format(),
-			texture->extent(0),
-			texture->levels(),
-			texture->layers(),
+			context->state->texture->image_type(),
+			context->state->texture->format(),
+			context->state->texture->extent(0),
+			context->state->texture->levels(),
+			context->state->texture->layers(),
 			this->sample_count,
 			this->tiling,
 			this->usage_flags,
@@ -2689,11 +3048,11 @@ public:
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
 			this->image->memoryBarrier(
-			  0,
-			  0,
-			  VK_IMAGE_LAYOUT_UNDEFINED,
-			  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			  context->state->texture->subresource_range()) });
+				0,
+				0,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				context->state->texture->subresource_range()) });
 
 		this->memory_manager = std::make_unique<MemoryPageManager>(context, this->image);
 		context->state->image = this->image->image;

@@ -255,5 +255,5 @@
             lod-renderpass)
          (separator main-renderpass)))
 
-   (define vulkan-window (window scene main-color-attachment))
-      vulkan-window)
+      (window scene))
+

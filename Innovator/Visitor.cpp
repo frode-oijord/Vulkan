@@ -122,11 +122,16 @@ DeviceVisitor::visit(class Node* node)
 	::memset(&device_features2, VK_FALSE, sizeof(VkPhysicalDeviceFeatures2));
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 	::memset(&device_address_features, VK_FALSE, sizeof(VkPhysicalDeviceBufferDeviceAddressFeatures));
+	::memset(&ray_tracing_features, VK_FALSE, sizeof(VkPhysicalDeviceRayTracingFeaturesKHR));
 #endif
 
 	device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR;
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 	device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR;
+	ray_tracing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_FEATURES_KHR;
+
+	device_address_features.pNext = &ray_tracing_features;
+
 	device_features2.pNext = &device_address_features;
 #endif
 	node->visit(this);
