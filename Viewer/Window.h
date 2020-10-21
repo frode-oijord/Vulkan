@@ -153,11 +153,9 @@ public:
 	VulkanWindow(std::shared_ptr<Node> scene)
 	{
 		devicevisitor.instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-		devicevisitor.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 		devicevisitor.instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 		devicevisitor.instance_extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #ifdef DEBUG
-		devicevisitor.device_layers.push_back("VK_LAYER_KHRONOS_validation");
 		devicevisitor.instance_layers.push_back("VK_LAYER_KHRONOS_validation");
 		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -173,22 +171,24 @@ public:
 		eventvisitor.state = this->state;
 		devicevisitor.state = this->state;
 
-		devicevisitor.visit(this->scene.get());
+		devicevisitor.visit(scene.get());
 
 		this->state->vulkan = std::make_shared<VulkanInstance>(
 			"Innovator",
 			devicevisitor.instance_layers,
 			devicevisitor.instance_extensions);
 
-		auto surface = std::make_shared<VulkanSurface>(
+		surface = std::make_shared<VulkanSurface>(
 			this->state->vulkan,
 			this->hWnd,
 			this->hInstance);
 
+		auto swapchain = std::make_shared<Swapchain>(surface, VK_PRESENT_MODE_FIFO_KHR);
+
 		this->scene = std::make_shared<Group>();
 		this->scene->children = {
 			scene,
-			std::make_shared<Swapchain>(surface, VK_PRESENT_MODE_FIFO_KHR)
+			swapchain
 		};
 
 #ifdef DEBUG
@@ -199,6 +199,11 @@ public:
 			VK_DEBUG_REPORT_ERROR_BIT_EXT |
 			VK_DEBUG_REPORT_DEBUG_BIT_EXT);
 #endif
+
+#ifdef DEBUG
+		devicevisitor.device_layers.push_back("VK_LAYER_KHRONOS_validation");
+#endif
+		devicevisitor.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 		this->state->device = std::make_shared<VulkanDevice>(
 			this->state->vulkan,
@@ -217,6 +222,8 @@ public:
 		allocvisitor.visit(this->scene.get());
 		pipelinevisitor.visit(this->scene.get());
 		recordvisitor.visit(this->scene.get());
+
+		this->resize(1920, 1080);
 	}
 
 	void redraw() override
@@ -225,7 +232,7 @@ public:
 			rendervisitor.visit(this->scene.get());
 			presentvisitor.visit(this->scene.get());
 		}
-		catch (VkException& e) {
+		catch (VkErrorOutOfDateException& e) {
 			std::cerr << e.what() << std::endl;
 			// recreate swapchain, try again next frame
 		}
@@ -241,6 +248,8 @@ public:
 		resizevisitor.visit(this->scene.get());
 		recordvisitor.visit(this->scene.get());
 		this->redraw();
+
+		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(this->state->device);
 	}
 
 	void mousePressed(int x, int y, int button) override
@@ -263,4 +272,5 @@ public:
 
 	std::shared_ptr<Group> scene;
 	std::shared_ptr<State> state{ nullptr };
+	std::shared_ptr<VulkanSurface> surface;
 };

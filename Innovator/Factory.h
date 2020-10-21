@@ -26,7 +26,7 @@ public:
 	virtual VkImageType image_type() const = 0;
 	virtual VkImageViewType image_view_type() const = 0;
 	virtual VkImageAspectFlags aspect_mask() const = 0;
-	VkImageSubresourceRange subresource_range() const
+	VkImageSubresourceRange subresourceRange() const
 	{
 		return {
 		  this->aspect_mask(),        // aspectMask 

@@ -17,7 +17,7 @@
             VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
             (uint32 0))
 
-        (textureimage filename)
+        (texturedata filename)
         (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
 
         (sparse-image 

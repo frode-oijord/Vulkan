@@ -427,8 +427,7 @@ public:
 };
 
 
-static VulkanAPI vk;
-
+inline VulkanAPI vk;
 
 class VulkanObject : public NonCopyable {
 public:
@@ -948,7 +947,7 @@ public:
 
 	char* map(VkDeviceSize size, VkDeviceSize offset, VkMemoryMapFlags flags = 0) const;
 	void unmap() const;
-	void memcpy(const void* src, VkDeviceSize size, VkDeviceSize offset);
+	void memcpy(const void* src, VkDeviceSize size, VkDeviceSize offset = 0);
 
 	std::shared_ptr<VulkanDevice> device;
 	VkDeviceMemory memory{ 0 };
@@ -1358,8 +1357,8 @@ public:
 		VkImageUsageFlags usage,
 		VkSharingMode sharing_mode,
 		VkImageCreateFlags flags = 0,
-		std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>(),
-		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED) :
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+		std::vector<uint32_t> queue_family_indices = std::vector<uint32_t>()) :
 		device(std::move(device))
 	{
 		VkImageCreateInfo create_info{
@@ -1619,7 +1618,8 @@ public:
 		VkImageUsageFlags usage,
 		VkSharingMode mode,
 		VkImageCreateFlags flags,
-		VkMemoryPropertyFlags memoryFlags)
+		VkMemoryPropertyFlags memoryFlags,
+		VkImageLayout initial_layout = VK_IMAGE_LAYOUT_UNDEFINED)
 	{
 		this->image = std::make_shared<VulkanImage>(
 			device,
@@ -1890,10 +1890,10 @@ public:
 	VulkanImageView(
 		std::shared_ptr<VulkanDevice> device,
 		VkImage image,
+		VkImageViewType viewType,
 		VkFormat format,
-		VkImageViewType view_type,
 		VkComponentMapping components,
-		VkImageSubresourceRange subresource_range) :
+		VkImageSubresourceRange subresourceRange) :
 		device(std::move(device))
 	{
 		VkImageViewCreateInfo create_info{
@@ -1901,10 +1901,10 @@ public:
 			.pNext = nullptr,
 			.flags = 0,
 			.image = image,
-			.viewType = view_type,
+			.viewType = viewType,
 			.format = format,
 			.components = components,
-			.subresourceRange = subresource_range,
+			.subresourceRange = subresourceRange,
 		};
 
 		THROW_ON_ERROR(vk.CreateImageView(this->device->device, &create_info, nullptr, &this->view));
@@ -2334,27 +2334,44 @@ public:
 };
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
-class VulkanAccelerationStructureGeometry {
+
+class VulkanRayTracingPipeline {
 public:
-	VulkanAccelerationStructureGeometry(
-		VkGeometryTypeKHR geometryType,
-		uint32_t maxPrimitiveCount,
-		VkIndexType	indexType,
-		uint32_t maxVertexCount,
-		VkFormat vertexFormat,
-		VkBool32 allowsTransforms)
+	VulkanRayTracingPipeline(
+		std::shared_ptr<VulkanInstance> vulkan,
+		std::shared_ptr<VulkanDevice> device,
+		const std::vector<VkPipelineShaderStageCreateInfo>& shader_stage_infos,
+		const std::vector<VkRayTracingShaderGroupCreateInfoKHR>& shader_groups,
+		VulkanPipelineLayout* pipeline_layout) :
+		vulkan(std::move(vulkan)),
+		device(std::move(device))
 	{
-		VkAccelerationStructureCreateGeometryTypeInfoKHR create_info{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
-			.pNext = nullptr,
-			.geometryType = geometryType,
-			.maxPrimitiveCount = maxPrimitiveCount,
-			.indexType = indexType,
-			.maxVertexCount = maxVertexCount,
-			.vertexFormat = vertexFormat,
-			.allowsTransforms = allowsTransforms
+		VkPipelineLibraryCreateInfoKHR libraries{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
 		};
+
+		VkRayTracingPipelineCreateInfoKHR raytracing_pipeline_create_info{
+			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.stageCount = static_cast<uint32_t>(shader_stage_infos.size()),
+			.pStages = shader_stage_infos.data(),
+			.groupCount = static_cast<uint32_t>(shader_groups.size()),
+			.pGroups = shader_groups.data(),
+			.maxRecursionDepth = 1,
+			.libraries = libraries,
+			.pLibraryInterface = nullptr,
+			.layout = pipeline_layout->layout,
+		};
+
+		THROW_ON_ERROR(this->vulkan->vkCreateRayTracingPipelinesKHR(
+			this->device->device, VK_NULL_HANDLE, 1, &raytracing_pipeline_create_info, nullptr, &this->pipeline));
 	}
+
+	~VulkanRayTracingPipeline() = default;
+
+	std::shared_ptr<VulkanInstance> vulkan;
+	std::shared_ptr<VulkanDevice> device;
+	VkPipeline pipeline;
 };
 
 
@@ -2385,96 +2402,29 @@ public:
 
 		THROW_ON_ERROR(this->vulkan->vkCreateAccelerationStructureKHR(this->device->device, &create_info, nullptr, &this->as));
 
-		{
-			VkMemoryRequirements2 memory_requirements2{
-				.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
-				.pNext = nullptr,
-			};
+		VkMemoryRequirements memory_requirements =
+			this->getMemoryRequirements(VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_KHR);
 
-			VkAccelerationStructureMemoryRequirementsInfoKHR memory_requirements_info{
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_KHR,
-				.pNext = nullptr,
-				.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_KHR,
-				.buildType = VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-				.accelerationStructure = this->as
-			};
+		uint32_t memory_type_index = this->device->physical_device.getMemoryTypeIndex(
+			memory_requirements.memoryTypeBits,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-			this->vulkan->vkGetAccelerationStructureMemoryRequirementsKHR(
-				this->device->device, &memory_requirements_info, &memory_requirements2);
+		this->memory = std::make_shared<VulkanMemory>(
+			this->device,
+			memory_requirements.size,
+			memory_type_index);
 
-			this->scratch_buffer = std::make_shared<VulkanBuffer>(
-				this->vulkan,
-				this->device,
-				0,
-				memory_requirements2.memoryRequirements.size,
-				VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-				VK_SHARING_MODE_EXCLUSIVE);
+		VkBindAccelerationStructureMemoryInfoKHR memory_info{
+			.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_KHR,
+			.pNext = nullptr,
+			.accelerationStructure = this->as,
+			.memory = this->memory->memory,
+			.memoryOffset = 0,
+			.deviceIndexCount = 0,
+			.pDeviceIndices = nullptr,
+		};
 
-			VkMemoryRequirements memory_requirements = this->scratch_buffer->getMemoryRequirements();
-
-			uint32_t memory_type_index = this->device->physical_device.getMemoryTypeIndex(
-				memory_requirements.memoryTypeBits,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-			VkMemoryAllocateFlagsInfo allocate_info{
-				VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR,
-				nullptr,
-				VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR,		// flags
-				0,												// deviceMask
-			};
-
-			this->scratch_memory = std::make_shared<VulkanMemory>(
-				this->device,
-				memory_requirements.size,
-				memory_type_index,
-				&allocate_info);
-
-			this->device->bindBufferMemory(
-				this->scratch_buffer->buffer,
-				this->scratch_memory->memory,
-				0);
-		}
-
-		{
-			VkMemoryRequirements2 memory_requirements2{
-				.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
-				.pNext = nullptr,
-			};
-
-			VkAccelerationStructureMemoryRequirementsInfoKHR memory_requirements_info{
-				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_KHR,
-				.pNext = nullptr,
-				.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_KHR,
-				.buildType = VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-				.accelerationStructure = this->as
-			};
-
-			this->vulkan->vkGetAccelerationStructureMemoryRequirementsKHR(
-				this->device->device, &memory_requirements_info, &memory_requirements2);
-
-			VkMemoryRequirements memory_requirements = memory_requirements2.memoryRequirements;
-
-			uint32_t memory_type_index = this->device->physical_device.getMemoryTypeIndex(
-				memory_requirements.memoryTypeBits,
-				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-			this->as_memory = std::make_shared<VulkanMemory>(
-				this->device,
-				memory_requirements.size,
-				memory_type_index);
-
-			VkBindAccelerationStructureMemoryInfoKHR memory_info = {
-				.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_KHR,
-				.pNext = nullptr,
-				.accelerationStructure = this->as,
-				.memory = this->as_memory->memory,
-				.memoryOffset = 0,
-				.deviceIndexCount = 0,
-				.pDeviceIndices = nullptr,
-			};
-
-			this->vulkan->vkBindAccelerationStructureMemoryKHR(this->device->device, 1, &memory_info);
-		}
+		this->vulkan->vkBindAccelerationStructureMemoryKHR(this->device->device, 1, &memory_info);
 	}
 
 
@@ -2483,24 +2433,63 @@ public:
 		this->vulkan->vkDestroyAccelerationStructureKHR(this->device->device, this->as, nullptr);
 	}
 
-	VkDeviceAddress getDeviceAddress()
+	static VkDeviceAddress GetDeviceAddress(VulkanInstance* vulkan, VulkanDevice* device, VkAccelerationStructureKHR as)
 	{
 		VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
 			.pNext = nullptr,
-			.accelerationStructure = this->as,
+			.accelerationStructure = as,
 		};
 
-		return this->vulkan->vkGetAccelerationStructureDeviceAddressKHR(this->device->device, &device_address_info);
+		return vulkan->vkGetAccelerationStructureDeviceAddressKHR(device->device, &device_address_info);
 	}
+
+
+	VkDeviceAddress getDeviceAddress()
+	{
+		return GetDeviceAddress(this->vulkan.get(), this->device.get(), this->as);
+	}
+
+	VkMemoryRequirements getMemoryRequirements(VkAccelerationStructureMemoryRequirementsTypeKHR type)
+	{
+		VkMemoryRequirements2 memory_requirements2{
+			.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+			.pNext = nullptr,
+		};
+
+		VkAccelerationStructureMemoryRequirementsInfoKHR memory_requirements_info{
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_KHR,
+			.pNext = nullptr,
+			.type = type,
+			.buildType = VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+			.accelerationStructure = this->as
+		};
+
+		this->vulkan->vkGetAccelerationStructureMemoryRequirementsKHR(
+			this->device->device, &memory_requirements_info, &memory_requirements2);
+
+		return memory_requirements2.memoryRequirements;
+	}
+
 
 	void build(
 		VkCommandBuffer command,
 		std::vector<VkAccelerationStructureGeometryKHR>& geometries,
-		std::vector<VkAccelerationStructureBuildOffsetInfoKHR*>& build_offset_infos)
+		std::vector<VkAccelerationStructureBuildOffsetInfoKHR>& build_offset_infos)
 	{
-		VkDeviceAddress address = this->scratch_buffer->getDeviceAddress();
+		VkMemoryRequirements memory_requirements =
+			this->getMemoryRequirements(VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_KHR);
 
+		auto scratch_buffer = std::make_shared<VulkanBufferObject>(
+			this->vulkan,
+			this->device,
+			0,
+			memory_requirements.size,
+			VK_BUFFER_USAGE_RAY_TRACING_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		VkDeviceAddress address = scratch_buffer->buffer->getDeviceAddress();
 		VkAccelerationStructureGeometryKHR* pGeometries = geometries.data();
 
 		VkAccelerationStructureBuildGeometryInfoKHR build_geometry_info{
@@ -2517,11 +2506,12 @@ public:
 			.scratchData = address
 		};
 
+		VkAccelerationStructureBuildOffsetInfoKHR* pInfos = build_offset_infos.data();
 		this->vulkan->vkCmdBuildAccelerationStructureKHR(
 			command,
 			static_cast<uint32_t>(build_offset_infos.size()),
 			&build_geometry_info,
-			build_offset_infos.data());
+			&pInfos);
 
 		VkMemoryBarrier barrier{
 			.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
@@ -2541,8 +2531,6 @@ public:
 	std::shared_ptr<VulkanDevice> device;
 	VkAccelerationStructureTypeKHR type;
 	VkAccelerationStructureKHR as;
-	std::shared_ptr<VulkanBuffer> scratch_buffer;
-	std::shared_ptr<VulkanMemory> scratch_memory;
-	std::shared_ptr<VulkanMemory> as_memory;
+	std::shared_ptr<VulkanMemory> memory;
 };
 #endif

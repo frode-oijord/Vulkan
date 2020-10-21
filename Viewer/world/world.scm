@@ -18,7 +18,7 @@
             VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE
             (uint32 0))
 
-         (textureimage filename)
+         (texturedata filename)
          (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
 
          (sparse-image 
@@ -30,10 +30,19 @@
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 
          (imageview 
-            VK_COMPONENT_SWIZZLE_R
-            VK_COMPONENT_SWIZZLE_G
-            VK_COMPONENT_SWIZZLE_B
-            VK_COMPONENT_SWIZZLE_A)
+            VK_IMAGE_VIEW_TYPE_2D
+            VK_FORMAT_R8G8B8A8_UNORM
+            (component-mapping
+               VK_COMPONENT_SWIZZLE_R
+               VK_COMPONENT_SWIZZLE_G
+               VK_COMPONENT_SWIZZLE_B
+               VK_COMPONENT_SWIZZLE_A)
+            (subresource-range
+               (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)
+               (uint32 0)
+               (uint32 1)
+               (uint32 0)
+               (uint32 1)))
 
          (descriptorsetlayoutbinding 
             (uint32 1) 

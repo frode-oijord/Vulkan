@@ -585,32 +585,54 @@ public:
 			.pImmutableSamplers = nullptr,
 			});
 
-		// only one of these is used, according to the descriptor type
-		this->descriptor_image_info = {
-			.sampler = context->state->sampler,
-			.imageView = context->state->imageView,
-			.imageLayout = context->state->imageLayout
-		};
+		const VkDescriptorImageInfo* pImageInfo = nullptr;
+		const VkDescriptorBufferInfo* pBufferInfo = nullptr;
+		const VkBufferView* pTexelBufferView = nullptr;
+		const void* pNext = nullptr;
 
-		this->descriptor_buffer_info = {
-			.buffer = context->state->buffer,
-			.offset = 0,
-			.range = VK_WHOLE_SIZE
-		};
+		switch (this->descriptorType) {
+		case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+			this->descriptor_set_acceleration_structure = {
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+				.pNext = nullptr,
+				.accelerationStructureCount = static_cast<uint32_t>(context->state->top_level_acceleration_structures.size()),
+				.pAccelerationStructures = context->state->top_level_acceleration_structures.data(),
+			};
 
-		VkWriteDescriptorSet set{
+			pNext = &this->descriptor_set_acceleration_structure;
+			break;
+
+		default:
+			this->descriptor_image_info = {
+				.sampler = context->state->sampler,
+				.imageView = context->state->imageView,
+				.imageLayout = context->state->imageLayout
+			};
+			pImageInfo = &this->descriptor_image_info;
+
+			this->descriptor_buffer_info = {
+				.buffer = context->state->buffer,
+				.offset = 0,
+				.range = VK_WHOLE_SIZE
+			};
+			pBufferInfo = &this->descriptor_buffer_info;
+			break;
+		}
+
+		VkWriteDescriptorSet write_descriptor_set{
 			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.pNext = 0,
-			.dstSet = 0,
+			.pNext = pNext,
+			.dstSet = nullptr,
 			.dstBinding = this->binding,
 			.dstArrayElement = 0,
 			.descriptorCount = 1,
 			.descriptorType = this->descriptorType,
 			.pImageInfo = &this->descriptor_image_info,
 			.pBufferInfo = &this->descriptor_buffer_info,
-			.pTexelBufferView = 0,
+			.pTexelBufferView = pTexelBufferView,
 		};
-		context->state->write_descriptor_sets.push_back(set);
+
+		context->state->write_descriptor_sets.push_back(write_descriptor_set);
 	}
 
 private:
@@ -619,6 +641,7 @@ private:
 	VkShaderStageFlags stageFlags;
 	VkDescriptorImageInfo descriptor_image_info{};
 	VkDescriptorBufferInfo descriptor_buffer_info{};
+	VkWriteDescriptorSetAccelerationStructureKHR descriptor_set_acceleration_structure{};
 };
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -634,6 +657,7 @@ public:
 		REGISTER_VISITOR(devicevisitor, Shader, device);
 		REGISTER_VISITOR(allocvisitor, Shader, alloc);
 		REGISTER_VISITOR(pipelinevisitor, Shader, pipeline);
+		REGISTER_VISITOR(recordvisitor, Shader, record);
 
 		shaderc_shader_kind kind = [stage]()
 		{
@@ -696,7 +720,7 @@ public:
 		this->shader = std::make_unique<VulkanShaderModule>(context->state->device, this->spv);
 	}
 
-	void pipeline(Visitor* context)
+	void updateState(Visitor* context)
 	{
 		context->state->shader_stage_infos.push_back({
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -709,6 +733,16 @@ public:
 			});
 	}
 
+	void pipeline(Visitor* context)
+	{
+		this->updateState(context);
+	}
+
+	void record(Visitor* context)
+	{
+		this->updateState(context);
+	}
+
 public:
 	std::vector<uint32_t> spv;
 	VkShaderStageFlagBits stage;
@@ -718,14 +752,14 @@ public:
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
-class AccelerationStructure : public Node {
+class BottomLevelAccelerationStructure : public Node {
 public:
 	IMPLEMENT_VISITABLE;
-	virtual ~AccelerationStructure() = default;
+	virtual ~BottomLevelAccelerationStructure() = default;
 
-	explicit AccelerationStructure()
+	explicit BottomLevelAccelerationStructure()
 	{
-		REGISTER_VISITOR(allocvisitor, AccelerationStructure, alloc);
+		REGISTER_VISITOR(allocvisitor, BottomLevelAccelerationStructure, alloc);
 	}
 
 	void device(DeviceVisitor* context)
@@ -823,8 +857,8 @@ public:
 			.transformOffset = 0,
 		};
 
-		std::vector<VkAccelerationStructureBuildOffsetInfoKHR*> build_offset_infos{
-			&build_offset_info
+		std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos{
+			build_offset_info
 		};
 
 		this->as->build(
@@ -832,19 +866,18 @@ public:
 			geometries,
 			build_offset_infos);
 
-		context->state->blas = this->as->as;
+		context->state->bottom_level_acceleration_structures.push_back(this->as->as);
 	}
 
 	std::shared_ptr<VulkanAccelerationStructure> as{ nullptr };
 };
 
-
-class RTXImage : public Node {
+class Image : public Node {
 public:
 	IMPLEMENT_VISITABLE;
-	virtual ~RTXImage() = default;
-	RTXImage(
-		VkImageType image_type,
+	virtual ~Image() = default;
+	Image(
+		VkImageType imageType,
 		VkFormat format,
 		VkExtent3D extent,
 		uint32_t levels,
@@ -854,9 +887,8 @@ public:
 		VkImageUsageFlags usage,
 		VkSharingMode mode,
 		VkImageCreateFlags flags,
-		VkMemoryPropertyFlags memoryFlags,
-		VkImageLayout imageLayout) :
-		image_type(image_type),
+		VkMemoryPropertyFlags memoryFlags) :
+		imageType(imageType),
 		format(format),
 		extent(extent),
 		levels(levels),
@@ -866,89 +898,49 @@ public:
 		usage(usage),
 		mode(mode),
 		flags(flags),
-		memoryFlags(memoryFlags),
-		imageLayout(imageLayout)
+		memoryFlags(memoryFlags)
 	{
-		REGISTER_VISITOR(allocvisitor, RTXImage, alloc);
-		REGISTER_VISITOR(recordvisitor, RTXImage, record);
-		REGISTER_VISITOR(pipelinevisitor, RTXImage, pipeline);
+		REGISTER_VISITOR(allocvisitor, Image, alloc);
+		REGISTER_VISITOR(resizevisitor, Image, alloc);
+		REGISTER_VISITOR(pipelinevisitor, Image, updateState);
+		REGISTER_VISITOR(recordvisitor, Image, updateState);
 	}
 
 	void alloc(CommandVisitor* context)
 	{
 		VkExtent3D extent = {
-			context->state->extent.width,
-			context->state->extent.height,
-			1
+			.width = context->state->extent.width,
+			.height = context->state->extent.height,
+			.depth = 1
 		};
 
 		this->image = std::make_shared<VulkanImageObject>(
 			context->state->device,
-			image_type,
-			format,
+			this->imageType,
+			this->format,
 			extent,
-			levels,
-			layers,
-			samples,
-			tiling,
-			usage,
-			mode,
-			flags,
-			memoryFlags);
+			this->levels,
+			this->layers,
+			this->samples,
+			this->tiling,
+			this->usage,
+			this->mode,
+			this->flags,
+			this->memoryFlags,
+			VK_IMAGE_LAYOUT_UNDEFINED);
 
-		VkImageSubresourceRange subresource_range{
-			VK_IMAGE_ASPECT_COLOR_BIT,			// aspectMask
-			0,									// baseMipLevel
-			1,									// levelCount
-			0,									// baseArrayLayer
-			1									// layerCount
-		};
-
-		VkComponentMapping components{
-			.r = VK_COMPONENT_SWIZZLE_R,
-			.g = VK_COMPONENT_SWIZZLE_G,
-			.b = VK_COMPONENT_SWIZZLE_B,
-			.a = VK_COMPONENT_SWIZZLE_A,
-		};
-
-		this->imageview = std::make_shared<VulkanImageView>(
-			context->state->device,
-			this->image->image->image,
-			format,
-			VK_IMAGE_VIEW_TYPE_2D,
-			components,
-			subresource_range);
-
-		context->state->default_command->pipelineBarrier(
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
-			this->image->image->memoryBarrier(
-				0,
-				0,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				this->imageLayout,
-				subresource_range) });
-
-		context->state->swapchain_format = this->format;
+		this->updateState(context);
 	}
 
-	void pipeline(Visitor* context)
+	void updateState(Visitor* context)
 	{
 		context->state->image = this->image->image->image;
-		context->state->imageLayout = this->imageLayout;
-		context->state->imageView = this->imageview->view;
+		context->state->imageFormat = this->format;
 	}
-
-	void record(Visitor* context)
-	{
-		context->state->swapchain_source = this->image->image->image;
-	}
-
 
 	std::shared_ptr<VulkanImageObject> image;
-	std::shared_ptr<VulkanImageView> imageview;
 
-	VkImageType image_type;
+	VkImageType imageType;
 	VkFormat format;
 	VkExtent3D extent;
 	uint32_t levels;
@@ -959,7 +951,240 @@ public:
 	VkSharingMode mode;
 	VkImageCreateFlags flags;
 	VkMemoryPropertyFlags memoryFlags;
-	VkImageLayout imageLayout;
+};
+
+
+class ImageView : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~ImageView() = default;
+	ImageView(
+		VkImageViewType type,
+		VkFormat format,
+		VkComponentMapping components,
+		VkImageSubresourceRange subresourceRange) :
+		type(type),
+		format(format),
+		components(components),
+		subresourceRange(subresourceRange)
+	{
+		REGISTER_VISITOR(allocvisitor, ImageView, alloc);
+		REGISTER_VISITOR(resizevisitor, ImageView, alloc);
+		REGISTER_VISITOR(pipelinevisitor, ImageView, updateState);
+		REGISTER_VISITOR(recordvisitor, ImageView, updateState);
+	}
+
+	void alloc(Visitor* context)
+	{
+		this->view = std::make_shared<VulkanImageView>(
+			context->state->device,
+			context->state->image,
+			this->type,
+			this->format,
+			this->components,
+			this->subresourceRange);
+
+		this->updateState(context);
+	}
+
+	void updateState(Visitor* context)
+	{
+		context->state->imageView = this->view->view;
+		context->state->subresourceRange = this->subresourceRange;
+	}
+
+	std::shared_ptr<VulkanImageView> view;
+
+private:
+	VkImageViewType type;
+	VkFormat format;
+	VkComponentMapping components;
+	VkImageSubresourceRange subresourceRange;
+};
+
+
+class ImageLayout : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~ImageLayout() = default;
+	ImageLayout(
+		VkImageLayout oldLayout,
+		VkImageLayout newLayout,
+		VkImageSubresourceRange subresourceRange) :
+		oldLayout(oldLayout),
+		newLayout(newLayout),
+		subresourceRange(subresourceRange)
+	{
+		REGISTER_VISITOR(allocvisitor, ImageLayout, alloc);
+		REGISTER_VISITOR(resizevisitor, ImageLayout, alloc);
+		REGISTER_VISITOR(pipelinevisitor, ImageLayout, updateState);
+		REGISTER_VISITOR(recordvisitor, ImageLayout, updateState);
+	}
+
+	void alloc(Visitor* context)
+	{
+		context->state->default_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+			VulkanImage::MemoryBarrier(
+				context->state->image,
+				0,
+				0,
+				this->oldLayout,
+				this->newLayout,
+				this->subresourceRange) });
+
+		this->updateState(context);
+	}
+
+	void updateState(Visitor* context)
+	{
+		context->state->imageLayout = this->newLayout;
+	}
+
+	VkImageLayout oldLayout;
+	VkImageLayout newLayout;
+	VkImageSubresourceRange subresourceRange;
+};
+
+
+class CurrentImageRenderTarget : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	~CurrentImageRenderTarget() = default;
+	CurrentImageRenderTarget()
+	{
+		REGISTER_VISITOR(allocvisitor, CurrentImageRenderTarget, updateState);
+		REGISTER_VISITOR(recordvisitor, CurrentImageRenderTarget, updateState);
+	}
+
+	void updateState(Visitor* context)
+	{
+		context->state->renderTarget = {
+			.image = context->state->image,
+			.format = context->state->imageFormat,
+			.layout = context->state->imageLayout,
+			.subresourceRange = context->state->subresourceRange
+		};
+	}
+};
+
+
+class TopLevelAccelerationStructure : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~TopLevelAccelerationStructure() = default;
+
+	explicit TopLevelAccelerationStructure()
+	{
+		REGISTER_VISITOR(allocvisitor, TopLevelAccelerationStructure, alloc);
+		REGISTER_VISITOR(pipelinevisitor, TopLevelAccelerationStructure, pipeline);
+	}
+
+	void alloc(CommandVisitor* context)
+	{
+		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos{ {
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
+			.pNext = nullptr,
+			.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+			.maxPrimitiveCount = 1,
+			.indexType = VK_INDEX_TYPE_NONE_KHR,
+			.maxVertexCount = 0,
+			.vertexFormat = VK_FORMAT_UNDEFINED,
+			.allowsTransforms = VK_FALSE,
+		} };
+
+		this->tlas = std::make_shared<VulkanAccelerationStructure>(
+			context->state->vulkan,
+			context->state->device,
+			0,															// compactedSize
+			VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,				// type
+			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
+			create_geometry_infos,										// geometryInfos
+			0);															// deviceAddress
+
+		std::vector<VkAccelerationStructureGeometryKHR> acceleration_structure_geometries;
+		std::vector<VkAccelerationStructureBuildOffsetInfoKHR> build_offset_infos;
+
+		for (auto& blas : context->state->bottom_level_acceleration_structures) {
+
+			VkTransformMatrixKHR transform{ {
+				{ 1, 0, 0, 0 },
+				{ 0, 1, 0, 0 },
+				{ 0, 0, 1, 0 }
+			} };
+
+			VkAccelerationStructureInstanceKHR instance{
+				.transform = transform,
+				.instanceCustomIndex = 0,
+				.mask = 0xFF,
+				.instanceShaderBindingTableRecordOffset = 0,
+				.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
+				.accelerationStructureReference =
+					VulkanAccelerationStructure::GetDeviceAddress(
+						context->state->vulkan.get(),
+						context->state->device.get(),
+						blas)
+			};
+
+			auto instance_buffer = std::make_shared<VulkanBufferObject>(
+				context->state->vulkan,
+				context->state->device,
+				0,
+				sizeof(instance),
+				VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				VK_SHARING_MODE_EXCLUSIVE,
+				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+			instance_buffer->memory->memcpy(&instance, sizeof(instance));
+
+			VkDeviceOrHostAddressConstKHR instance_data_device_address{
+				.deviceAddress = instance_buffer->buffer->getDeviceAddress()
+			};
+
+			VkAccelerationStructureGeometryInstancesDataKHR acceleration_structure_geometry_instances_data{
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+				.pNext = nullptr,
+				.arrayOfPointers = VK_FALSE,
+				.data = instance_data_device_address,
+			};
+
+			VkAccelerationStructureGeometryDataKHR acceleration_structure_geometry_data{
+				.instances = acceleration_structure_geometry_instances_data
+			};
+
+			VkAccelerationStructureGeometryKHR acceleration_structure_geometry{
+				.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+				.pNext = nullptr,
+				.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+				.geometry = acceleration_structure_geometry_data,
+				.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
+			};
+
+			acceleration_structure_geometries.push_back(acceleration_structure_geometry);
+
+			VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
+				.primitiveCount = 1,
+				.primitiveOffset = 0,
+				.firstVertex = 0,
+				.transformOffset = 0,
+			};
+
+			build_offset_infos.push_back(build_offset_info);
+		}
+
+		this->tlas->build(
+			context->state->default_command->buffer(),
+			acceleration_structure_geometries,
+			build_offset_infos);
+	}
+
+	void pipeline(Visitor* context)
+	{
+		context->state->top_level_acceleration_structures.push_back(this->tlas->as);
+	}
+
+	std::shared_ptr<VulkanAccelerationStructure> tlas{ nullptr };
 };
 
 
@@ -993,120 +1218,12 @@ public:
 
 	void alloc(CommandVisitor* context)
 	{
-		std::vector<VkAccelerationStructureCreateGeometryTypeInfoKHR> create_geometry_infos{ {
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_GEOMETRY_TYPE_INFO_KHR,
-			.pNext = nullptr,
-			.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-			.maxPrimitiveCount = 1,
-			.indexType = VK_INDEX_TYPE_NONE_KHR,
-			.maxVertexCount = 0,
-			.vertexFormat = VK_FORMAT_UNDEFINED,
-			.allowsTransforms = VK_FALSE,
-		} };
-
-		this->tlas = std::make_shared<VulkanAccelerationStructure>(
-			context->state->vulkan,
-			context->state->device,
-			0,															// compactedSize
-			VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,				// type
-			VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,	// flags
-			create_geometry_infos,										// geometryInfos
-			0);															// deviceAddress
-
-		VkTransformMatrixKHR transform{ {
-			{ 1, 0, 0, 0 },
-			{ 0, 1, 0, 0 },
-			{ 0, 0, 1, 0 }
-		} };
-
-		VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-			.pNext = nullptr,
-			.accelerationStructure = context->state->blas,
-		};
-
-		VkDeviceAddress blas_address = context->state->vulkan->vkGetAccelerationStructureDeviceAddressKHR(
-			context->state->device->device, &device_address_info);
-
-		VkAccelerationStructureInstanceKHR instance{
-			.transform = transform,
-			.instanceCustomIndex = 0,
-			.mask = 0xFF,
-			.instanceShaderBindingTableRecordOffset = 0,
-			.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-			.accelerationStructureReference = blas_address,
-		};
-
-		this->instance_buffer = std::make_shared<VulkanBufferObject>(
-			context->state->vulkan,
-			context->state->device,
-			0,
-			sizeof(instance),
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-			VK_SHARING_MODE_EXCLUSIVE,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-		this->instance_buffer->memory->memcpy(&instance, sizeof(instance), 0);
-
-		VkDeviceOrHostAddressConstKHR instance_data_device_address{
-			.deviceAddress = this->instance_buffer->buffer->getDeviceAddress()
-		};
-
-		VkAccelerationStructureGeometryInstancesDataKHR acceleration_structure_geometry_instances_data{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
-			.pNext = nullptr,
-			.arrayOfPointers = VK_FALSE,
-			.data = instance_data_device_address,
-		};
-
-		VkAccelerationStructureGeometryDataKHR acceleration_structure_geometry_data{
-			.instances = acceleration_structure_geometry_instances_data
-		};
-
-		VkAccelerationStructureGeometryKHR acceleration_structure_geometry{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-			.pNext = nullptr,
-			.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-			.geometry = acceleration_structure_geometry_data,
-			.flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
-		};
-
-		std::vector<VkAccelerationStructureGeometryKHR> acceleration_structure_geometries{
-			acceleration_structure_geometry
-		};
-
-		VkAccelerationStructureBuildOffsetInfoKHR build_offset_info{
-			.primitiveCount = 1,
-			.primitiveOffset = 0,
-			.firstVertex = 0,
-			.transformOffset = 0,
-		};
-
-		std::vector<VkAccelerationStructureBuildOffsetInfoKHR*> build_offset_infos{
-			&build_offset_info
-		};
-
-		this->tlas->build(
-			context->state->default_command->buffer(),
-			acceleration_structure_geometries,
-			build_offset_infos);
+		this->command = std::make_unique<VulkanCommandBuffers>(context->state->device);
+		this->queue = context->state->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state->descriptor_pool_sizes.push_back({
-			.type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-			.descriptorCount = 1,
-			});
-
-		context->state->descriptor_set_layout_bindings.push_back({
-			.binding = 2,
-			.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-			.descriptorCount = 1,
-			.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-			.pImmutableSamplers = nullptr,
-			});
-
 		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
 			context->state->device,
 			context->state->descriptor_pool_sizes);
@@ -1133,88 +1250,51 @@ public:
 			write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
 		}
 
-		VkWriteDescriptorSetAccelerationStructureKHR descriptor_acceleration_structure_info{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
-			.pNext = nullptr,
-			.accelerationStructureCount = 1,
-			.pAccelerationStructures = &this->tlas->as,
-		};
-
-		VkWriteDescriptorSet acceleration_structure_write{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.pNext = &descriptor_acceleration_structure_info,
-			.dstSet = this->descriptor_sets->descriptor_sets[0],
-			.dstBinding = 2,
-			.descriptorCount = 1,
-			.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
-		};
-
-		context->state->write_descriptor_sets.push_back(acceleration_structure_write);
-
 		this->descriptor_sets->update(context->state->write_descriptor_sets);
 
-		std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
+		for (size_t i = 0; i < context->state->shader_stage_infos.size(); i++) {
+			VkRayTracingShaderGroupCreateInfoKHR rtx_group_info{
+				.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+				.pNext = nullptr,
+				.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+				.generalShader = VK_SHADER_UNUSED_KHR,
+				.closestHitShader = VK_SHADER_UNUSED_KHR,
+				.anyHitShader = VK_SHADER_UNUSED_KHR,
+				.intersectionShader = VK_SHADER_UNUSED_KHR,
+			};
 
-		VkRayTracingShaderGroupCreateInfoKHR raygen_group_ci{
-			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
-			.pNext = nullptr,
-			.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
-			.generalShader = 0,
-			.closestHitShader = VK_SHADER_UNUSED_KHR,
-			.anyHitShader = VK_SHADER_UNUSED_KHR,
-			.intersectionShader = VK_SHADER_UNUSED_KHR,
-		};
+			switch (context->state->shader_stage_infos[i].stage) {
+			case VK_SHADER_STAGE_RAYGEN_BIT_KHR:
+			case VK_SHADER_STAGE_MISS_BIT_KHR:
+				rtx_group_info.generalShader = i;
+				break;
+			case VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:
+				rtx_group_info.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+				rtx_group_info.closestHitShader = i;
+				break;
+			default:
+				throw std::runtime_error("unsupported rtx shader stage");
+			}
 
-		shader_groups.push_back(raygen_group_ci);
+			this->shader_groups.push_back(rtx_group_info);
+		}
 
-		VkRayTracingShaderGroupCreateInfoKHR miss_group_ci{
-			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
-			.pNext = nullptr,
-			.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
-			.generalShader = 1,
-			.closestHitShader = VK_SHADER_UNUSED_KHR,
-			.anyHitShader = VK_SHADER_UNUSED_KHR,
-			.intersectionShader = VK_SHADER_UNUSED_KHR,
-		};
+		this->rtx_pipeline = std::make_shared<VulkanRayTracingPipeline>(
+			context->state->vulkan,
+			context->state->device,
+			context->state->shader_stage_infos,
+			this->shader_groups,
+			this->pipeline_layout.get());
+	}
 
-		shader_groups.push_back(miss_group_ci);
-
-		VkRayTracingShaderGroupCreateInfoKHR closes_hit_group_ci{
-			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
-			.pNext = nullptr,
-			.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
-			.generalShader = VK_SHADER_UNUSED_KHR,
-			.closestHitShader = 2,
-			.anyHitShader = VK_SHADER_UNUSED_KHR,
-			.intersectionShader = VK_SHADER_UNUSED_KHR,
-		};
-
-		shader_groups.push_back(closes_hit_group_ci);
-
-		VkPipelineLibraryCreateInfoKHR libraries{
-			.sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
-		};
-
-		VkRayTracingPipelineCreateInfoKHR raytracing_pipeline_create_info{
-			.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
-			.pNext = nullptr,
-			.stageCount = static_cast<uint32_t>(context->state->shader_stage_infos.size()),
-			.pStages = context->state->shader_stage_infos.data(),
-			.groupCount = static_cast<uint32_t>(shader_groups.size()),
-			.pGroups = shader_groups.data(),
-			.maxRecursionDepth = 1,
-			.libraries = libraries,
-			.pLibraryInterface = nullptr,
-			.layout = this->pipeline_layout->layout,
-		};
-
-		THROW_ON_ERROR(context->state->vulkan->vkCreateRayTracingPipelinesKHR(
-			context->state->device->device, VK_NULL_HANDLE, 1, &raytracing_pipeline_create_info, nullptr, &this->rtx_pipeline));
-
+	void record(Visitor* context)
+	{
 		VkPhysicalDeviceRayTracingPropertiesKHR ray_tracing_properties = context->state->device->physical_device.ray_tracing_properties;
 
-		const uint32_t group_count = 3;
-		const uint32_t shader_binding_table_size = ray_tracing_properties.shaderGroupBaseAlignment * group_count;
+		const VkDeviceSize shader_binding_table_count = context->state->shader_stage_infos.size();
+		const VkDeviceSize shader_binding_table_stride = ray_tracing_properties.shaderGroupBaseAlignment;
+		const VkDeviceSize shader_binding_table_size = shader_binding_table_stride * shader_binding_table_count;
+		const VkDeviceSize shader_binding_table_handle_size = ray_tracing_properties.shaderGroupHandleSize;
 
 		this->shader_binding_table = std::make_shared<VulkanBufferObject>(
 			context->state->vulkan,
@@ -1227,52 +1307,59 @@ public:
 
 		std::vector<uint8_t> shader_handle_storage(shader_binding_table_size);
 		THROW_ON_ERROR(context->state->vulkan->vkGetRayTracingShaderGroupHandlesKHR(
-			context->state->device->device, this->rtx_pipeline, 0, group_count, shader_binding_table_size, shader_handle_storage.data()));
+			context->state->device->device,
+			this->rtx_pipeline->pipeline,
+			0,
+			shader_binding_table_count,
+			shader_binding_table_size,
+			shader_handle_storage.data()));
 
-		uint8_t* data = reinterpret_cast<uint8_t*>(shader_binding_table->memory->map(VK_WHOLE_SIZE, 0, 0));
-		// This part is required, as the alignment and handle size may differ
-		for (uint32_t i = 0; i < group_count; i++) {
-			memcpy(data, shader_handle_storage.data() + i * ray_tracing_properties.shaderGroupHandleSize, ray_tracing_properties.shaderGroupHandleSize);
-			data += ray_tracing_properties.shaderGroupBaseAlignment;
+		for (uint32_t i = 0; i < shader_binding_table_count; i++) {
+			this->shader_binding_table->memory->memcpy(
+				&shader_handle_storage[shader_binding_table_handle_size * i],
+				shader_binding_table_handle_size,
+				shader_binding_table_stride * i);
 		}
-		shader_binding_table->memory->unmap();
-	}
 
-	void record(Visitor* context)
-	{
-		this->command = std::make_unique<VulkanCommandBuffers>(context->state->device);
-		this->queue = context->state->device->getQueue(VK_QUEUE_GRAPHICS_BIT);
-
-		VkPhysicalDeviceRayTracingPropertiesKHR ray_tracing_properties = context->state->device->physical_device.ray_tracing_properties;
-
-		this->command->begin();
-
-		const uint32_t shader_binding_table_size = ray_tracing_properties.shaderGroupBaseAlignment * 3;
-
-		VkStridedBufferRegionKHR raygen_shader_sbt_entry{
+		VkStridedBufferRegionKHR shader_sbt_entry{
 			.buffer = this->shader_binding_table->buffer->buffer,
-			.offset = static_cast<VkDeviceSize>(ray_tracing_properties.shaderGroupBaseAlignment * 0),
-			.stride = ray_tracing_properties.shaderGroupBaseAlignment,
+			.offset = 0,
+			.stride = shader_binding_table_stride,
 			.size = shader_binding_table_size,
 		};
 
-		VkStridedBufferRegionKHR miss_shader_sbt_entry{
-			.buffer = this->shader_binding_table->buffer->buffer,
-			.offset = static_cast<VkDeviceSize>(ray_tracing_properties.shaderGroupBaseAlignment * 1),
-			.stride = ray_tracing_properties.shaderGroupBaseAlignment,
-			.size = shader_binding_table_size,
-		};
-
-		VkStridedBufferRegionKHR hit_shader_sbt_entry{
-			.buffer = this->shader_binding_table->buffer->buffer,
-			.offset = static_cast<VkDeviceSize>(ray_tracing_properties.shaderGroupBaseAlignment * 2),
-			.stride = ray_tracing_properties.shaderGroupBaseAlignment,
-			.size = shader_binding_table_size,
-		};
-
+		VkStridedBufferRegionKHR raygen_shader_sbt_entry{};
+		VkStridedBufferRegionKHR miss_shader_sbt_entry{};
+		VkStridedBufferRegionKHR hit_shader_sbt_entry{};
 		VkStridedBufferRegionKHR callable_shader_sbt_entry{};
 
-		vk.CmdBindPipeline(this->command->buffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, this->rtx_pipeline);
+		for (size_t i = 0; i < context->state->shader_stage_infos.size(); i++) {
+			switch (context->state->shader_stage_infos[i].stage) {
+			case VK_SHADER_STAGE_RAYGEN_BIT_KHR:
+				raygen_shader_sbt_entry = shader_sbt_entry;
+				raygen_shader_sbt_entry.offset = shader_sbt_entry.stride * i;
+				break;
+			case VK_SHADER_STAGE_MISS_BIT_KHR:
+				miss_shader_sbt_entry = shader_sbt_entry;
+				miss_shader_sbt_entry.offset = shader_sbt_entry.stride * i;
+				break;
+			case VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR:
+				hit_shader_sbt_entry = shader_sbt_entry;
+				hit_shader_sbt_entry.offset = shader_sbt_entry.stride * i;
+				break;
+			case VK_SHADER_STAGE_CALLABLE_BIT_KHR:
+				callable_shader_sbt_entry = shader_sbt_entry;
+				callable_shader_sbt_entry.offset = shader_sbt_entry.stride * i;
+				break;
+			default:
+				throw std::runtime_error("unsupported rtx shader stage");
+				break;
+			}
+		}
+
+		VulkanCommandBuffers::Scope scope(this->command.get());
+
+		vk.CmdBindPipeline(this->command->buffer(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, this->rtx_pipeline->pipeline);
 
 		vk.CmdBindDescriptorSets(
 			this->command->buffer(),
@@ -1293,9 +1380,6 @@ public:
 			context->state->extent.width,
 			context->state->extent.height,
 			1);
-
-
-		this->command->end();
 	}
 
 	void render(Visitor* context)
@@ -1303,13 +1387,12 @@ public:
 		this->command->submit(this->queue, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
 	}
 
-	VkPipeline rtx_pipeline;
-	std::shared_ptr<VulkanAccelerationStructure> tlas{ nullptr };
 	std::shared_ptr<VulkanDescriptorSetLayout> descriptor_set_layout{ nullptr };
 	std::shared_ptr<VulkanDescriptorSets> descriptor_sets{ nullptr };
 	std::shared_ptr<VulkanPipelineLayout> pipeline_layout{ nullptr };
 	std::shared_ptr<VulkanBufferObject> shader_binding_table{ nullptr };
-	std::shared_ptr<VulkanBufferObject> instance_buffer{ nullptr };
+	std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
+	std::shared_ptr<VulkanRayTracingPipeline> rtx_pipeline;
 	std::unique_ptr<VulkanCommandBuffers> command;
 	VkQueue queue{ nullptr };
 
@@ -1430,7 +1513,7 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_UNDEFINED,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					context->state->texture->subresource_range())
+					context->state->texture->subresourceRange())
 			});
 
 		vk.CmdCopyBufferToImage(
@@ -1451,7 +1534,7 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					this->imageLayout,
-					context->state->texture->subresource_range())
+					context->state->texture->subresourceRange())
 			});
 
 		context->state->image = this->image->image->image;
@@ -1472,43 +1555,6 @@ private:
 	VkSharingMode sharing_mode;
 	VkImageCreateFlags create_flags;
 	VkImageLayout imageLayout;
-};
-
-
-class ImageView : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	virtual ~ImageView() = default;
-	ImageView(
-		VkComponentSwizzle r,
-		VkComponentSwizzle g,
-		VkComponentSwizzle b,
-		VkComponentSwizzle a) :
-		component_mapping({ r, g, b, a })
-	{
-		REGISTER_VISITOR(allocvisitor, ImageView, alloc);
-		REGISTER_VISITOR(pipelinevisitor, ImageView, pipeline);
-	}
-
-	void alloc(Visitor* context)
-	{
-		this->view = std::make_unique<VulkanImageView>(
-			context->state->device,
-			context->state->image,
-			context->state->texture->format(),
-			context->state->texture->image_view_type(),
-			this->component_mapping,
-			context->state->texture->subresource_range());
-	}
-
-	void pipeline(Visitor* context)
-	{
-		context->state->imageView = this->view->view;
-	}
-
-private:
-	std::unique_ptr<VulkanImageView> view;
-	VkComponentMapping component_mapping;
 };
 
 
@@ -1874,89 +1920,39 @@ private:
 };
 
 
-
-
-
-class FramebufferAttachment : public Node {
+class FramebufferAttachment : public Group {
 public:
 	IMPLEMENT_VISITABLE;
 	virtual ~FramebufferAttachment() = default;
 
-	FramebufferAttachment(
-		VkFormat format,
-		VkImageUsageFlags usage,
-		VkImageAspectFlags aspectMask) :
-		format(format),
-		usage(usage)
+	explicit FramebufferAttachment(std::vector<std::shared_ptr<Node>> children) :
+		Group(std::move(children))
 	{
-		this->subresource_range = {
-			aspectMask, 0, 1, 0, 1
-		};
-
 		REGISTER_VISITOR(allocvisitor, FramebufferAttachment, alloc);
 		REGISTER_VISITOR(resizevisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR(recordvisitor, FramebufferAttachment, record);
+		REGISTER_VISITOR(pipelinevisitor, FramebufferAttachment, visitChildren);
+		REGISTER_VISITOR(recordvisitor, FramebufferAttachment, visitChildren);
+	}
+
+	void visitChildren(Visitor* context)
+	{
+		Group::visit(context);
 	}
 
 	void alloc(Visitor* context)
 	{
-		VkExtent3D extent = {
-			.width = context->state->extent.width,
-			.height = context->state->extent.height,
-			.depth = 1
-		};
-
-		this->image = std::make_shared<VulkanImageObject>(
-			context->state->device,
-			VK_IMAGE_TYPE_2D,
-			this->format,
-			extent,
-			this->subresource_range.levelCount,
-			this->subresource_range.layerCount,
-			VK_SAMPLE_COUNT_1_BIT,
-			VK_IMAGE_TILING_OPTIMAL,
-			this->usage,
-			VK_SHARING_MODE_EXCLUSIVE,
-			0,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		this->imageview = std::make_shared<VulkanImageView>(
-			context->state->device,
-			this->image->image->image,
-			this->format,
-			VK_IMAGE_VIEW_TYPE_2D,
-			this->component_mapping,
-			this->subresource_range);
-
-		context->state->framebuffer_attachments.push_back(this->imageview->view);
-
-		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-			context->state->swapchain_format = this->format;
-		}
-	}
-
-	void record(Visitor* context)
-	{
-		if (this->usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
-			context->state->swapchain_source = this->image->image->image;
-		}
+		Group::visit(context);
+		context->state->framebuffer_attachments.push_back(context->state->imageView);
 	}
 
 public:
-	VkFormat format;
-	VkImageUsageFlags usage;
-	VkImageSubresourceRange subresource_range;
-
-	VkComponentMapping component_mapping{
-		.r = VK_COMPONENT_SWIZZLE_R,
-		.g = VK_COMPONENT_SWIZZLE_G,
-		.b = VK_COMPONENT_SWIZZLE_B,
-		.a = VK_COMPONENT_SWIZZLE_A,
-	};
+	VkFormat format{ VK_FORMAT_UNDEFINED };
+	VkImageUsageFlags usage{ 0 };
 
 public:
-	std::shared_ptr<VulkanImageObject> image;
-	std::shared_ptr<VulkanImageView> imageview;
+	std::shared_ptr<Image> image;
+	std::shared_ptr<ImageView> imageView;
+	std::shared_ptr<ImageLayout> imageLayout;
 };
 
 class Framebuffer : public Group {
@@ -2333,7 +2329,7 @@ public:
 	void resize(Visitor* context)
 	{
 		VkSurfaceFormatKHR surface_format =
-			this->surface->getSupportedSurfaceFormat(context->state->device, context->state->swapchain_format);
+			this->surface->getSupportedSurfaceFormat(context->state->device, context->state->renderTarget.format);
 
 		VkSwapchainKHR prevswapchain = (this->swapchain) ? this->swapchain->swapchain : 0;
 
@@ -2417,7 +2413,7 @@ public:
 
 			VulkanCommandBuffers::Scope command_scope(this->swap_buffers_command.get(), i);
 
-			VkImage srcImage = context->state->swapchain_source;
+			VkImage srcImage = context->state->renderTarget.image;
 			VkImage dstImage = this->swapchain_images[i];
 
 			this->swap_buffers_command->pipelineBarrier(
@@ -2428,7 +2424,7 @@ public:
 					srcImage,
 					VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,			// srcAccessMask
 					0,												// dstAccessMask 
-					VK_IMAGE_LAYOUT_GENERAL,		// oldLayout
+					context->state->renderTarget.layout,			// oldLayout
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,			// newLayout
 					this->subresource_range),
 				  VulkanImage::MemoryBarrier(
@@ -2452,9 +2448,9 @@ public:
 				  VulkanImage::MemoryBarrier(
 					srcImage,
 					0,												// srcAccessMask
-					0,												// dstAccessMask 
+					0,												// dstAccessMask
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-					VK_IMAGE_LAYOUT_GENERAL,
+					context->state->renderTarget.layout,
 					this->subresource_range),
 				  VulkanImage::MemoryBarrier(
 					dstImage,
@@ -2530,8 +2526,7 @@ public:
 	IMPLEMENT_VISITABLE;
 	virtual ~OffscreenImage() = default;
 
-	OffscreenImage(std::shared_ptr<FramebufferAttachment> color_attachment) :
-		color_attachment(std::move(color_attachment))
+	OffscreenImage()
 	{
 		REGISTER_VISITOR(allocvisitor, OffscreenImage, alloc);
 		REGISTER_VISITOR(resizevisitor, OffscreenImage, alloc);
@@ -2557,7 +2552,7 @@ public:
 		this->image = std::make_shared<VulkanImageObject>(
 			context->state->device,
 			VK_IMAGE_TYPE_2D,
-			this->color_attachment->format,
+			context->state->renderTarget.format,
 			extent,
 			this->subresource_range.levelCount,
 			this->subresource_range.layerCount,
@@ -2616,13 +2611,16 @@ public:
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,				// don't wait for anything, the color attachment was rendered to in preceding render pass
 			VK_PIPELINE_STAGE_TRANSFER_BIT,					// block transfer stage (copy)
 			{
-				this->color_attachment->image->image->memoryBarrier(
+				VulkanImage::MemoryBarrier(
+					context->state->renderTarget.image,
 					0,
 					0,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					this->subresource_range),
-				this->image->image->memoryBarrier(
+
+				VulkanImage::MemoryBarrier(
+					this->image->image->image,
 					0,
 					0,
 					VK_IMAGE_LAYOUT_GENERAL,
@@ -2631,7 +2629,7 @@ public:
 
 		vk.CmdCopyImage(
 			this->get_image_command->buffer(),
-			this->color_attachment->image->image->image,
+			context->state->renderTarget.image,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 			this->image->image->image,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -2641,13 +2639,16 @@ public:
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 			{
-				this->color_attachment->image->image->memoryBarrier(
+				VulkanImage::MemoryBarrier(
+					context->state->renderTarget.image,
 					0,
 					0,
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					this->subresource_range),
-				this->image->image->memoryBarrier(
+
+				VulkanImage::MemoryBarrier(
+					this->image->image->image,
 					0,
 					0,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -2665,7 +2666,7 @@ public:
 
 		this->fence->wait();
 
-		const uint8_t* data = reinterpret_cast<uint8_t*>(this->image->memory->map(VK_WHOLE_SIZE, 0, 0));
+		auto data = reinterpret_cast<uint8_t*>(this->image->memory->map(VK_WHOLE_SIZE, 0, 0));
 		data += this->dataOffset;
 
 		std::set<uint32_t> tiles;
@@ -2696,7 +2697,6 @@ public:
 	}
 
 private:
-	std::shared_ptr<FramebufferAttachment> color_attachment;
 	std::unique_ptr<VulkanCommandBuffers> get_image_command;
 	VkQueue get_image_queue{ nullptr };
 	const VkImageSubresourceRange subresource_range{
@@ -2741,7 +2741,7 @@ public:
 		};
 
 		const VkImageSubresource subresource{
-			this->texture->subresource_range().aspectMask,
+			this->texture->subresourceRange().aspectMask,
 			mipLevel,
 			0
 		};
@@ -2770,10 +2770,10 @@ public:
 			static_cast<VkDeviceSize>(brickExtent.depth);
 
 		const VkImageSubresourceLayers imageSubresource{
-			.aspectMask = this->texture->subresource_range().aspectMask,
+			.aspectMask = this->texture->subresourceRange().aspectMask,
 			.mipLevel = mipLevel,
-			.baseArrayLayer = this->texture->subresource_range().baseArrayLayer,
-			.layerCount = this->texture->subresource_range().layerCount,
+			.baseArrayLayer = this->texture->subresourceRange().baseArrayLayer,
+			.layerCount = this->texture->subresourceRange().layerCount,
 		};
 
 		if (false) {
@@ -2816,6 +2816,7 @@ public:
 	VkBufferImageCopy buffer_image_copy;
 };
 
+
 class MemoryPageManager {
 public:
 	MemoryPageManager(Visitor* context, std::shared_ptr<VulkanImage> image) :
@@ -2833,7 +2834,7 @@ public:
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
-			this->image->getSparseMemoryRequirements(context->state->texture->subresource_range().aspectMask);
+			this->image->getSparseMemoryRequirements(context->state->texture->subresourceRange().aspectMask);
 
 		uint32_t numTiles = 5000;
 		VkDeviceSize pageSize = memory_requirements.alignment;
@@ -2942,7 +2943,7 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					context->state->texture->subresource_range())
+					context->state->texture->subresourceRange())
 				});
 
 			vk.CmdCopyBufferToImage(
@@ -2963,7 +2964,7 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					context->state->texture->subresource_range())
+					context->state->texture->subresourceRange())
 				});
 
 			this->copy_sparse_command->end();
@@ -2993,7 +2994,6 @@ public:
 	std::unique_ptr<VulkanCommandBuffers> copy_sparse_command;
 	VkQueue copy_sparse_queue{ nullptr };
 };
-
 
 
 class SparseImage : public Node {
@@ -3052,9 +3052,10 @@ public:
 				0,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				context->state->texture->subresource_range()) });
+				context->state->texture->subresourceRange()) });
 
 		this->memory_manager = std::make_unique<MemoryPageManager>(context, this->image);
+
 		context->state->image = this->image->image;
 	}
 
