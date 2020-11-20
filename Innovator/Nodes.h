@@ -1055,6 +1055,7 @@ public:
 	CurrentImageRenderTarget()
 	{
 		REGISTER_VISITOR(allocvisitor, CurrentImageRenderTarget, updateState);
+		REGISTER_VISITOR(resizevisitor, CurrentImageRenderTarget, updateState);
 		REGISTER_VISITOR(recordvisitor, CurrentImageRenderTarget, updateState);
 	}
 
@@ -2374,7 +2375,7 @@ public:
 						0,
 						VK_IMAGE_LAYOUT_UNDEFINED,
 						VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-						this->subresource_range) });
+						context->state->renderTarget.subresourceRange) });
 		}
 	}
 
@@ -2387,10 +2388,10 @@ public:
 
 		for (size_t i = 0; i < this->swapchain_images.size(); i++) {
 			const VkImageSubresourceLayers subresource_layers{
-				.aspectMask = this->subresource_range.aspectMask,
-				.mipLevel = this->subresource_range.baseMipLevel,
-				.baseArrayLayer = this->subresource_range.baseArrayLayer,
-				.layerCount = this->subresource_range.layerCount,
+				.aspectMask = context->state->renderTarget.subresourceRange.aspectMask,
+				.mipLevel = context->state->renderTarget.subresourceRange.baseMipLevel,
+				.baseArrayLayer = context->state->renderTarget.subresourceRange.baseArrayLayer,
+				.layerCount = context->state->renderTarget.subresourceRange.layerCount,
 			};
 
 			VkOffset3D offset = {
@@ -2426,14 +2427,14 @@ public:
 					0,												// dstAccessMask 
 					context->state->renderTarget.layout,			// oldLayout
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,			// newLayout
-					this->subresource_range),
+					context->state->renderTarget.subresourceRange),
 				  VulkanImage::MemoryBarrier(
 					dstImage,
 					VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 					0,
 					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					this->subresource_range)
+					context->state->renderTarget.subresourceRange)
 				}, i);
 
 			vk.CmdCopyImage(this->swap_buffers_command->buffer(i),
@@ -2451,14 +2452,14 @@ public:
 					0,												// dstAccessMask
 					VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 					context->state->renderTarget.layout,
-					this->subresource_range),
+					context->state->renderTarget.subresourceRange),
 				  VulkanImage::MemoryBarrier(
 					dstImage,
 					0,												// srcAccessMask
 					0,												// dstAccessMask 
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-					this->subresource_range)
+					context->state->renderTarget.subresourceRange)
 				}, i);
 		}
 	}
@@ -2508,14 +2509,6 @@ private:
 	std::unique_ptr<VulkanCommandBuffers> swap_buffers_command;
 	std::unique_ptr<VulkanSemaphore> swapchain_image_ready;
 	std::unique_ptr<VulkanSemaphore> swap_buffers_finished;
-
-	const VkImageSubresourceRange subresource_range{
-	  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-	  .baseMipLevel = 0,
-	  .levelCount = 1,
-	  .baseArrayLayer = 0,
-	  .layerCount = 1,
-	};
 
 	uint32_t image_index{ 0 };
 };
