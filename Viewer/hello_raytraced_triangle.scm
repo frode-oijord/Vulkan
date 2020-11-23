@@ -111,50 +111,19 @@
          VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
          VK_SHADER_STAGE_RAYGEN_BIT)
 
-      (image
-         VK_IMAGE_TYPE_2D
-         VK_FORMAT_B8G8R8A8_UNORM
-         (extent3 1920 1080 1)
-         (uint32 1)
-         (uint32 1)
-         VK_SAMPLE_COUNT_1_BIT
-         VK_IMAGE_TILING_OPTIMAL
-         (imageusageflags VK_IMAGE_USAGE_TRANSFER_SRC_BIT VK_IMAGE_USAGE_STORAGE_BIT)
-         VK_SHARING_MODE_EXCLUSIVE
-         (imagecreateflags)
-         (memorypropertyflags VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-
-      (imageview 
-         VK_IMAGE_VIEW_TYPE_2D
-         VK_FORMAT_B8G8R8A8_UNORM
-         (component-mapping
-            VK_COMPONENT_SWIZZLE_R
-            VK_COMPONENT_SWIZZLE_G
-            VK_COMPONENT_SWIZZLE_B
-            VK_COMPONENT_SWIZZLE_A)
-         (subresource-range
-            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)
-            (uint32 0)
-            (uint32 1)
-            (uint32 0)
-            (uint32 1)))
-
-      (imagelayout
-         VK_IMAGE_LAYOUT_UNDEFINED
-         VK_IMAGE_LAYOUT_GENERAL
-         (subresource-range
-            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)
-            (uint32 0)
-            (uint32 1)
-            (uint32 0)
-            (uint32 1)))
-
+      (rtxbuffer
+         (framebuffer-attachment
+            VK_FORMAT_B8G8R8A8_UNORM
+            VK_IMAGE_LAYOUT_GENERAL
+            (imageusageflags 
+               VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+               VK_IMAGE_USAGE_STORAGE_BIT)
+            (imageaspectflags VK_IMAGE_ASPECT_COLOR_BIT)))
+ 
       (descriptorsetlayoutbinding
          (uint32 1)
          VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
          VK_SHADER_STAGE_RAYGEN_BIT)
-
-      (currentimagerendertarget)
 
       (top-level-acceleration-structure)
 

@@ -37,7 +37,7 @@ public:
 		};
 	}
 
-	std::vector<VkBufferImageCopy> get_regions()
+	std::vector<VkBufferImageCopy> getRegions()
 	{
 		std::vector<VkBufferImageCopy> regions(this->levels());
 

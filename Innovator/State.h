@@ -5,6 +5,15 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+typedef struct DescriptorSetInfo {
+	uint32_t binding;
+	VkDescriptorType descriptorType;
+	VkShaderStageFlags stageFlags;
+	VkDescriptorImageInfo descriptor_image_info{};
+	VkDescriptorBufferInfo descriptor_buffer_info{};
+	VkWriteDescriptorSetAccelerationStructureKHR descriptor_set_acceleration_structure{};
+} DescriptorSetInfo;
+
 struct RenderTarget {
 	VkImage image{ 0 };
 	VkFormat format{ VK_FORMAT_UNDEFINED };
@@ -31,7 +40,7 @@ struct State {
 	std::shared_ptr<VulkanRenderpass> renderpass{ 0 };
 	std::shared_ptr<VulkanFramebuffer> framebuffer{ 0 };
 
-	VkExtent2D extent{ 0, 0 };
+	VkExtent3D extent{ 0, 0, 0 };
 
 	VkPipelineRasterizationStateCreateInfo rasterization_state{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
@@ -59,12 +68,11 @@ struct State {
 	VkSampler sampler{ 0 };
 	VulkanCommandBuffers* command{ 0 };
 
+	std::vector<DescriptorSetInfo> descriptor_set_infos;
+
 	std::vector<VkAccelerationStructureKHR> top_level_acceleration_structures;
 	std::vector<VkAccelerationStructureKHR> bottom_level_acceleration_structures;
 	std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
-	std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
-	std::vector<VkWriteDescriptorSet> write_descriptor_sets;
-	std::vector<VkDescriptorSetLayoutBinding> descriptor_set_layout_bindings;
 	std::vector<VkPushConstantRange> push_constant_ranges;
 	std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
 	std::vector<VkVertexInputAttributeDescription> vertex_attributes;
@@ -76,7 +84,6 @@ struct State {
 	std::vector<uint32_t> preserve_attachments;
 	VkPipelineBindPoint bind_point;
 
-	std::vector<VkImageView> framebuffer_attachments;
 	std::vector<VkSubpassDescription> subpass_descriptions;
 	std::vector<VkAttachmentDescription> attachment_descriptions;
 

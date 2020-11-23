@@ -30,400 +30,213 @@
 
 class VulkanAPI {
 public:
-	// VK_core
-	PFN_vkCreateInstance CreateInstance;
-	PFN_vkDestroyInstance DestroyInstance;
-	PFN_vkEnumeratePhysicalDevices EnumeratePhysicalDevices;
-	PFN_vkGetPhysicalDeviceFeatures GetPhysicalDeviceFeatures;
-	PFN_vkGetPhysicalDeviceFormatProperties GetPhysicalDeviceFormatProperties;
-	PFN_vkGetPhysicalDeviceImageFormatProperties GetPhysicalDeviceImageFormatProperties;
-	PFN_vkGetPhysicalDeviceProperties GetPhysicalDeviceProperties;
-	PFN_vkGetPhysicalDeviceQueueFamilyProperties GetPhysicalDeviceQueueFamilyProperties;
-	PFN_vkGetPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties;
-	PFN_vkGetInstanceProcAddr GetInstanceProcAddr;
-	PFN_vkGetDeviceProcAddr GetDeviceProcAddr;
-	PFN_vkCreateDevice CreateDevice;
-	PFN_vkDestroyDevice DestroyDevice;
-	PFN_vkEnumerateInstanceExtensionProperties EnumerateInstanceExtensionProperties;
-	PFN_vkEnumerateDeviceExtensionProperties EnumerateDeviceExtensionProperties;
-	PFN_vkEnumerateInstanceLayerProperties EnumerateInstanceLayerProperties;
-	PFN_vkEnumerateDeviceLayerProperties EnumerateDeviceLayerProperties;
-	PFN_vkGetDeviceQueue GetDeviceQueue;
-	PFN_vkQueueSubmit QueueSubmit;
-	PFN_vkQueueWaitIdle QueueWaitIdle;
-	PFN_vkDeviceWaitIdle DeviceWaitIdle;
-	PFN_vkAllocateMemory AllocateMemory;
-	PFN_vkFreeMemory FreeMemory;
-	PFN_vkMapMemory MapMemory;
-	PFN_vkUnmapMemory UnmapMemory;
-	PFN_vkFlushMappedMemoryRanges FlushMappedMemoryRanges;
-	PFN_vkInvalidateMappedMemoryRanges InvalidateMappedMemoryRanges;
-	PFN_vkGetDeviceMemoryCommitment GetDeviceMemoryCommitment;
-	PFN_vkBindBufferMemory BindBufferMemory;
-	PFN_vkBindImageMemory BindImageMemory;
-	PFN_vkGetBufferMemoryRequirements GetBufferMemoryRequirements;
-	PFN_vkGetImageMemoryRequirements GetImageMemoryRequirements;
-	PFN_vkGetImageSparseMemoryRequirements GetImageSparseMemoryRequirements;
-	PFN_vkGetPhysicalDeviceSparseImageFormatProperties GetPhysicalDeviceSparseImageFormatProperties;
-	PFN_vkQueueBindSparse QueueBindSparse;
-	PFN_vkCreateFence CreateFence;
-	PFN_vkDestroyFence DestroyFence;
-	PFN_vkResetFences ResetFences;
-	PFN_vkGetFenceStatus GetFenceStatus;
-	PFN_vkWaitForFences WaitForFences;
-	PFN_vkCreateSemaphore CreateSemaphore;
-	PFN_vkDestroySemaphore DestroySemaphore;
-	PFN_vkCreateEvent CreateEvent;
-	PFN_vkDestroyEvent DestroyEvent;
-	PFN_vkGetEventStatus GetEventStatus;
-	PFN_vkSetEvent SetEvent;
-	PFN_vkResetEvent ResetEvent;
-	PFN_vkCreateQueryPool CreateQueryPool;
-	PFN_vkDestroyQueryPool DestroyQueryPool;
-	PFN_vkGetQueryPoolResults GetQueryPoolResults;
-	PFN_vkCreateBuffer CreateBuffer;
-	PFN_vkDestroyBuffer DestroyBuffer;
-	PFN_vkCreateBufferView CreateBufferView;
-	PFN_vkDestroyBufferView DestroyBufferView;
-	PFN_vkCreateImage CreateImage;
-	PFN_vkDestroyImage DestroyImage;
-	PFN_vkGetImageSubresourceLayout GetImageSubresourceLayout;
-	PFN_vkCreateImageView CreateImageView;
-	PFN_vkDestroyImageView DestroyImageView;
-	PFN_vkCreateShaderModule CreateShaderModule;
-	PFN_vkDestroyShaderModule DestroyShaderModule;
-	PFN_vkCreatePipelineCache CreatePipelineCache;
-	PFN_vkDestroyPipelineCache DestroyPipelineCache;
-	PFN_vkGetPipelineCacheData GetPipelineCacheData;
-	PFN_vkMergePipelineCaches MergePipelineCaches;
-	PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines;
-	PFN_vkCreateComputePipelines CreateComputePipelines;
-	PFN_vkDestroyPipeline DestroyPipeline;
-	PFN_vkCreatePipelineLayout CreatePipelineLayout;
-	PFN_vkDestroyPipelineLayout DestroyPipelineLayout;
-	PFN_vkCreateSampler CreateSampler;
-	PFN_vkDestroySampler DestroySampler;
-	PFN_vkCreateDescriptorSetLayout CreateDescriptorSetLayout;
-	PFN_vkDestroyDescriptorSetLayout DestroyDescriptorSetLayout;
-	PFN_vkCreateDescriptorPool CreateDescriptorPool;
-	PFN_vkDestroyDescriptorPool DestroyDescriptorPool;
-	PFN_vkResetDescriptorPool ResetDescriptorPool;
-	PFN_vkAllocateDescriptorSets AllocateDescriptorSets;
-	PFN_vkFreeDescriptorSets FreeDescriptorSets;
-	PFN_vkUpdateDescriptorSets UpdateDescriptorSets;
-	PFN_vkCreateFramebuffer CreateFramebuffer;
-	PFN_vkDestroyFramebuffer DestroyFramebuffer;
-	PFN_vkCreateRenderPass CreateRenderPass;
-	PFN_vkDestroyRenderPass DestroyRenderPass;
-	PFN_vkGetRenderAreaGranularity GetRenderAreaGranularity;
-	PFN_vkCreateCommandPool CreateCommandPool;
-	PFN_vkDestroyCommandPool DestroyCommandPool;
-	PFN_vkResetCommandPool ResetCommandPool;
-	PFN_vkAllocateCommandBuffers AllocateCommandBuffers;
-	PFN_vkFreeCommandBuffers FreeCommandBuffers;
-	PFN_vkBeginCommandBuffer BeginCommandBuffer;
-	PFN_vkEndCommandBuffer EndCommandBuffer;
-	PFN_vkResetCommandBuffer ResetCommandBuffer;
-	PFN_vkCmdBindPipeline CmdBindPipeline;
-	PFN_vkCmdSetViewport CmdSetViewport;
-	PFN_vkCmdSetScissor CmdSetScissor;
-	PFN_vkCmdSetLineWidth CmdSetLineWidth;
-	PFN_vkCmdSetDepthBias CmdSetDepthBias;
-	PFN_vkCmdSetBlendConstants CmdSetBlendConstants;
-	PFN_vkCmdSetDepthBounds CmdSetDepthBounds;
-	PFN_vkCmdSetStencilCompareMask CmdSetStencilCompareMask;
-	PFN_vkCmdSetStencilWriteMask CmdSetStencilWriteMask;
-	PFN_vkCmdSetStencilReference CmdSetStencilReference;
-	PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets;
-	PFN_vkCmdBindIndexBuffer CmdBindIndexBuffer;
-	PFN_vkCmdBindVertexBuffers CmdBindVertexBuffers;
-	PFN_vkCmdDraw CmdDraw;
-	PFN_vkCmdDrawIndexed CmdDrawIndexed;
-	PFN_vkCmdDrawIndirect CmdDrawIndirect;
-	PFN_vkCmdDrawIndexedIndirect CmdDrawIndexedIndirect;
-	PFN_vkCmdDispatch CmdDispatch;
-	PFN_vkCmdDispatchIndirect CmdDispatchIndirect;
-	PFN_vkCmdCopyBuffer CmdCopyBuffer;
-	PFN_vkCmdCopyImage CmdCopyImage;
-	PFN_vkCmdBlitImage CmdBlitImage;
-	PFN_vkCmdCopyBufferToImage CmdCopyBufferToImage;
-	PFN_vkCmdCopyImageToBuffer CmdCopyImageToBuffer;
-	PFN_vkCmdUpdateBuffer CmdUpdateBuffer;
-	PFN_vkCmdFillBuffer CmdFillBuffer;
-	PFN_vkCmdClearColorImage CmdClearColorImage;
-	PFN_vkCmdClearDepthStencilImage CmdClearDepthStencilImage;
-	PFN_vkCmdClearAttachments CmdClearAttachments;
-	PFN_vkCmdResolveImage CmdResolveImage;
-	PFN_vkCmdSetEvent CmdSetEvent;
-	PFN_vkCmdResetEvent CmdResetEvent;
-	PFN_vkCmdWaitEvents CmdWaitEvents;
-	PFN_vkCmdPipelineBarrier CmdPipelineBarrier;
-	PFN_vkCmdBeginQuery CmdBeginQuery;
-	PFN_vkCmdEndQuery CmdEndQuery;
-	PFN_vkCmdResetQueryPool CmdResetQueryPool;
-	PFN_vkCmdWriteTimestamp CmdWriteTimestamp;
-	PFN_vkCmdCopyQueryPoolResults CmdCopyQueryPoolResults;
-	PFN_vkCmdPushConstants CmdPushConstants;
-	PFN_vkCmdBeginRenderPass CmdBeginRenderPass;
-	PFN_vkCmdNextSubpass CmdNextSubpass;
-	PFN_vkCmdEndRenderPass CmdEndRenderPass;
-	PFN_vkCmdExecuteCommands CmdExecuteCommands;
-
-	// VK_KHR_surface
-	PFN_vkDestroySurfaceKHR DestroySurfaceKHR;
-	PFN_vkGetPhysicalDeviceSurfaceSupportKHR GetPhysicalDeviceSurfaceSupportKHR;
-	PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR GetPhysicalDeviceSurfaceCapabilitiesKHR;
-	PFN_vkGetPhysicalDeviceSurfaceFormatsKHR GetPhysicalDeviceSurfaceFormatsKHR;
-	PFN_vkGetPhysicalDeviceSurfacePresentModesKHR GetPhysicalDeviceSurfacePresentModesKHR;
-
-	// VK_KHR_swapchain
-	PFN_vkCreateSwapchainKHR CreateSwapchainKHR;
-	PFN_vkDestroySwapchainKHR DestroySwapchainKHR;
-	PFN_vkGetSwapchainImagesKHR GetSwapchainImagesKHR;
-	PFN_vkAcquireNextImageKHR AcquireNextImageKHR;
-	PFN_vkQueuePresentKHR QueuePresentKHR;
-
-	// VK_KHR_display
-	PFN_vkGetPhysicalDeviceDisplayPropertiesKHR GetPhysicalDeviceDisplayPropertiesKHR;
-	PFN_vkGetPhysicalDeviceDisplayPlanePropertiesKHR GetPhysicalDeviceDisplayPlanePropertiesKHR;
-	PFN_vkGetDisplayPlaneSupportedDisplaysKHR GetDisplayPlaneSupportedDisplaysKHR;
-	PFN_vkGetDisplayModePropertiesKHR GetDisplayModePropertiesKHR;
-	PFN_vkCreateDisplayModeKHR CreateDisplayModeKHR;
-	PFN_vkGetDisplayPlaneCapabilitiesKHR GetDisplayPlaneCapabilitiesKHR;
-	PFN_vkCreateDisplayPlaneSurfaceKHR CreateDisplayPlaneSurfaceKHR;
-
-	// VK_KHR_display_swapchain
-	PFN_vkCreateSharedSwapchainsKHR CreateSharedSwapchainsKHR;
-
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-	// VK_KHR_xlib_surface
-	PFN_vkCreateXlibSurfaceKHR CreateXlibSurfaceKHR;
-	PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR GetPhysicalDeviceXlibPresentationSupportKHR;
-#endif
-
-#ifdef VK_USE_PLATFORM_XCB_KHR
-	// VK_KHR_xcb_surface
-	PFN_vkCreateXcbSurfaceKHR CreateXcbSurfaceKHR;
-	PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR GetPhysicalDeviceXcbPresentationSupportKHR;
-#endif
-
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-	// VK_KHR_wayland_surface
-	PFN_vkCreateWaylandSurfaceKHR CreateWaylandSurfaceKHR;
-	PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR GetPhysicalDeviceWaylandPresentationSupportKHR;
-#endif
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
-	// VK_KHR_android_surface
-	PFN_vkCreateAndroidSurfaceKHR CreateAndroidSurfaceKHR;
+	void* libvulkan = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
 #endif
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
-	// VK_KHR_win32_surface
-	PFN_vkCreateWin32SurfaceKHR CreateWin32SurfaceKHR;
-	PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR GetPhysicalDeviceWin32PresentationSupportKHR;
-#endif
-
-	PFN_vkGetPhysicalDeviceFeatures2 GetPhysicalDeviceFeatures2;
-	PFN_vkGetPhysicalDeviceProperties2 GetPhysicalDeviceProperties2;
-
-	VulkanAPI()
-	{
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-		void* libvulkan = dlopen("libvulkan.so", RTLD_NOW | RTLD_LOCAL);
-#endif
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-		HINSTANCE libvulkan = LoadLibrary("vulkan-1.dll");
+	HINSTANCE libvulkan = LoadLibrary("vulkan-1.dll");
 #define dlsym GetProcAddress
 #endif
 
-		if (!libvulkan) {
-			throw std::runtime_error("unable to load Vulkan");
-		}
+	// VK_core
+	PFN_vkCreateInstance CreateInstance = reinterpret_cast<PFN_vkCreateInstance>(dlsym(libvulkan, "vkCreateInstance"));
+	PFN_vkDestroyInstance DestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(dlsym(libvulkan, "vkDestroyInstance"));
+	PFN_vkEnumeratePhysicalDevices EnumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(dlsym(libvulkan, "vkEnumeratePhysicalDevices"));
+	PFN_vkGetPhysicalDeviceFeatures GetPhysicalDeviceFeatures = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures>(dlsym(libvulkan, "vkGetPhysicalDeviceFeatures"));
+	PFN_vkGetPhysicalDeviceFormatProperties GetPhysicalDeviceFormatProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceFormatProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceFormatProperties"));
+	PFN_vkGetPhysicalDeviceImageFormatProperties GetPhysicalDeviceImageFormatProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceImageFormatProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceImageFormatProperties"));
+	PFN_vkGetPhysicalDeviceProperties GetPhysicalDeviceProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceProperties"));
+	PFN_vkGetPhysicalDeviceQueueFamilyProperties GetPhysicalDeviceQueueFamilyProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceQueueFamilyProperties"));
+	PFN_vkGetPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceMemoryProperties"));
+	PFN_vkGetInstanceProcAddr GetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(libvulkan, "vkGetInstanceProcAddr"));
+	PFN_vkGetDeviceProcAddr GetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(dlsym(libvulkan, "vkGetDeviceProcAddr"));
+	PFN_vkCreateDevice CreateDevice = reinterpret_cast<PFN_vkCreateDevice>(dlsym(libvulkan, "vkCreateDevice"));
+	PFN_vkDestroyDevice DestroyDevice = reinterpret_cast<PFN_vkDestroyDevice>(dlsym(libvulkan, "vkDestroyDevice"));
+	PFN_vkEnumerateInstanceExtensionProperties EnumerateInstanceExtensionProperties = reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(dlsym(libvulkan, "vkEnumerateInstanceExtensionProperties"));
+	PFN_vkEnumerateDeviceExtensionProperties EnumerateDeviceExtensionProperties = reinterpret_cast<PFN_vkEnumerateDeviceExtensionProperties>(dlsym(libvulkan, "vkEnumerateDeviceExtensionProperties"));
+	PFN_vkEnumerateInstanceLayerProperties EnumerateInstanceLayerProperties = reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(dlsym(libvulkan, "vkEnumerateInstanceLayerProperties"));
+	PFN_vkEnumerateDeviceLayerProperties EnumerateDeviceLayerProperties = reinterpret_cast<PFN_vkEnumerateDeviceLayerProperties>(dlsym(libvulkan, "vkEnumerateDeviceLayerProperties"));
+	PFN_vkGetDeviceQueue GetDeviceQueue = reinterpret_cast<PFN_vkGetDeviceQueue>(dlsym(libvulkan, "vkGetDeviceQueue"));
+	PFN_vkQueueSubmit QueueSubmit = reinterpret_cast<PFN_vkQueueSubmit>(dlsym(libvulkan, "vkQueueSubmit"));
+	PFN_vkQueueWaitIdle QueueWaitIdle = reinterpret_cast<PFN_vkQueueWaitIdle>(dlsym(libvulkan, "vkQueueWaitIdle"));
+	PFN_vkDeviceWaitIdle DeviceWaitIdle = reinterpret_cast<PFN_vkDeviceWaitIdle>(dlsym(libvulkan, "vkDeviceWaitIdle"));
+	PFN_vkAllocateMemory AllocateMemory = reinterpret_cast<PFN_vkAllocateMemory>(dlsym(libvulkan, "vkAllocateMemory"));
+	PFN_vkFreeMemory FreeMemory = reinterpret_cast<PFN_vkFreeMemory>(dlsym(libvulkan, "vkFreeMemory"));
+	PFN_vkMapMemory MapMemory = reinterpret_cast<PFN_vkMapMemory>(dlsym(libvulkan, "vkMapMemory"));
+	PFN_vkUnmapMemory UnmapMemory = reinterpret_cast<PFN_vkUnmapMemory>(dlsym(libvulkan, "vkUnmapMemory"));
+	PFN_vkFlushMappedMemoryRanges FlushMappedMemoryRanges = reinterpret_cast<PFN_vkFlushMappedMemoryRanges>(dlsym(libvulkan, "vkFlushMappedMemoryRanges"));
+	PFN_vkInvalidateMappedMemoryRanges InvalidateMappedMemoryRanges = reinterpret_cast<PFN_vkInvalidateMappedMemoryRanges>(dlsym(libvulkan, "vkInvalidateMappedMemoryRanges"));
+	PFN_vkGetDeviceMemoryCommitment GetDeviceMemoryCommitment = reinterpret_cast<PFN_vkGetDeviceMemoryCommitment>(dlsym(libvulkan, "vkGetDeviceMemoryCommitment"));
+	PFN_vkBindBufferMemory BindBufferMemory = reinterpret_cast<PFN_vkBindBufferMemory>(dlsym(libvulkan, "vkBindBufferMemory"));
+	PFN_vkBindImageMemory BindImageMemory = reinterpret_cast<PFN_vkBindImageMemory>(dlsym(libvulkan, "vkBindImageMemory"));
+	PFN_vkGetBufferMemoryRequirements GetBufferMemoryRequirements = reinterpret_cast<PFN_vkGetBufferMemoryRequirements>(dlsym(libvulkan, "vkGetBufferMemoryRequirements"));
+	PFN_vkGetImageMemoryRequirements GetImageMemoryRequirements = reinterpret_cast<PFN_vkGetImageMemoryRequirements>(dlsym(libvulkan, "vkGetImageMemoryRequirements"));
+	PFN_vkGetImageSparseMemoryRequirements GetImageSparseMemoryRequirements = reinterpret_cast<PFN_vkGetImageSparseMemoryRequirements>(dlsym(libvulkan, "vkGetImageSparseMemoryRequirements"));
+	PFN_vkGetPhysicalDeviceSparseImageFormatProperties GetPhysicalDeviceSparseImageFormatProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceSparseImageFormatProperties>(dlsym(libvulkan, "vk.GetPhysicalDeviceSparseImageFormatProperties"));
+	PFN_vkQueueBindSparse QueueBindSparse = reinterpret_cast<PFN_vkQueueBindSparse>(dlsym(libvulkan, "vkQueueBindSparse"));
+	PFN_vkCreateFence CreateFence = reinterpret_cast<PFN_vkCreateFence>(dlsym(libvulkan, "vkCreateFence"));
+	PFN_vkDestroyFence DestroyFence = reinterpret_cast<PFN_vkDestroyFence>(dlsym(libvulkan, "vkDestroyFence"));
+	PFN_vkResetFences ResetFences = reinterpret_cast<PFN_vkResetFences>(dlsym(libvulkan, "vkResetFences"));
+	PFN_vkGetFenceStatus GetFenceStatus = reinterpret_cast<PFN_vkGetFenceStatus>(dlsym(libvulkan, "vkGetFenceStatus"));
+	PFN_vkWaitForFences WaitForFences = reinterpret_cast<PFN_vkWaitForFences>(dlsym(libvulkan, "vkWaitForFences"));
+	PFN_vkCreateSemaphore CreateSemaphore = reinterpret_cast<PFN_vkCreateSemaphore>(dlsym(libvulkan, "vkCreateSemaphore"));
+	PFN_vkDestroySemaphore DestroySemaphore = reinterpret_cast<PFN_vkDestroySemaphore>(dlsym(libvulkan, "vkDestroySemaphore"));
+	PFN_vkCreateEvent CreateEvent = reinterpret_cast<PFN_vkCreateEvent>(dlsym(libvulkan, "vkCreateEvent"));
+	PFN_vkDestroyEvent DestroyEvent = reinterpret_cast<PFN_vkDestroyEvent>(dlsym(libvulkan, "vkDestroyEvent"));
+	PFN_vkGetEventStatus GetEventStatus = reinterpret_cast<PFN_vkGetEventStatus>(dlsym(libvulkan, "vkGetEventStatus"));
+	PFN_vkSetEvent SetEvent = reinterpret_cast<PFN_vkSetEvent>(dlsym(libvulkan, "vkSetEvent"));
+	PFN_vkResetEvent ResetEvent = reinterpret_cast<PFN_vkResetEvent>(dlsym(libvulkan, "vkResetEvent"));
+	PFN_vkCreateQueryPool CreateQueryPool = reinterpret_cast<PFN_vkCreateQueryPool>(dlsym(libvulkan, "vkCreateQueryPool"));
+	PFN_vkDestroyQueryPool DestroyQueryPool = reinterpret_cast<PFN_vkDestroyQueryPool>(dlsym(libvulkan, "vkDestroyQueryPool"));
+	PFN_vkGetQueryPoolResults GetQueryPoolResults = reinterpret_cast<PFN_vkGetQueryPoolResults>(dlsym(libvulkan, "vkGetQueryPoolResults"));
+	PFN_vkCreateBuffer CreateBuffer = reinterpret_cast<PFN_vkCreateBuffer>(dlsym(libvulkan, "vkCreateBuffer"));
+	PFN_vkDestroyBuffer DestroyBuffer = reinterpret_cast<PFN_vkDestroyBuffer>(dlsym(libvulkan, "vkDestroyBuffer"));
+	PFN_vkCreateBufferView CreateBufferView = reinterpret_cast<PFN_vkCreateBufferView>(dlsym(libvulkan, "vkCreateBufferView"));
+	PFN_vkDestroyBufferView DestroyBufferView = reinterpret_cast<PFN_vkDestroyBufferView>(dlsym(libvulkan, "vkDestroyBufferView"));
+	PFN_vkCreateImage CreateImage = reinterpret_cast<PFN_vkCreateImage>(dlsym(libvulkan, "vkCreateImage"));
+	PFN_vkDestroyImage DestroyImage = reinterpret_cast<PFN_vkDestroyImage>(dlsym(libvulkan, "vkDestroyImage"));
+	PFN_vkGetImageSubresourceLayout GetImageSubresourceLayout = reinterpret_cast<PFN_vkGetImageSubresourceLayout>(dlsym(libvulkan, "vkGetImageSubresourceLayout"));
+	PFN_vkCreateImageView CreateImageView = reinterpret_cast<PFN_vkCreateImageView>(dlsym(libvulkan, "vkCreateImageView"));
+	PFN_vkDestroyImageView DestroyImageView = reinterpret_cast<PFN_vkDestroyImageView>(dlsym(libvulkan, "vkDestroyImageView"));
+	PFN_vkCreateShaderModule CreateShaderModule = reinterpret_cast<PFN_vkCreateShaderModule>(dlsym(libvulkan, "vkCreateShaderModule"));
+	PFN_vkDestroyShaderModule DestroyShaderModule = reinterpret_cast<PFN_vkDestroyShaderModule>(dlsym(libvulkan, "vkDestroyShaderModule"));
+	PFN_vkCreatePipelineCache CreatePipelineCache = reinterpret_cast<PFN_vkCreatePipelineCache>(dlsym(libvulkan, "vkCreatePipelineCache"));
+	PFN_vkDestroyPipelineCache DestroyPipelineCache = reinterpret_cast<PFN_vkDestroyPipelineCache>(dlsym(libvulkan, "vkDestroyPipelineCache"));
+	PFN_vkGetPipelineCacheData GetPipelineCacheData = reinterpret_cast<PFN_vkGetPipelineCacheData>(dlsym(libvulkan, "vkGetPipelineCacheData"));
+	PFN_vkMergePipelineCaches MergePipelineCaches = reinterpret_cast<PFN_vkMergePipelineCaches>(dlsym(libvulkan, "vkMergePipelineCaches"));
+	PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines = reinterpret_cast<PFN_vkCreateGraphicsPipelines>(dlsym(libvulkan, "vkCreateGraphicsPipelines"));
+	PFN_vkCreateComputePipelines CreateComputePipelines = reinterpret_cast<PFN_vkCreateComputePipelines>(dlsym(libvulkan, "vkCreateComputePipelines"));
+	PFN_vkDestroyPipeline DestroyPipeline = reinterpret_cast<PFN_vkDestroyPipeline>(dlsym(libvulkan, "vkDestroyPipeline"));
+	PFN_vkCreatePipelineLayout CreatePipelineLayout = reinterpret_cast<PFN_vkCreatePipelineLayout>(dlsym(libvulkan, "vkCreatePipelineLayout"));
+	PFN_vkDestroyPipelineLayout DestroyPipelineLayout = reinterpret_cast<PFN_vkDestroyPipelineLayout>(dlsym(libvulkan, "vkDestroyPipelineLayout"));
+	PFN_vkCreateSampler CreateSampler = reinterpret_cast<PFN_vkCreateSampler>(dlsym(libvulkan, "vkCreateSampler"));
+	PFN_vkDestroySampler DestroySampler = reinterpret_cast<PFN_vkDestroySampler>(dlsym(libvulkan, "vkDestroySampler"));
+	PFN_vkCreateDescriptorSetLayout CreateDescriptorSetLayout = reinterpret_cast<PFN_vkCreateDescriptorSetLayout>(dlsym(libvulkan, "vkCreateDescriptorSetLayout"));
+	PFN_vkDestroyDescriptorSetLayout DestroyDescriptorSetLayout = reinterpret_cast<PFN_vkDestroyDescriptorSetLayout>(dlsym(libvulkan, "vkDestroyDescriptorSetLayout"));
+	PFN_vkCreateDescriptorPool CreateDescriptorPool = reinterpret_cast<PFN_vkCreateDescriptorPool>(dlsym(libvulkan, "vkCreateDescriptorPool"));
+	PFN_vkDestroyDescriptorPool DestroyDescriptorPool = reinterpret_cast<PFN_vkDestroyDescriptorPool>(dlsym(libvulkan, "vkDestroyDescriptorPool"));
+	PFN_vkResetDescriptorPool ResetDescriptorPool = reinterpret_cast<PFN_vkResetDescriptorPool>(dlsym(libvulkan, "vkResetDescriptorPool"));
+	PFN_vkAllocateDescriptorSets AllocateDescriptorSets = reinterpret_cast<PFN_vkAllocateDescriptorSets>(dlsym(libvulkan, "vkAllocateDescriptorSets"));
+	PFN_vkFreeDescriptorSets FreeDescriptorSets = reinterpret_cast<PFN_vkFreeDescriptorSets>(dlsym(libvulkan, "vkFreeDescriptorSets"));
+	PFN_vkUpdateDescriptorSets UpdateDescriptorSets = reinterpret_cast<PFN_vkUpdateDescriptorSets>(dlsym(libvulkan, "vkUpdateDescriptorSets"));
+	PFN_vkCreateFramebuffer CreateFramebuffer = reinterpret_cast<PFN_vkCreateFramebuffer>(dlsym(libvulkan, "vkCreateFramebuffer"));
+	PFN_vkDestroyFramebuffer DestroyFramebuffer = reinterpret_cast<PFN_vkDestroyFramebuffer>(dlsym(libvulkan, "vkDestroyFramebuffer"));
+	PFN_vkCreateRenderPass CreateRenderPass = reinterpret_cast<PFN_vkCreateRenderPass>(dlsym(libvulkan, "vkCreateRenderPass"));
+	PFN_vkDestroyRenderPass DestroyRenderPass = reinterpret_cast<PFN_vkDestroyRenderPass>(dlsym(libvulkan, "vkDestroyRenderPass"));
+	PFN_vkGetRenderAreaGranularity GetRenderAreaGranularity = reinterpret_cast<PFN_vkGetRenderAreaGranularity>(dlsym(libvulkan, "vkGetRenderAreaGranularity"));
+	PFN_vkCreateCommandPool CreateCommandPool = reinterpret_cast<PFN_vkCreateCommandPool>(dlsym(libvulkan, "vkCreateCommandPool"));
+	PFN_vkDestroyCommandPool DestroyCommandPool = reinterpret_cast<PFN_vkDestroyCommandPool>(dlsym(libvulkan, "vkDestroyCommandPool"));
+	PFN_vkResetCommandPool ResetCommandPool = reinterpret_cast<PFN_vkResetCommandPool>(dlsym(libvulkan, "vkResetCommandPool"));
+	PFN_vkAllocateCommandBuffers AllocateCommandBuffers = reinterpret_cast<PFN_vkAllocateCommandBuffers>(dlsym(libvulkan, "vkAllocateCommandBuffers"));
+	PFN_vkFreeCommandBuffers FreeCommandBuffers = reinterpret_cast<PFN_vkFreeCommandBuffers>(dlsym(libvulkan, "vkFreeCommandBuffers"));
+	PFN_vkBeginCommandBuffer BeginCommandBuffer = reinterpret_cast<PFN_vkBeginCommandBuffer>(dlsym(libvulkan, "vkBeginCommandBuffer"));
+	PFN_vkEndCommandBuffer EndCommandBuffer = reinterpret_cast<PFN_vkEndCommandBuffer>(dlsym(libvulkan, "vkEndCommandBuffer"));
+	PFN_vkResetCommandBuffer ResetCommandBuffer = reinterpret_cast<PFN_vkResetCommandBuffer>(dlsym(libvulkan, "vkResetCommandBuffer"));
+	PFN_vkCmdBindPipeline CmdBindPipeline = reinterpret_cast<PFN_vkCmdBindPipeline>(dlsym(libvulkan, "vkCmdBindPipeline"));
+	PFN_vkCmdSetViewport CmdSetViewport = reinterpret_cast<PFN_vkCmdSetViewport>(dlsym(libvulkan, "vkCmdSetViewport"));
+	PFN_vkCmdSetScissor CmdSetScissor = reinterpret_cast<PFN_vkCmdSetScissor>(dlsym(libvulkan, "vkCmdSetScissor"));
+	PFN_vkCmdSetLineWidth CmdSetLineWidth = reinterpret_cast<PFN_vkCmdSetLineWidth>(dlsym(libvulkan, "vkCmdSetLineWidth"));
+	PFN_vkCmdSetDepthBias CmdSetDepthBias = reinterpret_cast<PFN_vkCmdSetDepthBias>(dlsym(libvulkan, "vkCmdSetDepthBias"));
+	PFN_vkCmdSetBlendConstants CmdSetBlendConstants = reinterpret_cast<PFN_vkCmdSetBlendConstants>(dlsym(libvulkan, "vkCmdSetBlendConstants"));
+	PFN_vkCmdSetDepthBounds CmdSetDepthBounds = reinterpret_cast<PFN_vkCmdSetDepthBounds>(dlsym(libvulkan, "vkCmdSetDepthBounds"));
+	PFN_vkCmdSetStencilCompareMask CmdSetStencilCompareMask = reinterpret_cast<PFN_vkCmdSetStencilCompareMask>(dlsym(libvulkan, "vkCmdSetStencilCompareMask"));
+	PFN_vkCmdSetStencilWriteMask CmdSetStencilWriteMask = reinterpret_cast<PFN_vkCmdSetStencilWriteMask>(dlsym(libvulkan, "vkCmdSetStencilWriteMask"));
+	PFN_vkCmdSetStencilReference CmdSetStencilReference = reinterpret_cast<PFN_vkCmdSetStencilReference>(dlsym(libvulkan, "vkCmdSetStencilReference"));
+	PFN_vkCmdBindDescriptorSets CmdBindDescriptorSets = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(dlsym(libvulkan, "vkCmdBindDescriptorSets"));
+	PFN_vkCmdBindIndexBuffer CmdBindIndexBuffer = reinterpret_cast<PFN_vkCmdBindIndexBuffer>(dlsym(libvulkan, "vkCmdBindIndexBuffer"));
+	PFN_vkCmdBindVertexBuffers CmdBindVertexBuffers = reinterpret_cast<PFN_vkCmdBindVertexBuffers>(dlsym(libvulkan, "vkCmdBindVertexBuffers"));
+	PFN_vkCmdDraw CmdDraw = reinterpret_cast<PFN_vkCmdDraw>(dlsym(libvulkan, "vkCmdDraw"));
+	PFN_vkCmdDrawIndexed CmdDrawIndexed = reinterpret_cast<PFN_vkCmdDrawIndexed>(dlsym(libvulkan, "vkCmdDrawIndexed"));
+	PFN_vkCmdDrawIndirect CmdDrawIndirect = reinterpret_cast<PFN_vkCmdDrawIndirect>(dlsym(libvulkan, "vkCmdDrawIndirect"));
+	PFN_vkCmdDrawIndexedIndirect CmdDrawIndexedIndirect = reinterpret_cast<PFN_vkCmdDrawIndexedIndirect>(dlsym(libvulkan, "vkCmdDrawIndexedIndirect"));
+	PFN_vkCmdDispatch CmdDispatch = reinterpret_cast<PFN_vkCmdDispatch>(dlsym(libvulkan, "vkCmdDispatch"));
+	PFN_vkCmdDispatchIndirect CmdDispatchIndirect = reinterpret_cast<PFN_vkCmdDispatchIndirect>(dlsym(libvulkan, "vkCmdDispatchIndirect"));
+	PFN_vkCmdCopyBuffer CmdCopyBuffer = reinterpret_cast<PFN_vkCmdCopyBuffer>(dlsym(libvulkan, "vkCmdCopyBuffer"));
+	PFN_vkCmdCopyImage CmdCopyImage = reinterpret_cast<PFN_vkCmdCopyImage>(dlsym(libvulkan, "vkCmdCopyImage"));
+	PFN_vkCmdBlitImage CmdBlitImage = reinterpret_cast<PFN_vkCmdBlitImage>(dlsym(libvulkan, "vkCmdBlitImage"));
+	PFN_vkCmdCopyBufferToImage CmdCopyBufferToImage = reinterpret_cast<PFN_vkCmdCopyBufferToImage>(dlsym(libvulkan, "vkCmdCopyBufferToImage"));
+	PFN_vkCmdCopyImageToBuffer CmdCopyImageToBuffer = reinterpret_cast<PFN_vkCmdCopyImageToBuffer>(dlsym(libvulkan, "vkCmdCopyImageToBuffer"));
+	PFN_vkCmdUpdateBuffer CmdUpdateBuffer = reinterpret_cast<PFN_vkCmdUpdateBuffer>(dlsym(libvulkan, "vkCmdUpdateBuffer"));
+	PFN_vkCmdFillBuffer CmdFillBuffer = reinterpret_cast<PFN_vkCmdFillBuffer>(dlsym(libvulkan, "vkCmdFillBuffer"));
+	PFN_vkCmdClearColorImage CmdClearColorImage = reinterpret_cast<PFN_vkCmdClearColorImage>(dlsym(libvulkan, "vkCmdClearColorImage"));
+	PFN_vkCmdClearDepthStencilImage CmdClearDepthStencilImage = reinterpret_cast<PFN_vkCmdClearDepthStencilImage>(dlsym(libvulkan, "vkCmdClearDepthStencilImage"));
+	PFN_vkCmdClearAttachments CmdClearAttachments = reinterpret_cast<PFN_vkCmdClearAttachments>(dlsym(libvulkan, "vkCmdClearAttachments"));
+	PFN_vkCmdResolveImage CmdResolveImage = reinterpret_cast<PFN_vkCmdResolveImage>(dlsym(libvulkan, "vkCmdResolveImage"));
+	PFN_vkCmdSetEvent CmdSetEvent = reinterpret_cast<PFN_vkCmdSetEvent>(dlsym(libvulkan, "vkCmdSetEvent"));
+	PFN_vkCmdResetEvent CmdResetEvent = reinterpret_cast<PFN_vkCmdResetEvent>(dlsym(libvulkan, "vkCmdResetEvent"));
+	PFN_vkCmdWaitEvents CmdWaitEvents = reinterpret_cast<PFN_vkCmdWaitEvents>(dlsym(libvulkan, "vkCmdWaitEvents"));
+	PFN_vkCmdPipelineBarrier CmdPipelineBarrier = reinterpret_cast<PFN_vkCmdPipelineBarrier>(dlsym(libvulkan, "vkCmdPipelineBarrier"));
+	PFN_vkCmdBeginQuery CmdBeginQuery = reinterpret_cast<PFN_vkCmdBeginQuery>(dlsym(libvulkan, "vkCmdBeginQuery"));
+	PFN_vkCmdEndQuery CmdEndQuery = reinterpret_cast<PFN_vkCmdEndQuery>(dlsym(libvulkan, "vkCmdEndQuery"));
+	PFN_vkCmdResetQueryPool CmdResetQueryPool = reinterpret_cast<PFN_vkCmdResetQueryPool>(dlsym(libvulkan, "vkCmdResetQueryPool"));
+	PFN_vkCmdWriteTimestamp CmdWriteTimestamp = reinterpret_cast<PFN_vkCmdWriteTimestamp>(dlsym(libvulkan, "vkCmdWriteTimestamp"));
+	PFN_vkCmdCopyQueryPoolResults CmdCopyQueryPoolResults = reinterpret_cast<PFN_vkCmdCopyQueryPoolResults>(dlsym(libvulkan, "vkCmdCopyQueryPoolResults"));
+	PFN_vkCmdPushConstants CmdPushConstants = reinterpret_cast<PFN_vkCmdPushConstants>(dlsym(libvulkan, "vkCmdPushConstants"));
+	PFN_vkCmdBeginRenderPass CmdBeginRenderPass = reinterpret_cast<PFN_vkCmdBeginRenderPass>(dlsym(libvulkan, "vkCmdBeginRenderPass"));
+	PFN_vkCmdNextSubpass CmdNextSubpass = reinterpret_cast<PFN_vkCmdNextSubpass>(dlsym(libvulkan, "vkCmdNextSubpass"));
+	PFN_vkCmdEndRenderPass CmdEndRenderPass = reinterpret_cast<PFN_vkCmdEndRenderPass>(dlsym(libvulkan, "vkCmdEndRenderPass"));
+	PFN_vkCmdExecuteCommands CmdExecuteCommands = reinterpret_cast<PFN_vkCmdExecuteCommands>(dlsym(libvulkan, "vkCmdExecuteCommands"));
 
-		CreateInstance = reinterpret_cast<PFN_vkCreateInstance>(dlsym(libvulkan, "vkCreateInstance"));
-		DestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(dlsym(libvulkan, "vkDestroyInstance"));
-		EnumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(dlsym(libvulkan, "vkEnumeratePhysicalDevices"));
-		GetPhysicalDeviceFeatures = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures>(dlsym(libvulkan, "vkGetPhysicalDeviceFeatures"));
-		GetPhysicalDeviceFormatProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceFormatProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceFormatProperties"));
-		GetPhysicalDeviceImageFormatProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceImageFormatProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceImageFormatProperties"));
-		GetPhysicalDeviceProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceProperties"));
-		GetPhysicalDeviceQueueFamilyProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceQueueFamilyProperties"));
-		GetPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(dlsym(libvulkan, "vkGetPhysicalDeviceMemoryProperties"));
-		GetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(libvulkan, "vkGetInstanceProcAddr"));
-		GetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(dlsym(libvulkan, "vkGetDeviceProcAddr"));
-		CreateDevice = reinterpret_cast<PFN_vkCreateDevice>(dlsym(libvulkan, "vkCreateDevice"));
-		DestroyDevice = reinterpret_cast<PFN_vkDestroyDevice>(dlsym(libvulkan, "vkDestroyDevice"));
-		EnumerateInstanceExtensionProperties = reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(dlsym(libvulkan, "vkEnumerateInstanceExtensionProperties"));
-		EnumerateDeviceExtensionProperties = reinterpret_cast<PFN_vkEnumerateDeviceExtensionProperties>(dlsym(libvulkan, "vkEnumerateDeviceExtensionProperties"));
-		EnumerateInstanceLayerProperties = reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(dlsym(libvulkan, "vkEnumerateInstanceLayerProperties"));
-		EnumerateDeviceLayerProperties = reinterpret_cast<PFN_vkEnumerateDeviceLayerProperties>(dlsym(libvulkan, "vkEnumerateDeviceLayerProperties"));
-		GetDeviceQueue = reinterpret_cast<PFN_vkGetDeviceQueue>(dlsym(libvulkan, "vkGetDeviceQueue"));
-		QueueSubmit = reinterpret_cast<PFN_vkQueueSubmit>(dlsym(libvulkan, "vkQueueSubmit"));
-		QueueWaitIdle = reinterpret_cast<PFN_vkQueueWaitIdle>(dlsym(libvulkan, "vkQueueWaitIdle"));
-		DeviceWaitIdle = reinterpret_cast<PFN_vkDeviceWaitIdle>(dlsym(libvulkan, "vkDeviceWaitIdle"));
-		AllocateMemory = reinterpret_cast<PFN_vkAllocateMemory>(dlsym(libvulkan, "vkAllocateMemory"));
-		FreeMemory = reinterpret_cast<PFN_vkFreeMemory>(dlsym(libvulkan, "vkFreeMemory"));
-		MapMemory = reinterpret_cast<PFN_vkMapMemory>(dlsym(libvulkan, "vkMapMemory"));
-		UnmapMemory = reinterpret_cast<PFN_vkUnmapMemory>(dlsym(libvulkan, "vkUnmapMemory"));
-		FlushMappedMemoryRanges = reinterpret_cast<PFN_vkFlushMappedMemoryRanges>(dlsym(libvulkan, "vkFlushMappedMemoryRanges"));
-		InvalidateMappedMemoryRanges = reinterpret_cast<PFN_vkInvalidateMappedMemoryRanges>(dlsym(libvulkan, "vkInvalidateMappedMemoryRanges"));
-		GetDeviceMemoryCommitment = reinterpret_cast<PFN_vkGetDeviceMemoryCommitment>(dlsym(libvulkan, "vkGetDeviceMemoryCommitment"));
-		BindBufferMemory = reinterpret_cast<PFN_vkBindBufferMemory>(dlsym(libvulkan, "vkBindBufferMemory"));
-		BindImageMemory = reinterpret_cast<PFN_vkBindImageMemory>(dlsym(libvulkan, "vkBindImageMemory"));
-		GetBufferMemoryRequirements = reinterpret_cast<PFN_vkGetBufferMemoryRequirements>(dlsym(libvulkan, "vkGetBufferMemoryRequirements"));
-		GetImageMemoryRequirements = reinterpret_cast<PFN_vkGetImageMemoryRequirements>(dlsym(libvulkan, "vkGetImageMemoryRequirements"));
-		GetImageSparseMemoryRequirements = reinterpret_cast<PFN_vkGetImageSparseMemoryRequirements>(dlsym(libvulkan, "vkGetImageSparseMemoryRequirements"));
-		GetPhysicalDeviceSparseImageFormatProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceSparseImageFormatProperties>(dlsym(libvulkan, "vk.GetPhysicalDeviceSparseImageFormatProperties"));
-		QueueBindSparse = reinterpret_cast<PFN_vkQueueBindSparse>(dlsym(libvulkan, "vkQueueBindSparse"));
-		CreateFence = reinterpret_cast<PFN_vkCreateFence>(dlsym(libvulkan, "vkCreateFence"));
-		DestroyFence = reinterpret_cast<PFN_vkDestroyFence>(dlsym(libvulkan, "vkDestroyFence"));
-		ResetFences = reinterpret_cast<PFN_vkResetFences>(dlsym(libvulkan, "vkResetFences"));
-		GetFenceStatus = reinterpret_cast<PFN_vkGetFenceStatus>(dlsym(libvulkan, "vkGetFenceStatus"));
-		WaitForFences = reinterpret_cast<PFN_vkWaitForFences>(dlsym(libvulkan, "vkWaitForFences"));
-		CreateSemaphore = reinterpret_cast<PFN_vkCreateSemaphore>(dlsym(libvulkan, "vkCreateSemaphore"));
-		DestroySemaphore = reinterpret_cast<PFN_vkDestroySemaphore>(dlsym(libvulkan, "vkDestroySemaphore"));
-		CreateEvent = reinterpret_cast<PFN_vkCreateEvent>(dlsym(libvulkan, "vkCreateEvent"));
-		DestroyEvent = reinterpret_cast<PFN_vkDestroyEvent>(dlsym(libvulkan, "vkDestroyEvent"));
-		GetEventStatus = reinterpret_cast<PFN_vkGetEventStatus>(dlsym(libvulkan, "vkGetEventStatus"));
-		SetEvent = reinterpret_cast<PFN_vkSetEvent>(dlsym(libvulkan, "vkSetEvent"));
-		ResetEvent = reinterpret_cast<PFN_vkResetEvent>(dlsym(libvulkan, "vkResetEvent"));
-		CreateQueryPool = reinterpret_cast<PFN_vkCreateQueryPool>(dlsym(libvulkan, "vkCreateQueryPool"));
-		DestroyQueryPool = reinterpret_cast<PFN_vkDestroyQueryPool>(dlsym(libvulkan, "vkDestroyQueryPool"));
-		GetQueryPoolResults = reinterpret_cast<PFN_vkGetQueryPoolResults>(dlsym(libvulkan, "vkGetQueryPoolResults"));
-		CreateBuffer = reinterpret_cast<PFN_vkCreateBuffer>(dlsym(libvulkan, "vkCreateBuffer"));
-		DestroyBuffer = reinterpret_cast<PFN_vkDestroyBuffer>(dlsym(libvulkan, "vkDestroyBuffer"));
-		CreateBufferView = reinterpret_cast<PFN_vkCreateBufferView>(dlsym(libvulkan, "vkCreateBufferView"));
-		DestroyBufferView = reinterpret_cast<PFN_vkDestroyBufferView>(dlsym(libvulkan, "vkDestroyBufferView"));
-		CreateImage = reinterpret_cast<PFN_vkCreateImage>(dlsym(libvulkan, "vkCreateImage"));
-		DestroyImage = reinterpret_cast<PFN_vkDestroyImage>(dlsym(libvulkan, "vkDestroyImage"));
-		GetImageSubresourceLayout = reinterpret_cast<PFN_vkGetImageSubresourceLayout>(dlsym(libvulkan, "vkGetImageSubresourceLayout"));
-		CreateImageView = reinterpret_cast<PFN_vkCreateImageView>(dlsym(libvulkan, "vkCreateImageView"));
-		DestroyImageView = reinterpret_cast<PFN_vkDestroyImageView>(dlsym(libvulkan, "vkDestroyImageView"));
-		CreateShaderModule = reinterpret_cast<PFN_vkCreateShaderModule>(dlsym(libvulkan, "vkCreateShaderModule"));
-		DestroyShaderModule = reinterpret_cast<PFN_vkDestroyShaderModule>(dlsym(libvulkan, "vkDestroyShaderModule"));
-		CreatePipelineCache = reinterpret_cast<PFN_vkCreatePipelineCache>(dlsym(libvulkan, "vkCreatePipelineCache"));
-		DestroyPipelineCache = reinterpret_cast<PFN_vkDestroyPipelineCache>(dlsym(libvulkan, "vkDestroyPipelineCache"));
-		GetPipelineCacheData = reinterpret_cast<PFN_vkGetPipelineCacheData>(dlsym(libvulkan, "vkGetPipelineCacheData"));
-		MergePipelineCaches = reinterpret_cast<PFN_vkMergePipelineCaches>(dlsym(libvulkan, "vkMergePipelineCaches"));
-		CreateGraphicsPipelines = reinterpret_cast<PFN_vkCreateGraphicsPipelines>(dlsym(libvulkan, "vkCreateGraphicsPipelines"));
-		CreateComputePipelines = reinterpret_cast<PFN_vkCreateComputePipelines>(dlsym(libvulkan, "vkCreateComputePipelines"));
-		DestroyPipeline = reinterpret_cast<PFN_vkDestroyPipeline>(dlsym(libvulkan, "vkDestroyPipeline"));
-		CreatePipelineLayout = reinterpret_cast<PFN_vkCreatePipelineLayout>(dlsym(libvulkan, "vkCreatePipelineLayout"));
-		DestroyPipelineLayout = reinterpret_cast<PFN_vkDestroyPipelineLayout>(dlsym(libvulkan, "vkDestroyPipelineLayout"));
-		CreateSampler = reinterpret_cast<PFN_vkCreateSampler>(dlsym(libvulkan, "vkCreateSampler"));
-		DestroySampler = reinterpret_cast<PFN_vkDestroySampler>(dlsym(libvulkan, "vkDestroySampler"));
-		CreateDescriptorSetLayout = reinterpret_cast<PFN_vkCreateDescriptorSetLayout>(dlsym(libvulkan, "vkCreateDescriptorSetLayout"));
-		DestroyDescriptorSetLayout = reinterpret_cast<PFN_vkDestroyDescriptorSetLayout>(dlsym(libvulkan, "vkDestroyDescriptorSetLayout"));
-		CreateDescriptorPool = reinterpret_cast<PFN_vkCreateDescriptorPool>(dlsym(libvulkan, "vkCreateDescriptorPool"));
-		DestroyDescriptorPool = reinterpret_cast<PFN_vkDestroyDescriptorPool>(dlsym(libvulkan, "vkDestroyDescriptorPool"));
-		ResetDescriptorPool = reinterpret_cast<PFN_vkResetDescriptorPool>(dlsym(libvulkan, "vkResetDescriptorPool"));
-		AllocateDescriptorSets = reinterpret_cast<PFN_vkAllocateDescriptorSets>(dlsym(libvulkan, "vkAllocateDescriptorSets"));
-		FreeDescriptorSets = reinterpret_cast<PFN_vkFreeDescriptorSets>(dlsym(libvulkan, "vkFreeDescriptorSets"));
-		UpdateDescriptorSets = reinterpret_cast<PFN_vkUpdateDescriptorSets>(dlsym(libvulkan, "vkUpdateDescriptorSets"));
-		CreateFramebuffer = reinterpret_cast<PFN_vkCreateFramebuffer>(dlsym(libvulkan, "vkCreateFramebuffer"));
-		DestroyFramebuffer = reinterpret_cast<PFN_vkDestroyFramebuffer>(dlsym(libvulkan, "vkDestroyFramebuffer"));
-		CreateRenderPass = reinterpret_cast<PFN_vkCreateRenderPass>(dlsym(libvulkan, "vkCreateRenderPass"));
-		DestroyRenderPass = reinterpret_cast<PFN_vkDestroyRenderPass>(dlsym(libvulkan, "vkDestroyRenderPass"));
-		GetRenderAreaGranularity = reinterpret_cast<PFN_vkGetRenderAreaGranularity>(dlsym(libvulkan, "vkGetRenderAreaGranularity"));
-		CreateCommandPool = reinterpret_cast<PFN_vkCreateCommandPool>(dlsym(libvulkan, "vkCreateCommandPool"));
-		DestroyCommandPool = reinterpret_cast<PFN_vkDestroyCommandPool>(dlsym(libvulkan, "vkDestroyCommandPool"));
-		ResetCommandPool = reinterpret_cast<PFN_vkResetCommandPool>(dlsym(libvulkan, "vkResetCommandPool"));
-		AllocateCommandBuffers = reinterpret_cast<PFN_vkAllocateCommandBuffers>(dlsym(libvulkan, "vkAllocateCommandBuffers"));
-		FreeCommandBuffers = reinterpret_cast<PFN_vkFreeCommandBuffers>(dlsym(libvulkan, "vkFreeCommandBuffers"));
-		BeginCommandBuffer = reinterpret_cast<PFN_vkBeginCommandBuffer>(dlsym(libvulkan, "vkBeginCommandBuffer"));
-		EndCommandBuffer = reinterpret_cast<PFN_vkEndCommandBuffer>(dlsym(libvulkan, "vkEndCommandBuffer"));
-		ResetCommandBuffer = reinterpret_cast<PFN_vkResetCommandBuffer>(dlsym(libvulkan, "vkResetCommandBuffer"));
-		CmdBindPipeline = reinterpret_cast<PFN_vkCmdBindPipeline>(dlsym(libvulkan, "vkCmdBindPipeline"));
-		CmdSetViewport = reinterpret_cast<PFN_vkCmdSetViewport>(dlsym(libvulkan, "vkCmdSetViewport"));
-		CmdSetScissor = reinterpret_cast<PFN_vkCmdSetScissor>(dlsym(libvulkan, "vkCmdSetScissor"));
-		CmdSetLineWidth = reinterpret_cast<PFN_vkCmdSetLineWidth>(dlsym(libvulkan, "vkCmdSetLineWidth"));
-		CmdSetDepthBias = reinterpret_cast<PFN_vkCmdSetDepthBias>(dlsym(libvulkan, "vkCmdSetDepthBias"));
-		CmdSetBlendConstants = reinterpret_cast<PFN_vkCmdSetBlendConstants>(dlsym(libvulkan, "vkCmdSetBlendConstants"));
-		CmdSetDepthBounds = reinterpret_cast<PFN_vkCmdSetDepthBounds>(dlsym(libvulkan, "vkCmdSetDepthBounds"));
-		CmdSetStencilCompareMask = reinterpret_cast<PFN_vkCmdSetStencilCompareMask>(dlsym(libvulkan, "vkCmdSetStencilCompareMask"));
-		CmdSetStencilWriteMask = reinterpret_cast<PFN_vkCmdSetStencilWriteMask>(dlsym(libvulkan, "vkCmdSetStencilWriteMask"));
-		CmdSetStencilReference = reinterpret_cast<PFN_vkCmdSetStencilReference>(dlsym(libvulkan, "vkCmdSetStencilReference"));
-		CmdBindDescriptorSets = reinterpret_cast<PFN_vkCmdBindDescriptorSets>(dlsym(libvulkan, "vkCmdBindDescriptorSets"));
-		CmdBindIndexBuffer = reinterpret_cast<PFN_vkCmdBindIndexBuffer>(dlsym(libvulkan, "vkCmdBindIndexBuffer"));
-		CmdBindVertexBuffers = reinterpret_cast<PFN_vkCmdBindVertexBuffers>(dlsym(libvulkan, "vkCmdBindVertexBuffers"));
-		CmdDraw = reinterpret_cast<PFN_vkCmdDraw>(dlsym(libvulkan, "vkCmdDraw"));
-		CmdDrawIndexed = reinterpret_cast<PFN_vkCmdDrawIndexed>(dlsym(libvulkan, "vkCmdDrawIndexed"));
-		CmdDrawIndirect = reinterpret_cast<PFN_vkCmdDrawIndirect>(dlsym(libvulkan, "vkCmdDrawIndirect"));
-		CmdDrawIndexedIndirect = reinterpret_cast<PFN_vkCmdDrawIndexedIndirect>(dlsym(libvulkan, "vkCmdDrawIndexedIndirect"));
-		CmdDispatch = reinterpret_cast<PFN_vkCmdDispatch>(dlsym(libvulkan, "vkCmdDispatch"));
-		CmdDispatchIndirect = reinterpret_cast<PFN_vkCmdDispatchIndirect>(dlsym(libvulkan, "vkCmdDispatchIndirect"));
-		CmdCopyBuffer = reinterpret_cast<PFN_vkCmdCopyBuffer>(dlsym(libvulkan, "vkCmdCopyBuffer"));
-		CmdCopyImage = reinterpret_cast<PFN_vkCmdCopyImage>(dlsym(libvulkan, "vkCmdCopyImage"));
-		CmdBlitImage = reinterpret_cast<PFN_vkCmdBlitImage>(dlsym(libvulkan, "vkCmdBlitImage"));
-		CmdCopyBufferToImage = reinterpret_cast<PFN_vkCmdCopyBufferToImage>(dlsym(libvulkan, "vkCmdCopyBufferToImage"));
-		CmdCopyImageToBuffer = reinterpret_cast<PFN_vkCmdCopyImageToBuffer>(dlsym(libvulkan, "vkCmdCopyImageToBuffer"));
-		CmdUpdateBuffer = reinterpret_cast<PFN_vkCmdUpdateBuffer>(dlsym(libvulkan, "vkCmdUpdateBuffer"));
-		CmdFillBuffer = reinterpret_cast<PFN_vkCmdFillBuffer>(dlsym(libvulkan, "vkCmdFillBuffer"));
-		CmdClearColorImage = reinterpret_cast<PFN_vkCmdClearColorImage>(dlsym(libvulkan, "vkCmdClearColorImage"));
-		CmdClearDepthStencilImage = reinterpret_cast<PFN_vkCmdClearDepthStencilImage>(dlsym(libvulkan, "vkCmdClearDepthStencilImage"));
-		CmdClearAttachments = reinterpret_cast<PFN_vkCmdClearAttachments>(dlsym(libvulkan, "vkCmdClearAttachments"));
-		CmdResolveImage = reinterpret_cast<PFN_vkCmdResolveImage>(dlsym(libvulkan, "vkCmdResolveImage"));
-		CmdSetEvent = reinterpret_cast<PFN_vkCmdSetEvent>(dlsym(libvulkan, "vkCmdSetEvent"));
-		CmdResetEvent = reinterpret_cast<PFN_vkCmdResetEvent>(dlsym(libvulkan, "vkCmdResetEvent"));
-		CmdWaitEvents = reinterpret_cast<PFN_vkCmdWaitEvents>(dlsym(libvulkan, "vkCmdWaitEvents"));
-		CmdPipelineBarrier = reinterpret_cast<PFN_vkCmdPipelineBarrier>(dlsym(libvulkan, "vkCmdPipelineBarrier"));
-		CmdBeginQuery = reinterpret_cast<PFN_vkCmdBeginQuery>(dlsym(libvulkan, "vkCmdBeginQuery"));
-		CmdEndQuery = reinterpret_cast<PFN_vkCmdEndQuery>(dlsym(libvulkan, "vkCmdEndQuery"));
-		CmdResetQueryPool = reinterpret_cast<PFN_vkCmdResetQueryPool>(dlsym(libvulkan, "vkCmdResetQueryPool"));
-		CmdWriteTimestamp = reinterpret_cast<PFN_vkCmdWriteTimestamp>(dlsym(libvulkan, "vkCmdWriteTimestamp"));
-		CmdCopyQueryPoolResults = reinterpret_cast<PFN_vkCmdCopyQueryPoolResults>(dlsym(libvulkan, "vkCmdCopyQueryPoolResults"));
-		CmdPushConstants = reinterpret_cast<PFN_vkCmdPushConstants>(dlsym(libvulkan, "vkCmdPushConstants"));
-		CmdBeginRenderPass = reinterpret_cast<PFN_vkCmdBeginRenderPass>(dlsym(libvulkan, "vkCmdBeginRenderPass"));
-		CmdNextSubpass = reinterpret_cast<PFN_vkCmdNextSubpass>(dlsym(libvulkan, "vkCmdNextSubpass"));
-		CmdEndRenderPass = reinterpret_cast<PFN_vkCmdEndRenderPass>(dlsym(libvulkan, "vkCmdEndRenderPass"));
-		CmdExecuteCommands = reinterpret_cast<PFN_vkCmdExecuteCommands>(dlsym(libvulkan, "vkCmdExecuteCommands"));
-		DestroySurfaceKHR = reinterpret_cast<PFN_vkDestroySurfaceKHR>(dlsym(libvulkan, "vkDestroySurfaceKHR"));
-		GetPhysicalDeviceSurfaceSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfaceSupportKHR"));
-		GetPhysicalDeviceSurfaceCapabilitiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR"));
-		GetPhysicalDeviceSurfaceFormatsKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
-		GetPhysicalDeviceSurfacePresentModesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfacePresentModesKHR"));
-		CreateSwapchainKHR = reinterpret_cast<PFN_vkCreateSwapchainKHR>(dlsym(libvulkan, "vkCreateSwapchainKHR"));
-		DestroySwapchainKHR = reinterpret_cast<PFN_vkDestroySwapchainKHR>(dlsym(libvulkan, "vkDestroySwapchainKHR"));
-		GetSwapchainImagesKHR = reinterpret_cast<PFN_vkGetSwapchainImagesKHR>(dlsym(libvulkan, "vkGetSwapchainImagesKHR"));
-		AcquireNextImageKHR = reinterpret_cast<PFN_vkAcquireNextImageKHR>(dlsym(libvulkan, "vkAcquireNextImageKHR"));
-		QueuePresentKHR = reinterpret_cast<PFN_vkQueuePresentKHR>(dlsym(libvulkan, "vkQueuePresentKHR"));
-		GetPhysicalDeviceDisplayPropertiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceDisplayPropertiesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceDisplayPropertiesKHR"));
-		GetPhysicalDeviceDisplayPlanePropertiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceDisplayPlanePropertiesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR"));
-		GetDisplayPlaneSupportedDisplaysKHR = reinterpret_cast<PFN_vkGetDisplayPlaneSupportedDisplaysKHR>(dlsym(libvulkan, "vkGetDisplayPlaneSupportedDisplaysKHR"));
-		GetDisplayModePropertiesKHR = reinterpret_cast<PFN_vkGetDisplayModePropertiesKHR>(dlsym(libvulkan, "vkGetDisplayModePropertiesKHR"));
-		CreateDisplayModeKHR = reinterpret_cast<PFN_vkCreateDisplayModeKHR>(dlsym(libvulkan, "vkCreateDisplayModeKHR"));
-		GetDisplayPlaneCapabilitiesKHR = reinterpret_cast<PFN_vkGetDisplayPlaneCapabilitiesKHR>(dlsym(libvulkan, "vkGetDisplayPlaneCapabilitiesKHR"));
-		CreateDisplayPlaneSurfaceKHR = reinterpret_cast<PFN_vkCreateDisplayPlaneSurfaceKHR>(dlsym(libvulkan, "vkCreateDisplayPlaneSurfaceKHR"));
-		CreateSharedSwapchainsKHR = reinterpret_cast<PFN_vkCreateSharedSwapchainsKHR>(dlsym(libvulkan, "vkCreateSharedSwapchainsKHR"));
 
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-		CreateXlibSurfaceKHR = reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(dlsym(libvulkan, "vkCreateXlibSurfaceKHR"));
-		GetPhysicalDeviceXlibPresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceXlibPresentationSupportKHR"));
+#ifdef VK_KHR_surface
+	PFN_vkDestroySurfaceKHR DestroySurfaceKHR = reinterpret_cast<PFN_vkDestroySurfaceKHR>(dlsym(libvulkan, "vkDestroySurfaceKHR"));
+	PFN_vkGetPhysicalDeviceSurfaceSupportKHR GetPhysicalDeviceSurfaceSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfaceSupportKHR"));
+	PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR GetPhysicalDeviceSurfaceCapabilitiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR"));
+	PFN_vkGetPhysicalDeviceSurfaceFormatsKHR GetPhysicalDeviceSurfaceFormatsKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
+	PFN_vkGetPhysicalDeviceSurfacePresentModesKHR GetPhysicalDeviceSurfacePresentModesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceSurfacePresentModesKHR"));
 #endif
 
-#ifdef VK_USE_PLATFORM_XCB_KHR
-		CreateXcbSurfaceKHR = reinterpret_cast<PFN_vkCreateXcbSurfaceKHR>(dlsym(libvulkan, "vkCreateXcbSurfaceKHR"));
-		GetPhysicalDeviceXcbPresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceXcbPresentationSupportKHR"));
+#ifdef VK_KHR_swapchain
+	PFN_vkCreateSwapchainKHR CreateSwapchainKHR = reinterpret_cast<PFN_vkCreateSwapchainKHR>(dlsym(libvulkan, "vkCreateSwapchainKHR"));
+	PFN_vkDestroySwapchainKHR DestroySwapchainKHR = reinterpret_cast<PFN_vkDestroySwapchainKHR>(dlsym(libvulkan, "vkDestroySwapchainKHR"));
+	PFN_vkGetSwapchainImagesKHR GetSwapchainImagesKHR = reinterpret_cast<PFN_vkGetSwapchainImagesKHR>(dlsym(libvulkan, "vkGetSwapchainImagesKHR"));
+	PFN_vkAcquireNextImageKHR AcquireNextImageKHR = reinterpret_cast<PFN_vkAcquireNextImageKHR>(dlsym(libvulkan, "vkAcquireNextImageKHR"));
+	PFN_vkQueuePresentKHR QueuePresentKHR = reinterpret_cast<PFN_vkQueuePresentKHR>(dlsym(libvulkan, "vkQueuePresentKHR"));
 #endif
 
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-		CreateWaylandSurfaceKHR = reinterpret_cast<PFN_vkCreateWaylandSurfaceKHR>(dlsym(libvulkan, "vkCreateWaylandSurfaceKHR"));
-		GetPhysicalDeviceWaylandPresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceWaylandPresentationSupportKHR"));
+#ifdef VK_KHR_display
+	PFN_vkCreateDisplayModeKHR CreateDisplayModeKHR = reinterpret_cast<PFN_vkCreateDisplayModeKHR>(dlsym(libvulkan, "vkCreateDisplayModeKHR"));
+	PFN_vkCreateDisplayPlaneSurfaceKHR CreateDisplayPlaneSurfaceKHR = reinterpret_cast<PFN_vkCreateDisplayPlaneSurfaceKHR>(dlsym(libvulkan, "vkCreateDisplayPlaneSurfaceKHR"));
+	PFN_vkGetDisplayModePropertiesKHR GetDisplayModePropertiesKHR = reinterpret_cast<PFN_vkGetDisplayModePropertiesKHR>(dlsym(libvulkan, "vkGetDisplayModePropertiesKHR"));
+	PFN_vkGetDisplayPlaneSupportedDisplaysKHR GetDisplayPlaneSupportedDisplaysKHR = reinterpret_cast<PFN_vkGetDisplayPlaneSupportedDisplaysKHR>(dlsym(libvulkan, "vkGetDisplayPlaneSupportedDisplaysKHR"));
+	PFN_vkGetPhysicalDeviceDisplayPropertiesKHR GetPhysicalDeviceDisplayPropertiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceDisplayPropertiesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceDisplayPropertiesKHR"));
+	PFN_vkGetPhysicalDeviceDisplayPlanePropertiesKHR GetPhysicalDeviceDisplayPlanePropertiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceDisplayPlanePropertiesKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR"));
+	PFN_vkGetDisplayPlaneCapabilitiesKHR GetDisplayPlaneCapabilitiesKHR = reinterpret_cast<PFN_vkGetDisplayPlaneCapabilitiesKHR>(dlsym(libvulkan, "vkGetDisplayPlaneCapabilitiesKHR"));
 #endif
 
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-		CreateAndroidSurfaceKHR = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(dlsym(libvulkan, "vkCreateAndroidSurfaceKHR"));
+#ifdef VK_KHR_display_swapchain
+	PFN_vkCreateSharedSwapchainsKHR CreateSharedSwapchainsKHR = reinterpret_cast<PFN_vkCreateSharedSwapchainsKHR>(dlsym(libvulkan, "vkCreateSharedSwapchainsKHR"));
 #endif
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-		CreateWin32SurfaceKHR = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(dlsym(libvulkan, "vkCreateWin32SurfaceKHR"));
-		GetPhysicalDeviceWin32PresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceWin32PresentationSupportKHR"));
+#ifdef VK_KHR_xlib_surface
+	PFN_vkCreateXlibSurfaceKHR CreateXlibSurfaceKHR = reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(dlsym(libvulkan, "vkCreateXlibSurfaceKHR"));
+	PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR GetPhysicalDeviceXcbPresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceXcbPresentationSupportKHR"));
 #endif
-		GetPhysicalDeviceFeatures2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2>(dlsym(libvulkan, "vkGetPhysicalDeviceFeatures2"));
-		GetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>(dlsym(libvulkan, "vkGetPhysicalDeviceProperties2"));
-	}
+
+#ifdef VK_KHR_xcb_surface
+	PFN_vkCreateXcbSurfaceKHR CreateXcbSurfaceKHR = reinterpret_cast<PFN_vkCreateXcbSurfaceKHR>(dlsym(libvulkan, "vkCreateXcbSurfaceKHR"));
+	PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR GetPhysicalDeviceXcbPresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceXcbPresentationSupportKHR"));
+#endif
+
+#ifdef VK_KHR_wayland_surface
+	PFN_vkCreateWaylandSurfaceKHR CreateWaylandSurfaceKHR = reinterpret_cast<PFN_vkCreateWaylandSurfaceKHR>(dlsym(libvulkan, "vkCreateWaylandSurfaceKHR"));
+	PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR GetPhysicalDeviceWaylandPresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceWaylandPresentationSupportKHR"));
+#endif
+
+#ifdef VK_KHR_android_surface
+	PFN_vkCreateAndroidSurfaceKHR CreateAndroidSurfaceKHR = reinterpret_cast<PFN_vkCreateAndroidSurfaceKHR>(dlsym(libvulkan, "vkCreateAndroidSurfaceKHR"));
+#endif
+
+#ifdef VK_KHR_win32_surface
+	PFN_vkCreateWin32SurfaceKHR CreateWin32SurfaceKHR = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(dlsym(libvulkan, "vkCreateWin32SurfaceKHR"));
+	PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR GetPhysicalDeviceWin32PresentationSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR>(dlsym(libvulkan, "vkGetPhysicalDeviceWin32PresentationSupportKHR"));
+#endif
+
+#ifdef VK_KHR_get_physical_device_properties2
+	PFN_vkGetPhysicalDeviceFeatures2KHR GetPhysicalDeviceFeatures2 = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2>(dlsym(libvulkan, "vkGetPhysicalDeviceFeatures2"));
+	PFN_vkGetPhysicalDeviceProperties2 GetPhysicalDeviceProperties2 = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2>(dlsym(libvulkan, "vkGetPhysicalDeviceProperties2"));
+#endif
 };
 
 
@@ -447,11 +260,10 @@ public:
 		device(device)
 	{
 		this->device_address_features.pNext = &this->ray_tracing_features;
-		this->features2.pNext = &this->device_address_features;
+		this->supported_features2.pNext = &this->device_address_features;
 		this->properties2.pNext = &this->ray_tracing_properties;
 
-		vk.GetPhysicalDeviceFeatures(this->device, &this->features);
-		vk.GetPhysicalDeviceFeatures2(this->device, &this->features2);
+		vk.GetPhysicalDeviceFeatures2(this->device, &this->supported_features2);
 		vk.GetPhysicalDeviceProperties(this->device, &this->properties);
 		vk.GetPhysicalDeviceProperties2(this->device, &this->properties2);
 
@@ -551,71 +363,35 @@ public:
 		throw std::runtime_error("VulkanDevice::getMemoryTypeIndex: could not find suitable memory type");
 	}
 
-	bool supportsFeatures(const VkPhysicalDeviceFeatures& required_features) const
+	template<typename T>
+	bool supportsFeatures(const T* supported_features, const T* required_features) const
 	{
-		return
-			this->features.logicOp >= required_features.logicOp &&
-			this->features.wideLines >= required_features.wideLines &&
-			this->features.depthClamp >= required_features.depthClamp &&
-			this->features.alphaToOne >= required_features.alphaToOne &&
-			this->features.depthBounds >= required_features.depthBounds &&
-			this->features.largePoints >= required_features.largePoints &&
-			this->features.shaderInt64 >= required_features.shaderInt64 &&
-			this->features.shaderInt16 >= required_features.shaderInt16 &&
-			this->features.dualSrcBlend >= required_features.dualSrcBlend &&
-			this->features.multiViewport >= required_features.multiViewport &&
-			this->features.shaderFloat64 >= required_features.shaderFloat64 &&
-			this->features.sparseBinding >= required_features.sparseBinding &&
-			this->features.imageCubeArray >= required_features.imageCubeArray &&
-			this->features.geometryShader >= required_features.geometryShader &&
-			this->features.depthBiasClamp >= required_features.depthBiasClamp &&
-			this->features.independentBlend >= required_features.independentBlend &&
-			this->features.fillModeNonSolid >= required_features.fillModeNonSolid &&
-			this->features.inheritedQueries >= required_features.inheritedQueries &&
-			this->features.sampleRateShading >= required_features.sampleRateShading &&
-			this->features.multiDrawIndirect >= required_features.multiDrawIndirect &&
-			this->features.samplerAnisotropy >= required_features.samplerAnisotropy &&
-			this->features.robustBufferAccess >= required_features.robustBufferAccess &&
-			this->features.tessellationShader >= required_features.tessellationShader &&
-			this->features.shaderClipDistance >= required_features.shaderClipDistance &&
-			this->features.shaderCullDistance >= required_features.shaderCullDistance &&
-			this->features.fullDrawIndexUint32 >= required_features.fullDrawIndexUint32 &&
-			this->features.textureCompressionBC >= required_features.textureCompressionBC &&
-			this->features.shaderResourceMinLod >= required_features.shaderResourceMinLod &&
-			this->features.occlusionQueryPrecise >= required_features.occlusionQueryPrecise &&
-			this->features.sparseResidencyBuffer >= required_features.sparseResidencyBuffer &&
-			this->features.textureCompressionETC2 >= required_features.textureCompressionETC2 &&
-			this->features.sparseResidencyImage2D >= required_features.sparseResidencyImage2D &&
-			this->features.sparseResidencyImage3D >= required_features.sparseResidencyImage3D &&
-			this->features.sparseResidencyAliased >= required_features.sparseResidencyAliased &&
-			this->features.pipelineStatisticsQuery >= required_features.pipelineStatisticsQuery &&
-			this->features.shaderResourceResidency >= required_features.shaderResourceResidency &&
-			this->features.sparseResidency2Samples >= required_features.sparseResidency2Samples &&
-			this->features.sparseResidency4Samples >= required_features.sparseResidency4Samples &&
-			this->features.sparseResidency8Samples >= required_features.sparseResidency8Samples &&
-			this->features.variableMultisampleRate >= required_features.variableMultisampleRate &&
-			this->features.sparseResidency16Samples >= required_features.sparseResidency16Samples &&
-			this->features.fragmentStoresAndAtomics >= required_features.fragmentStoresAndAtomics &&
-			this->features.drawIndirectFirstInstance >= required_features.drawIndirectFirstInstance &&
-			this->features.shaderImageGatherExtended >= required_features.shaderImageGatherExtended &&
-			this->features.textureCompressionASTC_LDR >= required_features.textureCompressionASTC_LDR &&
-			this->features.shaderStorageImageMultisample >= required_features.shaderStorageImageMultisample &&
-			this->features.vertexPipelineStoresAndAtomics >= required_features.vertexPipelineStoresAndAtomics &&
-			this->features.shaderStorageImageExtendedFormats >= required_features.shaderStorageImageExtendedFormats &&
-			this->features.shaderStorageImageReadWithoutFormat >= required_features.shaderStorageImageReadWithoutFormat &&
-			this->features.shaderStorageImageWriteWithoutFormat >= required_features.shaderStorageImageWriteWithoutFormat &&
-			this->features.shaderTessellationAndGeometryPointSize >= required_features.shaderTessellationAndGeometryPointSize &&
-			this->features.shaderSampledImageArrayDynamicIndexing >= required_features.shaderSampledImageArrayDynamicIndexing &&
-			this->features.shaderStorageImageArrayDynamicIndexing >= required_features.shaderStorageImageArrayDynamicIndexing &&
-			this->features.shaderUniformBufferArrayDynamicIndexing >= required_features.shaderUniformBufferArrayDynamicIndexing &&
-			this->features.shaderStorageBufferArrayDynamicIndexing >= required_features.shaderStorageBufferArrayDynamicIndexing;
+		const size_t struct_size = sizeof(T);
+		const size_t feature_count = struct_size / sizeof(VkBool32);
+
+		std::array<VkBool32, feature_count> required;
+		std::array<VkBool32, feature_count> supported;
+
+		memcpy(&required, required_features, struct_size);
+		memcpy(&supported, supported_features, struct_size);
+
+		for (uint32_t i = 0; i < feature_count; i++) {
+			if (required[i] && !supported[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	bool supportsFeatures(const VkPhysicalDeviceFeatures2& required_features2) const
+	{
+		return this->supportsFeatures(&this->supported_features2.features, &required_features2.features);
 	}
 
 	VkPhysicalDevice device;
-	VkPhysicalDeviceFeatures features{};
 
 	// Provided by VK_KHR_buffer_device_address
-	VkPhysicalDeviceBufferDeviceAddressFeaturesEXT device_address_features{
+	VkPhysicalDeviceBufferDeviceAddressFeatures device_address_features{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_EXT
 	};
 
@@ -627,7 +403,7 @@ public:
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_FEATURES_KHR
 	};
 
-	VkPhysicalDeviceFeatures2 features2{
+	VkPhysicalDeviceFeatures2 supported_features2{
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2_KHR
 	};
 
@@ -724,10 +500,11 @@ public:
 			this->physical_devices.emplace_back(physical_device);
 		}
 
+#ifdef VK_EXT_debug_report
 		this->vkCreateDebugReportCallbackEXT = this->getProcAddress<PFN_vkCreateDebugReportCallbackEXT>("vkCreateDebugReportCallbackEXT");
 		this->vkDestroyDebugReportCallbackEXT = this->getProcAddress<PFN_vkDestroyDebugReportCallbackEXT>("vkDestroyDebugReportCallbackEXT");
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-		// VK_KHR_ray_tracing extension
+#endif
+#ifdef VK_KHR_ray_tracing
 		this->vkBindAccelerationStructureMemoryKHR = this->getProcAddress<PFN_vkBindAccelerationStructureMemoryKHR>("vkBindAccelerationStructureMemoryKHR");
 		this->vkBuildAccelerationStructureKHR = this->getProcAddress<PFN_vkBuildAccelerationStructureKHR>("vkBuildAccelerationStructureKHR");
 		this->vkCmdBuildAccelerationStructureIndirectKHR = this->getProcAddress<PFN_vkCmdBuildAccelerationStructureIndirectKHR>("vkCmdBuildAccelerationStructureIndirectKHR");
@@ -765,7 +542,7 @@ public:
 		for (auto device : this->physical_devices)
 		{
 			s += std::string(device.properties.deviceName) + '\n';
-			for (auto extension : device.extension_properties)
+			for (const auto& extension : device.extension_properties)
 			{
 				s += std::string(extension.extensionName) + '\n';
 			}
@@ -778,7 +555,7 @@ public:
 		return reinterpret_cast<T>(vk.GetInstanceProcAddr(this->instance, name.c_str()));
 	};
 
-	VulkanPhysicalDevice selectPhysicalDevice(const VkPhysicalDeviceFeatures& required_features)
+	VulkanPhysicalDevice selectPhysicalDevice(const VkPhysicalDeviceFeatures2& required_features)
 	{
 		std::vector<VulkanPhysicalDevice> devices;
 		for (auto& physical_device : this->physical_devices) {
@@ -792,12 +569,12 @@ public:
 		return devices.front();
 	}
 
-	// VK_EXT_debug_report
+#ifdef VK_EXT_debug_report
 	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT;
 	PFN_vkDestroyDebugReportCallbackEXT vkDestroyDebugReportCallbackEXT;
+#endif
 
-	// VK_KHR_ray_tracing extension
-#ifdef VK_USE_PLATFORM_WIN32_KHR
+#ifdef VK_KHR_ray_tracing
 	PFN_vkBindAccelerationStructureMemoryKHR vkBindAccelerationStructureMemoryKHR;
 	PFN_vkBuildAccelerationStructureKHR vkBuildAccelerationStructureKHR;
 	PFN_vkCmdBuildAccelerationStructureIndirectKHR vkCmdBuildAccelerationStructureIndirectKHR;
@@ -835,7 +612,8 @@ public:
 		const VkPhysicalDeviceFeatures2& device_features2,
 		const std::vector<const char*>& required_layers = {},
 		const std::vector<const char*>& required_extensions = {}) :
-		physical_device(vulkan->selectPhysicalDevice(device_features2.features))
+		vulkan(std::move(vulkan)),
+		physical_device(this->vulkan->selectPhysicalDevice(device_features2))
 	{
 		std::for_each(required_layers.begin(), required_layers.end(), [&](const char* layer_name) {
 			for (const auto& properties : physical_device.layer_properties)
@@ -927,7 +705,30 @@ public:
 		return this->queues[queue_index];
 	}
 
+#ifdef VK_KHR_ray_tracing
+	VkDeviceAddress getDeviceAddress(VkAccelerationStructureKHR as)
+	{
+		VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+			.pNext = nullptr,
+			.accelerationStructure = as,
+		};
+		return this->vulkan->vkGetAccelerationStructureDeviceAddressKHR(this->device, &device_address_info);
+	}
+
+	VkDeviceAddress getDeviceAddress(VkBuffer buffer)
+	{
+		VkBufferDeviceAddressInfo buffer_address_info{
+			.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+			.pNext = nullptr,
+			.buffer = buffer,
+		};
+		return this->vulkan->vkGetBufferDeviceAddressKHR(this->device, &buffer_address_info);
+	}
+#endif
+
 	VkDevice device{ nullptr };
+	std::shared_ptr<VulkanInstance> vulkan;
 	VulkanPhysicalDevice physical_device;
 	std::vector<VkQueue> queues;
 	VkCommandPool default_pool{ 0 };
@@ -984,7 +785,7 @@ static VkBool32 DebugCallback(
 	return VK_FALSE;
 }
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
+#ifdef VK_EXT_debug_report
 class VulkanDebugCallback {
 public:
 	VulkanDebugCallback() = delete;
@@ -1101,7 +902,7 @@ class VulkanSurface {
 public:
 	VulkanSurface() = delete;
 
-#if defined(VK_USE_PLATFORM_WIN32_KHR)
+#if defined(VK_KHR_win32_surface)
 	VulkanSurface(
 		std::shared_ptr<VulkanInstance> vulkan,
 		HWND window,
@@ -1119,7 +920,7 @@ public:
 		THROW_ON_ERROR(vk.CreateWin32SurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
 	}
 
-#elif defined(VK_USE_PLATFORM_ANDROID_KHR)
+#elif defined(VK_KHR_android_surface)
 	VulkanSurface(
 		std::shared_ptr<VulkanInstance> vulkan,
 		ANativeWindow* window) :
@@ -1136,18 +937,18 @@ public:
 	}
 
 
-#elif defined(VK_USE_PLATFORM_XCB_KHR)
+#elif defined(VK_KHR_xcb_surface)
 	VulkanSurface(std::shared_ptr<VulkanInstance> vulkan,
 		xcb_window_t window,
 		xcb_connection_t* connection) :
 		vulkan(std::move(vulkan))
 	{
 		VkXcbSurfaceCreateInfoKHR create_info{
-			VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,		// sType 
-			nullptr,											// pNext
-			0,													// flags (reserved for future use)
-			connection,											// connection
-			window,												// window
+			.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+			.pNext = nullptr,
+			.flags = 0,
+			.connection = connection,
+			.window = window,
 		};
 
 		THROW_ON_ERROR(vk.CreateXcbSurfaceKHR(this->vulkan->instance, &create_info, nullptr, &this->surface));
@@ -1486,14 +1287,12 @@ public:
 	VulkanBuffer() = delete;
 
 	VulkanBuffer(
-		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
 		VkBufferCreateFlags flags,
 		VkDeviceSize size,
 		VkBufferUsageFlags usage,
 		VkSharingMode sharingMode,
 		const std::vector<uint32_t>& queueFamilyIndices = std::vector<uint32_t>()) :
-		vulkan(std::move(vulkan)),
 		device(std::move(device))
 	{
 		VkBufferCreateInfo create_info{
@@ -1525,24 +1324,7 @@ public:
 
 		return memory_requirements;
 	}
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-	VkDeviceAddress getDeviceAddress(VkDevice device, VkBuffer buffer)
-	{
-		VkBufferDeviceAddressInfo buffer_address_info{
-			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-			nullptr,
-			buffer
-		};
-		return this->vulkan->vkGetBufferDeviceAddressKHR(device, &buffer_address_info);
-	}
 
-	VkDeviceAddress getDeviceAddress()
-	{
-		return getDeviceAddress(this->device->device, this->buffer);
-	}
-#endif
-
-	std::shared_ptr<VulkanInstance> vulkan;
 	std::shared_ptr<VulkanDevice> device;
 	VkBuffer buffer{ 0 };
 };
@@ -1551,7 +1333,6 @@ public:
 class VulkanBufferObject {
 public:
 	VulkanBufferObject(
-		std::shared_ptr<VulkanInstance> vulkan,
 		std::shared_ptr<VulkanDevice> device,
 		VkBufferCreateFlags createFlags,
 		VkDeviceSize size,
@@ -1560,7 +1341,6 @@ public:
 		VkMemoryPropertyFlags memoryFlags)
 	{
 		this->buffer = std::make_shared<VulkanBuffer>(
-			vulkan,
 			device,
 			createFlags,
 			size,
@@ -1925,9 +1705,43 @@ public:
 
 	VulkanSampler(
 		std::shared_ptr<VulkanDevice> device,
-		VkSamplerCreateInfo create_info) :
+		VkFilter magFilter,
+		VkFilter minFilter,
+		VkSamplerMipmapMode mipmapMode,
+		VkSamplerAddressMode addressModeU,
+		VkSamplerAddressMode addressModeV,
+		VkSamplerAddressMode addressModeW,
+		float mipLodBias,
+		VkBool32 anisotropyEnable,
+		float maxAnisotropy,
+		VkBool32 compareEnable,
+		VkCompareOp compareOp,
+		float minLod,
+		float maxLod,
+		VkBorderColor borderColor,
+		VkBool32 unnormalizedCoordinates) :
 		device(std::move(device))
 	{
+		VkSamplerCreateInfo create_info{
+			.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.magFilter = magFilter,
+			.minFilter = minFilter,
+			.mipmapMode = mipmapMode,
+			.addressModeU = addressModeU,
+			.addressModeV = addressModeV,
+			.addressModeW = addressModeW,
+			.mipLodBias = mipLodBias,
+			.anisotropyEnable = anisotropyEnable,
+			.maxAnisotropy = maxAnisotropy,
+			.compareEnable = compareEnable,
+			.compareOp = compareOp,
+			.minLod = minLod,
+			.maxLod = maxLod,
+			.borderColor = borderColor,
+			.unnormalizedCoordinates = unnormalizedCoordinates
+		};
 		THROW_ON_ERROR(vk.CreateSampler(this->device->device, &create_info, nullptr, &this->sampler));
 	}
 
@@ -2076,7 +1890,8 @@ public:
 		std::shared_ptr<VulkanDevice> device,
 		std::shared_ptr<VulkanRenderpass> renderpass,
 		std::vector<VkImageView> attachments,
-		VkExtent2D extent,
+		uint32_t width,
+		uint32_t height,
 		uint32_t layers) :
 		device(std::move(device)),
 		renderpass(std::move(renderpass))
@@ -2088,8 +1903,8 @@ public:
 			.renderPass = this->renderpass->renderpass,
 			.attachmentCount = static_cast<uint32_t>(attachments.size()),
 			.pAttachments = attachments.data(),
-			.width = extent.width,
-			.height = extent.height,
+			.width = width,
+			.height = height,
 			.layers = layers,
 		};
 
@@ -2333,7 +2148,7 @@ public:
 	VkPipeline pipeline{ 0 };
 };
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
+#ifdef VK_KHR_ray_tracing
 
 class VulkanRayTracingPipeline {
 public:
@@ -2433,22 +2248,6 @@ public:
 		this->vulkan->vkDestroyAccelerationStructureKHR(this->device->device, this->as, nullptr);
 	}
 
-	static VkDeviceAddress GetDeviceAddress(VulkanInstance* vulkan, VulkanDevice* device, VkAccelerationStructureKHR as)
-	{
-		VkAccelerationStructureDeviceAddressInfoKHR device_address_info{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-			.pNext = nullptr,
-			.accelerationStructure = as,
-		};
-
-		return vulkan->vkGetAccelerationStructureDeviceAddressKHR(device->device, &device_address_info);
-	}
-
-
-	VkDeviceAddress getDeviceAddress()
-	{
-		return GetDeviceAddress(this->vulkan.get(), this->device.get(), this->as);
-	}
 
 	VkMemoryRequirements getMemoryRequirements(VkAccelerationStructureMemoryRequirementsTypeKHR type)
 	{
@@ -2481,7 +2280,6 @@ public:
 			this->getMemoryRequirements(VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_KHR);
 
 		auto scratch_buffer = std::make_shared<VulkanBufferObject>(
-			this->vulkan,
 			this->device,
 			0,
 			memory_requirements.size,
@@ -2489,7 +2287,7 @@ public:
 			VK_SHARING_MODE_EXCLUSIVE,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-		VkDeviceAddress address = scratch_buffer->buffer->getDeviceAddress();
+		VkDeviceAddress address = this->device->getDeviceAddress(scratch_buffer->buffer->buffer);
 		VkAccelerationStructureGeometryKHR* pGeometries = geometries.data();
 
 		VkAccelerationStructureBuildGeometryInfoKHR build_geometry_info{

@@ -47,6 +47,7 @@ std::shared_ptr<Node> shared_from_node_list(const List& lst)
 	return std::make_shared<Type>(scm::any_cast<ItemType>(lst));
 }
 
+
 template <typename T>
 std::shared_ptr<Node> bufferdata(const List& lst)
 {
@@ -91,8 +92,9 @@ Flags flags(const List& lst) {
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 int window(const List& lst)
 {
-	auto scene = std::any_cast<std::shared_ptr<Node>>(lst[0]);
-	auto window = std::make_shared<VulkanWindow>(scene, 1920, 1080);
+	auto extent = std::any_cast<VkExtent2D>(lst[0]);
+	auto scene = std::any_cast<std::shared_ptr<Node>>(lst[1]);
+	auto window = std::make_shared<VulkanWindow>(extent, scene);
 	return window->show();
 }
 #endif
@@ -127,6 +129,13 @@ VkExtent3D extent3(const List& lst)
 	};
 }
 
+VkExtent2D extent2(const List& lst)
+{
+	return VkExtent2D{
+		.width = static_cast<uint32_t>(std::any_cast<Number>(lst[0])),
+		.height = static_cast<uint32_t>(std::any_cast<Number>(lst[1])),
+	};
+}
 
 env_ptr innovator_env()
 {
@@ -137,6 +146,7 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "uint32", fun_ptr(make_object<uint32_t, Number>) });
 	innovator_env->inner.insert({ "float", fun_ptr(make_object<float, Number>) });
 	innovator_env->inner.insert({ "dvec3", fun_ptr(make_object<glm::dvec3, Number, Number, Number>) });
+	innovator_env->inner.insert({ "extent2", fun_ptr(extent2) });
 	innovator_env->inner.insert({ "extent3", fun_ptr(extent3) });
 	innovator_env->inner.insert({ "count", fun_ptr(count) });
 	innovator_env->inner.insert({ "print", fun_ptr(toString) });
@@ -146,6 +156,7 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "imageaspectflags", fun_ptr(flags<VkImageAspectFlags, VkImageAspectFlagBits>) });
 	innovator_env->inner.insert({ "imagecreateflags", fun_ptr(flags<VkImageCreateFlags, VkImageCreateFlagBits>) });
 	innovator_env->inner.insert({ "imageaspectflags", fun_ptr(flags<VkImageAspectFlags, VkImageAspectFlagBits>) });
+	innovator_env->inner.insert({ "shaderstageflags", fun_ptr(flags<VkShaderStageFlags, VkShaderStageFlagBits>) });
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 	innovator_env->inner.insert({ "window", fun_ptr(window) });
 	innovator_env->inner.insert({ "raytracecommand", fun_ptr(node<RayTraceCommand>) });
@@ -166,16 +177,12 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, glm::dvec3, glm::dvec3>) });
 	innovator_env->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, glm::dvec3, glm::dvec3>) });
 	innovator_env->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
-	innovator_env->inner.insert({ "framebuffer-attachment", fun_ptr(shared_from_node_list<FramebufferAttachment, std::shared_ptr<Node>>) });
+	innovator_env->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageLayout, VkImageUsageFlags, VkImageAspectFlags>) });
 	innovator_env->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });
-	innovator_env->inner.insert({ "sampler", fun_ptr(node<Sampler, VkFilter, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, VkSamplerAddressMode, VkSamplerAddressMode, float, uint32_t, float, uint32_t, VkCompareOp, float, float, VkBorderColor, uint32_t>) });
 	innovator_env->inner.insert({ "texturedata", fun_ptr(node<TextureData, std::string>) });
-	innovator_env->inner.insert({ "textureimage", fun_ptr(node<TextureImage, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
-	innovator_env->inner.insert({ "image", fun_ptr(node<Image, VkImageType, VkFormat, VkExtent3D, uint32_t, uint32_t, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkMemoryPropertyFlags>) });
-	innovator_env->inner.insert({ "currentimagerendertarget", fun_ptr(node<CurrentImageRenderTarget>) });
-	innovator_env->inner.insert({ "sparse-image", fun_ptr(node<SparseImage, VkSampleCountFlagBits, VkImageTiling, VkImageUsageFlags, VkSharingMode, VkImageCreateFlags, VkImageLayout>) });
-	innovator_env->inner.insert({ "imageview", fun_ptr(node<ImageView, VkImageViewType, VkFormat, VkComponentMapping, VkImageSubresourceRange>) });
-	innovator_env->inner.insert({ "imagelayout", fun_ptr(node<ImageLayout, VkImageLayout, VkImageLayout, VkImageSubresourceRange>) });
+	innovator_env->inner.insert({ "textureimage", fun_ptr(node<TextureImage, uint32_t, VkShaderStageFlags, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, std::string>) });
+	innovator_env->inner.insert({ "sparsetextureimage", fun_ptr(node<SparseTextureImage, uint32_t, VkShaderStageFlags, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, std::string>) });
+	innovator_env->inner.insert({ "rtxbuffer", fun_ptr(shared_from_node_list<RTXbuffer, std::shared_ptr<Node>>) });
 	innovator_env->inner.insert({ "component-mapping", fun_ptr(componentMapping) });
 	innovator_env->inner.insert({ "subresource-range", fun_ptr(imageSubresourceRange) });
 	innovator_env->inner.insert({ "group", fun_ptr(shared_from_node_list<Group, std::shared_ptr<Node>>) });

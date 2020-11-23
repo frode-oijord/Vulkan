@@ -305,6 +305,7 @@ public:
 	{
 		context->state->bufferdata = this;
 		context->state->texture = this->texture.get();
+		context->state->subresourceRange = this->texture->subresourceRange();
 	}
 
 private:
@@ -333,7 +334,6 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
-			context->state->vulkan,
 			context->state->device,
 			this->create_flags,
 			context->state->bufferdata->size(),
@@ -378,7 +378,6 @@ public:
 	void alloc(CommandVisitor* context)
 	{
 		this->bufferobject = std::make_shared<VulkanBufferObject>(
-			context->state->vulkan,
 			context->state->device,
 			this->create_flags,
 			context->state->bufferdata->size(),
@@ -427,7 +426,6 @@ public:
 	void alloc(Visitor* context)
 	{
 		this->buffer = std::make_shared<VulkanBufferObject>(
-			context->state->vulkan,
 			context->state->device,
 			0,
 			sizeof(glm::mat4) * 3,
@@ -562,86 +560,43 @@ public:
 	DescriptorSetLayoutBinding(
 		uint32_t binding,
 		VkDescriptorType descriptorType,
-		VkShaderStageFlags stageFlags) :
-		binding(binding),
-		descriptorType(descriptorType),
-		stageFlags(stageFlags)
+		VkShaderStageFlags stageFlags)
 	{
 		REGISTER_VISITOR(pipelinevisitor, DescriptorSetLayoutBinding, pipeline);
+
+		this->info.binding = binding;
+		this->info.descriptorType = descriptorType;
+		this->info.stageFlags = stageFlags;
 	}
 
 	void pipeline(Visitor* context)
 	{
-		context->state->descriptor_pool_sizes.push_back({
-			.type = this->descriptorType,
-			.descriptorCount = 1,
-			});
-
-		context->state->descriptor_set_layout_bindings.push_back({
-			.binding = this->binding,
-			.descriptorType = this->descriptorType,
-			.descriptorCount = 1,
-			.stageFlags = this->stageFlags,
-			.pImmutableSamplers = nullptr,
-			});
-
-		const VkDescriptorImageInfo* pImageInfo = nullptr;
-		const VkDescriptorBufferInfo* pBufferInfo = nullptr;
-		const VkBufferView* pTexelBufferView = nullptr;
-		const void* pNext = nullptr;
-
-		switch (this->descriptorType) {
-		case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
-			this->descriptor_set_acceleration_structure = {
+		if (info.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
+			info.descriptor_set_acceleration_structure = {
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
 				.pNext = nullptr,
 				.accelerationStructureCount = static_cast<uint32_t>(context->state->top_level_acceleration_structures.size()),
 				.pAccelerationStructures = context->state->top_level_acceleration_structures.data(),
 			};
-
-			pNext = &this->descriptor_set_acceleration_structure;
-			break;
-
-		default:
-			this->descriptor_image_info = {
-				.sampler = context->state->sampler,
-				.imageView = context->state->imageView,
-				.imageLayout = context->state->imageLayout
-			};
-			pImageInfo = &this->descriptor_image_info;
-
-			this->descriptor_buffer_info = {
+		}
+		else {
+			info.descriptor_buffer_info = {
 				.buffer = context->state->buffer,
 				.offset = 0,
 				.range = VK_WHOLE_SIZE
 			};
-			pBufferInfo = &this->descriptor_buffer_info;
-			break;
+
+			info.descriptor_image_info = {
+				.sampler = context->state->sampler,
+				.imageView = context->state->imageView,
+				.imageLayout = context->state->imageLayout
+			};
 		}
-
-		VkWriteDescriptorSet write_descriptor_set{
-			.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.pNext = pNext,
-			.dstSet = nullptr,
-			.dstBinding = this->binding,
-			.dstArrayElement = 0,
-			.descriptorCount = 1,
-			.descriptorType = this->descriptorType,
-			.pImageInfo = &this->descriptor_image_info,
-			.pBufferInfo = &this->descriptor_buffer_info,
-			.pTexelBufferView = pTexelBufferView,
-		};
-
-		context->state->write_descriptor_sets.push_back(write_descriptor_set);
+		context->state->descriptor_set_infos.push_back(this->info);
 	}
 
 private:
-	uint32_t binding;
-	VkDescriptorType descriptorType;
-	VkShaderStageFlags stageFlags;
-	VkDescriptorImageInfo descriptor_image_info{};
-	VkDescriptorBufferInfo descriptor_buffer_info{};
-	VkWriteDescriptorSetAccelerationStructureKHR descriptor_set_acceleration_structure{};
+	DescriptorSetInfo info;
 };
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
@@ -750,7 +705,7 @@ public:
 };
 #endif
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
+#ifdef VK_KHR_ray_tracing
 
 class BottomLevelAccelerationStructure : public Node {
 public:
@@ -760,11 +715,12 @@ public:
 	explicit BottomLevelAccelerationStructure()
 	{
 		REGISTER_VISITOR(allocvisitor, BottomLevelAccelerationStructure, alloc);
+		REGISTER_VISITOR(devicevisitor, BottomLevelAccelerationStructure, device);
 	}
 
 	void device(DeviceVisitor* context)
 	{
-		context->device_address_features.bufferDeviceAddress = VK_TRUE;
+		context->getFeatures<VkPhysicalDeviceBufferDeviceAddressFeatures>().bufferDeviceAddress = VK_TRUE;
 	}
 
 	void alloc(CommandVisitor* context)
@@ -872,204 +828,6 @@ public:
 	std::shared_ptr<VulkanAccelerationStructure> as{ nullptr };
 };
 
-class Image : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	virtual ~Image() = default;
-	Image(
-		VkImageType imageType,
-		VkFormat format,
-		VkExtent3D extent,
-		uint32_t levels,
-		uint32_t layers,
-		VkSampleCountFlagBits samples,
-		VkImageTiling tiling,
-		VkImageUsageFlags usage,
-		VkSharingMode mode,
-		VkImageCreateFlags flags,
-		VkMemoryPropertyFlags memoryFlags) :
-		imageType(imageType),
-		format(format),
-		extent(extent),
-		levels(levels),
-		layers(layers),
-		samples(samples),
-		tiling(tiling),
-		usage(usage),
-		mode(mode),
-		flags(flags),
-		memoryFlags(memoryFlags)
-	{
-		REGISTER_VISITOR(allocvisitor, Image, alloc);
-		REGISTER_VISITOR(resizevisitor, Image, alloc);
-		REGISTER_VISITOR(pipelinevisitor, Image, updateState);
-		REGISTER_VISITOR(recordvisitor, Image, updateState);
-	}
-
-	void alloc(CommandVisitor* context)
-	{
-		VkExtent3D extent = {
-			.width = context->state->extent.width,
-			.height = context->state->extent.height,
-			.depth = 1
-		};
-
-		this->image = std::make_shared<VulkanImageObject>(
-			context->state->device,
-			this->imageType,
-			this->format,
-			extent,
-			this->levels,
-			this->layers,
-			this->samples,
-			this->tiling,
-			this->usage,
-			this->mode,
-			this->flags,
-			this->memoryFlags,
-			VK_IMAGE_LAYOUT_UNDEFINED);
-
-		this->updateState(context);
-	}
-
-	void updateState(Visitor* context)
-	{
-		context->state->image = this->image->image->image;
-		context->state->imageFormat = this->format;
-	}
-
-	std::shared_ptr<VulkanImageObject> image;
-
-	VkImageType imageType;
-	VkFormat format;
-	VkExtent3D extent;
-	uint32_t levels;
-	uint32_t layers;
-	VkSampleCountFlagBits samples;
-	VkImageTiling tiling;
-	VkImageUsageFlags usage;
-	VkSharingMode mode;
-	VkImageCreateFlags flags;
-	VkMemoryPropertyFlags memoryFlags;
-};
-
-
-class ImageView : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	virtual ~ImageView() = default;
-	ImageView(
-		VkImageViewType type,
-		VkFormat format,
-		VkComponentMapping components,
-		VkImageSubresourceRange subresourceRange) :
-		type(type),
-		format(format),
-		components(components),
-		subresourceRange(subresourceRange)
-	{
-		REGISTER_VISITOR(allocvisitor, ImageView, alloc);
-		REGISTER_VISITOR(resizevisitor, ImageView, alloc);
-		REGISTER_VISITOR(pipelinevisitor, ImageView, updateState);
-		REGISTER_VISITOR(recordvisitor, ImageView, updateState);
-	}
-
-	void alloc(Visitor* context)
-	{
-		this->view = std::make_shared<VulkanImageView>(
-			context->state->device,
-			context->state->image,
-			this->type,
-			this->format,
-			this->components,
-			this->subresourceRange);
-
-		this->updateState(context);
-	}
-
-	void updateState(Visitor* context)
-	{
-		context->state->imageView = this->view->view;
-		context->state->subresourceRange = this->subresourceRange;
-	}
-
-	std::shared_ptr<VulkanImageView> view;
-
-private:
-	VkImageViewType type;
-	VkFormat format;
-	VkComponentMapping components;
-	VkImageSubresourceRange subresourceRange;
-};
-
-
-class ImageLayout : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	virtual ~ImageLayout() = default;
-	ImageLayout(
-		VkImageLayout oldLayout,
-		VkImageLayout newLayout,
-		VkImageSubresourceRange subresourceRange) :
-		oldLayout(oldLayout),
-		newLayout(newLayout),
-		subresourceRange(subresourceRange)
-	{
-		REGISTER_VISITOR(allocvisitor, ImageLayout, alloc);
-		REGISTER_VISITOR(resizevisitor, ImageLayout, alloc);
-		REGISTER_VISITOR(pipelinevisitor, ImageLayout, updateState);
-		REGISTER_VISITOR(recordvisitor, ImageLayout, updateState);
-	}
-
-	void alloc(Visitor* context)
-	{
-		context->state->default_command->pipelineBarrier(
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
-			VulkanImage::MemoryBarrier(
-				context->state->image,
-				0,
-				0,
-				this->oldLayout,
-				this->newLayout,
-				this->subresourceRange) });
-
-		this->updateState(context);
-	}
-
-	void updateState(Visitor* context)
-	{
-		context->state->imageLayout = this->newLayout;
-	}
-
-	VkImageLayout oldLayout;
-	VkImageLayout newLayout;
-	VkImageSubresourceRange subresourceRange;
-};
-
-
-class CurrentImageRenderTarget : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	~CurrentImageRenderTarget() = default;
-	CurrentImageRenderTarget()
-	{
-		REGISTER_VISITOR(allocvisitor, CurrentImageRenderTarget, updateState);
-		REGISTER_VISITOR(resizevisitor, CurrentImageRenderTarget, updateState);
-		REGISTER_VISITOR(recordvisitor, CurrentImageRenderTarget, updateState);
-	}
-
-	void updateState(Visitor* context)
-	{
-		context->state->renderTarget = {
-			.image = context->state->image,
-			.format = context->state->imageFormat,
-			.layout = context->state->imageLayout,
-			.subresourceRange = context->state->subresourceRange
-		};
-	}
-};
-
 
 class TopLevelAccelerationStructure : public Node {
 public:
@@ -1121,15 +879,10 @@ public:
 				.mask = 0xFF,
 				.instanceShaderBindingTableRecordOffset = 0,
 				.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-				.accelerationStructureReference =
-					VulkanAccelerationStructure::GetDeviceAddress(
-						context->state->vulkan.get(),
-						context->state->device.get(),
-						blas)
+				.accelerationStructureReference = context->state->device->getDeviceAddress(blas)
 			};
 
 			auto instance_buffer = std::make_shared<VulkanBufferObject>(
-				context->state->vulkan,
 				context->state->device,
 				0,
 				sizeof(instance),
@@ -1140,7 +893,7 @@ public:
 			instance_buffer->memory->memcpy(&instance, sizeof(instance));
 
 			VkDeviceOrHostAddressConstKHR instance_data_device_address{
-				.deviceAddress = instance_buffer->buffer->getDeviceAddress()
+				.deviceAddress = context->state->device->getDeviceAddress(instance_buffer->buffer->buffer)
 			};
 
 			VkAccelerationStructureGeometryInstancesDataKHR acceleration_structure_geometry_instances_data{
@@ -1205,8 +958,8 @@ public:
 
 	void device(DeviceVisitor* visitor)
 	{
-		visitor->ray_tracing_features.rayTracing = VK_TRUE;
-		visitor->device_address_features.bufferDeviceAddress = VK_TRUE;
+		visitor->getFeatures<VkPhysicalDeviceRayTracingFeaturesKHR>().rayTracing = VK_TRUE;
+		visitor->getFeatures<VkPhysicalDeviceBufferDeviceAddressFeatures>().bufferDeviceAddress = VK_TRUE;
 
 		visitor->device_extensions.push_back(VK_KHR_RAY_TRACING_EXTENSION_NAME);
 		visitor->device_extensions.push_back(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
@@ -1225,13 +978,54 @@ public:
 
 	void pipeline(Visitor* context)
 	{
+		std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
+		std::vector<VkWriteDescriptorSet> write_descriptor_sets;
+		std::vector<VkDescriptorSetLayoutBinding> descriptor_set_layout_bindings;
+
+		for (auto& info : context->state->descriptor_set_infos) {
+			VkWriteDescriptorSet write_descriptor_set{
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.pNext = nullptr,
+				.dstSet = nullptr,
+				.dstBinding = info.binding,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = info.descriptorType,
+				.pImageInfo = nullptr,
+				.pBufferInfo = nullptr,
+				.pTexelBufferView = nullptr,
+			};
+
+			if (info.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
+				write_descriptor_set.pNext = &info.descriptor_set_acceleration_structure;
+			}
+
+			write_descriptor_set.pBufferInfo = &info.descriptor_buffer_info;
+			write_descriptor_set.pImageInfo = &info.descriptor_image_info;
+
+			descriptor_pool_sizes.push_back({
+				.type = info.descriptorType,
+				.descriptorCount = 1,
+				});
+
+			descriptor_set_layout_bindings.push_back({
+				.binding = info.binding,
+				.descriptorType = info.descriptorType,
+				.descriptorCount = 1,
+				.stageFlags = info.stageFlags,
+				.pImmutableSamplers = nullptr,
+				});
+
+			write_descriptor_sets.push_back(write_descriptor_set);
+		}
+
 		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
 			context->state->device,
-			context->state->descriptor_pool_sizes);
+			descriptor_pool_sizes);
 
 		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
 			context->state->device,
-			context->state->descriptor_set_layout_bindings);
+			descriptor_set_layout_bindings);
 
 		std::vector<VkDescriptorSetLayout> descriptor_set_layouts{
 			this->descriptor_set_layout->layout
@@ -1247,11 +1041,10 @@ public:
 			descriptor_pool,
 			descriptor_set_layouts);
 
-		for (auto& write_descriptor_set : context->state->write_descriptor_sets) {
+		for (auto& write_descriptor_set : write_descriptor_sets) {
 			write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
 		}
-
-		this->descriptor_sets->update(context->state->write_descriptor_sets);
+		this->descriptor_sets->update(write_descriptor_sets);
 
 		for (size_t i = 0; i < context->state->shader_stage_infos.size(); i++) {
 			VkRayTracingShaderGroupCreateInfoKHR rtx_group_info{
@@ -1298,7 +1091,6 @@ public:
 		const VkDeviceSize shader_binding_table_handle_size = ray_tracing_properties.shaderGroupHandleSize;
 
 		this->shader_binding_table = std::make_shared<VulkanBufferObject>(
-			context->state->vulkan,
 			context->state->device,
 			0,
 			shader_binding_table_size,
@@ -1400,164 +1192,6 @@ public:
 };
 #endif
 
-class Sampler : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	virtual ~Sampler() = default;
-
-	Sampler(
-		VkFilter magFilter,
-		VkFilter minFilter,
-		VkSamplerMipmapMode mipmapMode,
-		VkSamplerAddressMode addressModeU,
-		VkSamplerAddressMode addressModeV,
-		VkSamplerAddressMode addressModeW,
-		float mipLodBias,
-		VkBool32 anisotropyEnable,
-		float maxAnisotropy,
-		VkBool32 compareEnable,
-		VkCompareOp compareOp,
-		float minLod,
-		float maxLod,
-		VkBorderColor borderColor,
-		VkBool32 unnormalizedCoordinates) :
-		create_info({
-			.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-			.pNext = nullptr,
-			.flags = 0,
-			.magFilter = magFilter,
-			.minFilter = minFilter,
-			.mipmapMode = mipmapMode,
-			.addressModeU = addressModeU,
-			.addressModeV = addressModeV,
-			.addressModeW = addressModeW,
-			.mipLodBias = mipLodBias,
-			.anisotropyEnable = anisotropyEnable,
-			.maxAnisotropy = maxAnisotropy,
-			.compareEnable = compareEnable,
-			.compareOp = compareOp,
-			.minLod = minLod,
-			.maxLod = maxLod,
-			.borderColor = borderColor,
-			.unnormalizedCoordinates = unnormalizedCoordinates
-			})
-	{
-		REGISTER_VISITOR(allocvisitor, Sampler, alloc);
-		REGISTER_VISITOR(pipelinevisitor, Sampler, pipeline);
-	}
-
-	void alloc(Visitor* context)
-	{
-		this->sampler = std::make_unique<VulkanSampler>(
-			context->state->device,
-			this->create_info);
-	}
-
-	void pipeline(Visitor* context)
-	{
-		context->state->sampler = this->sampler->sampler;
-	}
-
-private:
-	std::unique_ptr<VulkanSampler> sampler;
-	VkSamplerCreateInfo create_info;
-};
-
-
-class TextureImage : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	virtual ~TextureImage() = default;
-	TextureImage(
-		VkSampleCountFlagBits sample_count,
-		VkImageTiling tiling,
-		VkImageUsageFlags usage_flags,
-		VkSharingMode sharing_mode,
-		VkImageCreateFlags create_flags,
-		VkImageLayout layout) :
-		sample_count(sample_count),
-		tiling(tiling),
-		usage_flags(usage_flags),
-		sharing_mode(sharing_mode),
-		create_flags(create_flags),
-		imageLayout(layout)
-	{
-		REGISTER_VISITOR(allocvisitor, TextureImage, alloc);
-		REGISTER_VISITOR(pipelinevisitor, TextureImage, pipeline);
-	}
-
-	void alloc(CommandVisitor* context)
-	{
-		this->image = std::make_shared<VulkanImageObject>(
-			context->state->device,
-			context->state->texture->image_type(),
-			context->state->texture->format(),
-			context->state->texture->extent(0),
-			context->state->texture->levels(),
-			context->state->texture->layers(),
-			this->sample_count,
-			this->tiling,
-			this->usage_flags,
-			this->sharing_mode,
-			this->create_flags,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		std::vector<VkBufferImageCopy> regions = context->state->texture->get_regions();
-
-		context->state->default_command->pipelineBarrier(
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,				// don't wait for anything
-			VK_PIPELINE_STAGE_TRANSFER_BIT,					// but block transfer 
-			{
-				VulkanImage::MemoryBarrier(
-					this->image->image->image,
-					0,
-					0,
-					VK_IMAGE_LAYOUT_UNDEFINED,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					context->state->texture->subresourceRange())
-			});
-
-		vk.CmdCopyBufferToImage(
-			context->state->default_command->buffer(),
-			context->state->buffer,
-			this->image->image->image,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			static_cast<uint32_t>(regions.size()),
-			regions.data());
-
-		context->state->default_command->pipelineBarrier(
-			VK_PIPELINE_STAGE_TRANSFER_BIT,					// wait for transfer
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,			// don't block anything
-			{
-				VulkanImage::MemoryBarrier(
-					this->image->image->image,
-					0,
-					0,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					this->imageLayout,
-					context->state->texture->subresourceRange())
-			});
-
-		context->state->image = this->image->image->image;
-	}
-
-	void pipeline(Visitor* context)
-	{
-		context->state->imageLayout = this->imageLayout;
-		context->state->image = this->image->image->image;
-	}
-
-private:
-	std::shared_ptr<VulkanImageObject> image;
-
-	VkSampleCountFlagBits sample_count;
-	VkImageTiling tiling;
-	VkImageUsageFlags usage_flags;
-	VkSharingMode sharing_mode;
-	VkImageCreateFlags create_flags;
-	VkImageLayout imageLayout;
-};
-
 
 class Extent : public Node {
 public:
@@ -1565,8 +1199,8 @@ public:
 	Extent() = delete;
 	virtual ~Extent() = default;
 
-	Extent(uint32_t width, uint32_t height) :
-		extent{ width, height }
+	Extent(uint32_t width, uint32_t height, uint32_t depth = 1) :
+		extent{ width, height, depth }
 	{
 		REGISTER_VISITOR(allocvisitor, Extent, update);
 		REGISTER_VISITOR(pipelinevisitor, Extent, update);
@@ -1581,7 +1215,7 @@ public:
 	}
 
 private:
-	VkExtent2D extent;
+	VkExtent3D extent;
 };
 
 
@@ -1626,24 +1260,73 @@ public:
 
 	void pipeline(Visitor* context)
 	{
+		std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
+		std::vector<VkWriteDescriptorSet> write_descriptor_sets;
+		std::vector<VkDescriptorSetLayoutBinding> descriptor_set_layout_bindings;
+
+		for (auto& info : context->state->descriptor_set_infos) {
+			VkWriteDescriptorSet write_descriptor_set{
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.pNext = nullptr,
+				.dstSet = nullptr,
+				.dstBinding = info.binding,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = info.descriptorType,
+				.pImageInfo = nullptr,
+				.pBufferInfo = nullptr,
+				.pTexelBufferView = nullptr,
+			};
+
+			if (info.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
+				write_descriptor_set.pNext = &info.descriptor_set_acceleration_structure;
+			}
+
+			write_descriptor_set.pBufferInfo = &info.descriptor_buffer_info;
+			write_descriptor_set.pImageInfo = &info.descriptor_image_info;
+
+			descriptor_pool_sizes.push_back({
+				.type = info.descriptorType,
+				.descriptorCount = 1,
+				});
+
+			descriptor_set_layout_bindings.push_back({
+				.binding = info.binding,
+				.descriptorType = info.descriptorType,
+				.descriptorCount = 1,
+				.stageFlags = info.stageFlags,
+				.pImmutableSamplers = nullptr,
+				});
+
+			write_descriptor_sets.push_back(write_descriptor_set);
+		}
+
+		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
+			context->state->device,
+			descriptor_pool_sizes);
+
 		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
 			context->state->device,
-			context->state->descriptor_set_layout_bindings);
+			descriptor_set_layout_bindings);
 
-		this->descriptor_set = std::make_unique<VulkanDescriptorSets>(
-			context->state->device,
-			this->descriptor_pool,
-			std::vector<VkDescriptorSetLayout>{ this->descriptor_set_layout->layout });
+		std::vector<VkDescriptorSetLayout> descriptor_set_layouts{
+			this->descriptor_set_layout->layout
+		};
 
 		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
 			context->state->device,
-			std::vector<VkDescriptorSetLayout>{ this->descriptor_set_layout->layout },
+			descriptor_set_layouts,
 			context->state->push_constant_ranges);
 
-		for (auto& write_descriptor_set : context->state->write_descriptor_sets) {
-			write_descriptor_set.dstSet = this->descriptor_set->descriptor_sets[0];
+		this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
+			context->state->device,
+			descriptor_pool,
+			descriptor_set_layouts);
+
+		for (auto& write_descriptor_set : write_descriptor_sets) {
+			write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
 		}
-		this->descriptor_set->update(context->state->write_descriptor_sets);
+		this->descriptor_sets->update(write_descriptor_sets);
 
 		this->compute_pipeline = std::make_unique<VulkanComputePipeline>(
 			context->state->device,
@@ -1658,8 +1341,8 @@ public:
 			VK_PIPELINE_BIND_POINT_COMPUTE,
 			this->pipeline_layout->layout,
 			0,
-			static_cast<uint32_t>(this->descriptor_set->descriptor_sets.size()),
-			this->descriptor_set->descriptor_sets.data(),
+			static_cast<uint32_t>(this->descriptor_sets->descriptor_sets.size()),
+			this->descriptor_sets->descriptor_sets.data(),
 			0,
 			nullptr);
 
@@ -1682,7 +1365,7 @@ private:
 	std::unique_ptr<VulkanCommandBuffers> command;
 
 	std::shared_ptr<VulkanDescriptorSetLayout> descriptor_set_layout;
-	std::shared_ptr<VulkanDescriptorSets> descriptor_set;
+	std::shared_ptr<VulkanDescriptorSets> descriptor_sets;
 	std::shared_ptr<VulkanPipelineLayout> pipeline_layout;
 	std::shared_ptr<VulkanDescriptorPool> descriptor_pool;
 };
@@ -1710,13 +1393,54 @@ public:
 
 	void pipeline(Visitor* context)
 	{
+		std::vector<VkDescriptorPoolSize> descriptor_pool_sizes;
+		std::vector<VkWriteDescriptorSet> write_descriptor_sets;
+		std::vector<VkDescriptorSetLayoutBinding> descriptor_set_layout_bindings;
+
+		for (auto& info : context->state->descriptor_set_infos) {
+			VkWriteDescriptorSet write_descriptor_set{
+				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.pNext = nullptr,
+				.dstSet = nullptr,
+				.dstBinding = info.binding,
+				.dstArrayElement = 0,
+				.descriptorCount = 1,
+				.descriptorType = info.descriptorType,
+				.pImageInfo = nullptr,
+				.pBufferInfo = nullptr,
+				.pTexelBufferView = nullptr,
+			};
+
+			if (info.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
+				write_descriptor_set.pNext = &info.descriptor_set_acceleration_structure;
+			}
+
+			write_descriptor_set.pBufferInfo = &info.descriptor_buffer_info;
+			write_descriptor_set.pImageInfo = &info.descriptor_image_info;
+
+			descriptor_pool_sizes.push_back({
+				.type = info.descriptorType,
+				.descriptorCount = 1,
+				});
+
+			descriptor_set_layout_bindings.push_back({
+				.binding = info.binding,
+				.descriptorType = info.descriptorType,
+				.descriptorCount = 1,
+				.stageFlags = info.stageFlags,
+				.pImmutableSamplers = nullptr,
+				});
+
+			write_descriptor_sets.push_back(write_descriptor_set);
+		}
+
 		auto descriptor_pool = std::make_shared<VulkanDescriptorPool>(
 			context->state->device,
-			context->state->descriptor_pool_sizes);
+			descriptor_pool_sizes);
 
 		this->descriptor_set_layout = std::make_unique<VulkanDescriptorSetLayout>(
 			context->state->device,
-			context->state->descriptor_set_layout_bindings);
+			descriptor_set_layout_bindings);
 
 		std::vector<VkDescriptorSetLayout> descriptor_set_layouts{
 			this->descriptor_set_layout->layout
@@ -1732,10 +1456,10 @@ public:
 			descriptor_pool,
 			descriptor_set_layouts);
 
-		for (auto& write_descriptor_set : context->state->write_descriptor_sets) {
+		for (auto& write_descriptor_set : write_descriptor_sets) {
 			write_descriptor_set.dstSet = this->descriptor_sets->descriptor_sets[0];
 		}
-		this->descriptor_sets->update(context->state->write_descriptor_sets);
+		this->descriptor_sets->update(write_descriptor_sets);
 
 		this->graphics_pipeline = std::make_unique<VulkanGraphicsPipeline>(
 			context->state->device,
@@ -1774,7 +1498,7 @@ public:
 
 		std::vector<VkRect2D> scissors{ {
 			{ 0, 0 },
-			context->state->extent
+			VkExtent2D{ context->state->extent.width, context->state->extent.width }
 		} };
 
 		std::vector<VkViewport> viewports{ {
@@ -1921,40 +1645,119 @@ private:
 };
 
 
-class FramebufferAttachment : public Group {
+class FramebufferAttachment : public Node {
 public:
 	IMPLEMENT_VISITABLE;
 	virtual ~FramebufferAttachment() = default;
 
-	explicit FramebufferAttachment(std::vector<std::shared_ptr<Node>> children) :
-		Group(std::move(children))
+	explicit FramebufferAttachment(
+		VkFormat format,
+		VkImageLayout layout,
+		VkImageUsageFlags usage,
+		VkImageAspectFlags aspectMask) :
+		format(format),
+		layout(layout),
+		usage(usage),
+		subresourceRange({ aspectMask, 0, 1, 0, 1 })
 	{
 		REGISTER_VISITOR(allocvisitor, FramebufferAttachment, alloc);
 		REGISTER_VISITOR(resizevisitor, FramebufferAttachment, alloc);
-		REGISTER_VISITOR(pipelinevisitor, FramebufferAttachment, visitChildren);
-		REGISTER_VISITOR(recordvisitor, FramebufferAttachment, visitChildren);
-	}
-
-	void visitChildren(Visitor* context)
-	{
-		Group::visit(context);
 	}
 
 	void alloc(Visitor* context)
 	{
-		Group::visit(context);
-		context->state->framebuffer_attachments.push_back(context->state->imageView);
+		this->image = std::make_shared<VulkanImageObject>(
+			context->state->device,
+			VK_IMAGE_TYPE_2D,
+			this->format,
+			context->state->extent,
+			1,
+			1,
+			VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TILING_OPTIMAL,
+			this->usage,
+			VK_SHARING_MODE_EXCLUSIVE,
+			0,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+		VkComponentMapping componentMapping{
+			.r = VK_COMPONENT_SWIZZLE_R,
+			.g = VK_COMPONENT_SWIZZLE_G,
+			.b = VK_COMPONENT_SWIZZLE_B,
+			.a = VK_COMPONENT_SWIZZLE_A,
+		};
+
+		this->view = std::make_shared<VulkanImageView>(
+			context->state->device,
+			this->image->image->image,
+			VK_IMAGE_VIEW_TYPE_2D,
+			this->format,
+			componentMapping,
+			this->subresourceRange);
+
+		context->state->default_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+			VulkanImage::MemoryBarrier(
+				this->image->image->image,
+				0,
+				0,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				this->layout,
+				this->subresourceRange) });
 	}
 
 public:
-	VkFormat format{ VK_FORMAT_UNDEFINED };
-	VkImageUsageFlags usage{ 0 };
+	VkFormat format;
+	VkImageLayout layout;
+	VkImageUsageFlags usage;
+	VkImageSubresourceRange subresourceRange;
 
-public:
-	std::shared_ptr<Image> image;
-	std::shared_ptr<ImageView> imageView;
-	std::shared_ptr<ImageLayout> imageLayout;
+	std::shared_ptr<VulkanImageObject> image;
+	std::shared_ptr<VulkanImageView> view;
 };
+
+
+class RTXbuffer : public Group {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~RTXbuffer() = default;
+
+	explicit RTXbuffer(std::vector<std::shared_ptr<Node>> children) :
+		Group(std::move(children))
+	{
+		REGISTER_VISITOR(allocvisitor, RTXbuffer, alloc);
+		REGISTER_VISITOR(resizevisitor, RTXbuffer, alloc);
+		REGISTER_VISITOR(pipelinevisitor, RTXbuffer, update);
+		REGISTER_VISITOR(recordvisitor, RTXbuffer, update);
+	}
+
+	void alloc(Visitor* context)
+	{
+		for (auto child : this->children) {
+			child->visit(context);
+		}
+		this->update(context);
+	}
+
+	void update(Visitor* context)
+	{
+		auto attachment0 = static_pointer_cast<FramebufferAttachment>(this->children[0]);
+
+		context->state->renderTarget = {
+			.image = attachment0->image->image->image,
+			.format = attachment0->format,
+			.layout = attachment0->layout,
+			.subresourceRange = attachment0->subresourceRange
+		};
+
+		context->state->imageView = attachment0->view->view;
+		context->state->imageLayout = attachment0->layout;
+	}
+
+	VkExtent3D extent{ 1920, 1080, 1 };
+};
+
 
 class Framebuffer : public Group {
 public:
@@ -1966,33 +1769,41 @@ public:
 	{
 		REGISTER_VISITOR(allocvisitor, Framebuffer, alloc);
 		REGISTER_VISITOR(resizevisitor, Framebuffer, alloc);
-		REGISTER_VISITOR(recordvisitor, Framebuffer, record);
+		REGISTER_VISITOR(recordvisitor, Framebuffer, update);
 	}
 
-	void do_alloc(CommandVisitor* context)
+	void update(Visitor* context)
 	{
-		this->framebuffer = std::make_unique<VulkanFramebuffer>(
-			context->state->device,
-			context->state->renderpass,
-			context->state->framebuffer_attachments,
-			context->state->extent,
-			1);
-		context->state->framebuffer = this->framebuffer;
+		auto attachment0 = static_pointer_cast<FramebufferAttachment>(this->children[0]);
+
+		context->state->renderTarget = {
+			.image = attachment0->image->image->image,
+			.format = attachment0->format,
+			.layout = attachment0->layout,
+			.subresourceRange = attachment0->subresourceRange
+		};
 	}
 
 	void alloc(CommandVisitor* context)
 	{
-		Group::visit(context);
-		this->do_alloc(context);
-	}
+		std::vector<VkImageView> framebuffer_attachments;
 
-	void record(Visitor* context)
-	{
-		Group::visit(context);
-	}
+		for (auto child : this->children) {
+			child->visit(context);
+			auto attachment = static_pointer_cast<FramebufferAttachment>(child);
+			framebuffer_attachments.push_back(attachment->view->view);
+		}
 
-public:
-	std::shared_ptr<VulkanFramebuffer> framebuffer;
+		context->state->framebuffer = std::make_unique<VulkanFramebuffer>(
+			context->state->device,
+			context->state->renderpass,
+			framebuffer_attachments,
+			context->state->extent.width,
+			context->state->extent.height,
+			1);
+
+		this->update(context);
+	}
 };
 
 
@@ -2129,7 +1940,6 @@ public:
 	void alloc(Visitor* context)
 	{
 		Group::visit(context);
-
 		context->state->subpass_descriptions.push_back({
 			.flags = 0,
 			.pipelineBindPoint = context->state->bind_point,
@@ -2228,12 +2038,12 @@ public:
 	void render(Visitor* context)
 	{
 		const VkRect2D renderarea{
-			{ 0, 0 },						// offset
-			context->state->extent			// extent
+			.offset = { 0, 0 },
+			.extent = VkExtent2D{ context->state->extent.width, context->state->extent.height }
 		};
 
 		const std::vector<VkClearValue> clearvalues{
-			{.color = { 1.0f, 1.0f, 0.0f, 0.0f } },
+			{.color = { 0.0f, 0.0f, 0.0f, 0.0f } },
 			{.depthStencil = { 1.0f, 0 } }
 		};
 
@@ -2340,7 +2150,7 @@ public:
 			3,
 			surface_format.format,
 			surface_format.colorSpace,
-			context->state->extent,
+			VkExtent2D{ context->state->extent.width, context->state->extent.height },
 			1,
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
 			VK_SHARING_MODE_EXCLUSIVE,
@@ -2538,15 +2348,11 @@ public:
 		// VK_QUEUE_TRANSFER_BIT capability separately for that queue family is optional.
 		this->get_image_queue = context->state->device->getQueue(VK_QUEUE_COMPUTE_BIT);
 
-		VkExtent3D extent = {
-		  context->state->extent.width, context->state->extent.height, 1
-		};
-
 		this->image = std::make_shared<VulkanImageObject>(
 			context->state->device,
 			VK_IMAGE_TYPE_2D,
 			context->state->renderTarget.format,
-			extent,
+			context->state->extent,
 			this->subresource_range.levelCount,
 			this->subresource_range.layerCount,
 			VK_SAMPLE_COUNT_1_BIT,
@@ -2586,16 +2392,12 @@ public:
 			0, 0, 0
 		};
 
-		VkExtent3D extent3d = {
-			context->state->extent.width, context->state->extent.height, 1
-		};
-
 		VkImageCopy image_copy{
 			.srcSubresource = subresource_layers,
 			.srcOffset = offset,
 			.dstSubresource = subresource_layers,
 			.dstOffset = offset,
-			.extent = extent3d,
+			.extent = context->state->extent,
 		};
 
 		VulkanCommandBuffers::Scope command_scope(this->get_image_command.get());
@@ -2699,6 +2501,164 @@ private:
 	std::shared_ptr<VulkanFence> fence{ nullptr };
 
 	VkDeviceSize dataOffset{ 0 };
+};
+
+
+class TextureImage : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	virtual ~TextureImage() = default;
+
+	explicit TextureImage(
+		uint32_t binding,
+		VkShaderStageFlags stageFlags,
+		VkFilter filter,
+		VkSamplerMipmapMode mipmapMode,
+		VkSamplerAddressMode addressMode,
+		const std::string& filename) :
+		binding(binding),
+		stageFlags(stageFlags),
+		filter(filter),
+		mipmapMode(mipmapMode),
+		addressMode(addressMode),
+		texture(VulkanImageFactory::Create(filename))
+	{
+		REGISTER_VISITOR(allocvisitor, TextureImage, alloc);
+		REGISTER_VISITOR(pipelinevisitor, TextureImage, updateState);
+		REGISTER_VISITOR(recordvisitor, TextureImage, updateState);
+	}
+
+	void alloc(Visitor* context)
+	{
+		this->sampler = std::make_unique<VulkanSampler>(
+			context->state->device,
+			this->filter,
+			this->filter,
+			this->mipmapMode,
+			this->addressMode,
+			this->addressMode,
+			this->addressMode,
+			0.0f,
+			VK_FALSE,
+			0.0f,
+			VK_FALSE,
+			VK_COMPARE_OP_NEVER,
+			0.0f,
+			static_cast<float>(this->texture->levels()),
+			VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+			VK_FALSE);
+
+		this->image = std::make_unique<VulkanImageObject>(
+			context->state->device,
+			this->texture->image_type(),
+			this->texture->format(),
+			this->texture->extent(0),
+			this->texture->levels(),
+			this->texture->layers(),
+			VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			0,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED);
+
+		this->buffer = std::make_unique<VulkanBufferObject>(
+			context->state->device,
+			0,
+			this->texture->size(),
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+		MemoryMap memmap(this->buffer->memory.get());
+		std::copy(this->texture->data(), this->texture->data() + this->texture->size(), memmap.mem);
+
+		VkComponentMapping componentMapping{
+			.r = VK_COMPONENT_SWIZZLE_R,
+			.g = VK_COMPONENT_SWIZZLE_G,
+			.b = VK_COMPONENT_SWIZZLE_B,
+			.a = VK_COMPONENT_SWIZZLE_A,
+		};
+
+		VkImageSubresourceRange subresourceRange = this->texture->subresourceRange();
+
+		this->view = std::make_unique<VulkanImageView>(
+			context->state->device,
+			this->image->image->image,
+			this->texture->image_view_type(),
+			this->texture->format(),
+			componentMapping,
+			subresourceRange);
+
+		std::vector<VkBufferImageCopy> regions = this->texture->getRegions();
+
+		context->state->default_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,					// don't wait for anything
+			VK_PIPELINE_STAGE_TRANSFER_BIT,						// but block transfer
+			{
+				VulkanImage::MemoryBarrier(
+					this->image->image->image,
+					0,
+					0,
+					VK_IMAGE_LAYOUT_UNDEFINED,					// old layout
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,		// new layout
+					subresourceRange)
+			});
+
+		vk.CmdCopyBufferToImage(
+			context->state->default_command->buffer(),
+			this->buffer->buffer->buffer,
+			this->image->image->image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			static_cast<uint32_t>(regions.size()),
+			regions.data());
+
+		context->state->default_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TRANSFER_BIT,						// wait for transfer
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,				// don't block anything
+			{
+				VulkanImage::MemoryBarrier(
+					this->image->image->image,
+					0,
+					0,
+					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,		// old layout
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,	// new layout
+					subresourceRange)
+			});
+
+		this->updateState(context);
+	}
+
+	void updateState(Visitor* context)
+	{
+		VkDescriptorImageInfo descriptorImageInfo{
+			.sampler = this->sampler->sampler,
+			.imageView = this->view->view,
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		};
+
+		DescriptorSetInfo descriptorSetInfo{
+			.binding = this->binding,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.stageFlags = this->stageFlags,
+			.descriptor_image_info = descriptorImageInfo,
+		};
+
+		context->state->descriptor_set_infos.push_back(descriptorSetInfo);
+	}
+
+	uint32_t binding;
+	VkShaderStageFlags stageFlags;
+	VkFilter filter;
+	VkSamplerMipmapMode mipmapMode;
+	VkSamplerAddressMode addressMode;
+
+	std::shared_ptr<VulkanTextureImage> texture;
+	std::unique_ptr<VulkanSampler> sampler;
+	std::unique_ptr<VulkanImageObject> image;
+	std::unique_ptr<VulkanBufferObject> buffer;
+	std::unique_ptr<VulkanImageView> view;
 };
 
 
@@ -2810,15 +2770,117 @@ public:
 };
 
 
-class MemoryPageManager {
+class SparseTextureImage : public Node {
 public:
-	MemoryPageManager(Visitor* context, std::shared_ptr<VulkanImage> image) :
-		image(std::move(image))
+	IMPLEMENT_VISITABLE;
+	virtual ~SparseTextureImage() = default;
+
+	explicit SparseTextureImage(
+		uint32_t binding,
+		VkShaderStageFlags stageFlags,
+		VkFilter filter,
+		VkSamplerMipmapMode mipmapMode,
+		VkSamplerAddressMode addressMode,
+		const std::string& filename) :
+		binding(binding),
+		stageFlags(stageFlags),
+		filter(filter),
+		mipmapMode(mipmapMode),
+		addressMode(addressMode),
+		texture(VulkanImageFactory::Create(filename))
 	{
+		REGISTER_VISITOR(devicevisitor, SparseTextureImage, device);
+		REGISTER_VISITOR(allocvisitor, SparseTextureImage, alloc);
+		REGISTER_VISITOR(pipelinevisitor, SparseTextureImage, updateState);
+		REGISTER_VISITOR(recordvisitor, SparseTextureImage, updateState);
+		REGISTER_VISITOR(rendervisitor, SparseTextureImage, render);
+	}
+
+	void device(DeviceVisitor* context)
+	{
+		context->device_features.sparseBinding = VK_TRUE;
+		context->device_features.sparseResidencyImage2D = VK_TRUE;
+		context->device_features.sparseResidencyImage3D = VK_TRUE;
+	}
+
+	void alloc(Visitor* context)
+	{
+		this->sampler = std::make_unique<VulkanSampler>(
+			context->state->device,
+			this->filter,
+			this->filter,
+			this->mipmapMode,
+			this->addressMode,
+			this->addressMode,
+			this->addressMode,
+			0.0f,
+			VK_FALSE,
+			0.0f,
+			VK_FALSE,
+			VK_COMPARE_OP_NEVER,
+			0.0f,
+			static_cast<float>(this->texture->levels()),
+			VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+			VK_FALSE);
+
+		this->image = std::make_unique<VulkanImage>(
+			context->state->device,
+			this->texture->image_type(),
+			this->texture->format(),
+			this->texture->extent(0),
+			this->texture->levels(),
+			this->texture->layers(),
+			VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED);
+
+		VkComponentMapping componentMapping{
+			.r = VK_COMPONENT_SWIZZLE_R,
+			.g = VK_COMPONENT_SWIZZLE_G,
+			.b = VK_COMPONENT_SWIZZLE_B,
+			.a = VK_COMPONENT_SWIZZLE_A,
+		};
+
+		VkImageSubresourceRange subresourceRange = this->texture->subresourceRange();
+
+		this->view = std::make_unique<VulkanImageView>(
+			context->state->device,
+			this->image->image,
+			this->texture->image_view_type(),
+			this->texture->format(),
+			componentMapping,
+			subresourceRange);
+
+		context->state->default_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
+			this->image->memoryBarrier(
+				0,
+				0,
+				VK_IMAGE_LAYOUT_UNDEFINED,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				subresourceRange) });
+
+		this->updateState(context);
+
 		this->bind_sparse_finished = std::make_unique<VulkanSemaphore>(context->state->device);
 		this->copy_sparse_finished = std::make_unique<VulkanSemaphore>(context->state->device);
 		this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->state->device);
 		this->copy_sparse_queue = context->state->device->getQueue(VK_QUEUE_SPARSE_BINDING_BIT);
+
+		this->buffer = std::make_unique<VulkanBufferObject>(
+			context->state->device,
+			0,
+			this->texture->size(),
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+		MemoryMap memmap(this->buffer->memory.get());
+		std::copy(this->texture->data(), this->texture->data() + this->texture->size(), memmap.mem);
 
 		VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
 
@@ -2827,9 +2889,9 @@ public:
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
-			this->image->getSparseMemoryRequirements(context->state->texture->subresourceRange().aspectMask);
+			this->image->getSparseMemoryRequirements(subresourceRange.aspectMask);
 
-		uint32_t numTiles = 5000;
+		uint32_t numTiles = 1500;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
 		this->image_memory = std::make_shared<VulkanMemory>(
@@ -2843,13 +2905,31 @@ public:
 			this->reusable_pages.push_back(
 				std::make_shared<MemoryPage>(
 					this->image_memory->memory,
-					context->state->texture,
+					this->texture.get(),
 					imageExtent,
 					i * pageSize));
 		}
 	}
 
-	void updateBindings(RenderVisitor* context)
+	void updateState(Visitor* context)
+	{
+		VkDescriptorImageInfo descriptorImageInfo{
+			.sampler = this->sampler->sampler,
+			.imageView = this->view->view,
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		};
+
+		DescriptorSetInfo descriptorSetInfo{
+			.binding = this->binding,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.stageFlags = this->stageFlags,
+			.descriptor_image_info = descriptorImageInfo,
+		};
+
+		context->state->descriptor_set_infos.push_back(descriptorSetInfo);
+	}
+
+	void render(RenderVisitor* context)
 	{
 		std::set<uint32_t> tiles = context->image->getTiles(context);
 
@@ -2924,6 +3004,8 @@ public:
 			context->state->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
 		}
 		else {
+			VkImageSubresourceRange subresourceRange = this->texture->subresourceRange();
+
 			this->copy_sparse_command->begin();
 
 			this->copy_sparse_command->pipelineBarrier(
@@ -2936,12 +3018,12 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					context->state->texture->subresourceRange())
+					subresourceRange)
 				});
 
 			vk.CmdCopyBufferToImage(
 				this->copy_sparse_command->buffer(),
-				context->state->buffer,
+				this->buffer->buffer->buffer,
 				this->image->image,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				static_cast<uint32_t>(regions.size()),
@@ -2957,7 +3039,7 @@ public:
 					0,
 					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					context->state->texture->subresourceRange())
+					subresourceRange)
 				});
 
 			this->copy_sparse_command->end();
@@ -2976,7 +3058,20 @@ public:
 		}
 	}
 
-	std::shared_ptr<VulkanImage> image;
+
+	uint32_t binding;
+	VkShaderStageFlags stageFlags;
+	VkFilter filter;
+	VkSamplerMipmapMode mipmapMode;
+	VkSamplerAddressMode addressMode;
+
+	std::shared_ptr<VulkanTextureImage> texture;
+	std::unique_ptr<VulkanSampler> sampler;
+	std::unique_ptr<VulkanImage> image;
+	std::unique_ptr<VulkanBufferObject> buffer;
+	std::unique_ptr<VulkanImageView> view;
+
+
 	std::shared_ptr<VulkanMemory> image_memory;
 	std::map<uint32_t, std::shared_ptr<MemoryPage>> used_image_memory_pages;
 	std::deque<std::shared_ptr<MemoryPage>> reusable_pages;
@@ -2986,92 +3081,4 @@ public:
 	std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
 	std::unique_ptr<VulkanCommandBuffers> copy_sparse_command;
 	VkQueue copy_sparse_queue{ nullptr };
-};
-
-
-class SparseImage : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	SparseImage() = delete;
-	virtual ~SparseImage() = default;
-	SparseImage(
-		VkSampleCountFlagBits sample_count,
-		VkImageTiling tiling,
-		VkImageUsageFlags usage_flags,
-		VkSharingMode sharing_mode,
-		VkImageCreateFlags create_flags,
-		VkImageLayout layout) :
-		sample_count(sample_count),
-		tiling(tiling),
-		usage_flags(usage_flags),
-		sharing_mode(sharing_mode),
-		create_flags(create_flags),
-		layout(layout)
-	{
-		REGISTER_VISITOR(devicevisitor, SparseImage, device);
-		REGISTER_VISITOR(allocvisitor, SparseImage, alloc);
-		REGISTER_VISITOR(pipelinevisitor, SparseImage, pipeline);
-		REGISTER_VISITOR(rendervisitor, SparseImage, render);
-		REGISTER_VISITOR(devicevisitor, SparseImage, device);
-	}
-
-	void device(DeviceVisitor* context)
-	{
-		context->device_features.sparseBinding = VK_TRUE;
-		context->device_features.sparseResidencyImage2D = VK_TRUE;
-		context->device_features.sparseResidencyImage3D = VK_TRUE;
-	}
-
-	void alloc(CommandVisitor* context)
-	{
-		this->image = std::make_shared<VulkanImage>(
-			context->state->device,
-			context->state->texture->image_type(),
-			context->state->texture->format(),
-			context->state->texture->extent(0),
-			context->state->texture->levels(),
-			context->state->texture->layers(),
-			this->sample_count,
-			this->tiling,
-			this->usage_flags,
-			this->sharing_mode,
-			this->create_flags);
-
-		context->state->default_command->pipelineBarrier(
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, {
-			this->image->memoryBarrier(
-				0,
-				0,
-				VK_IMAGE_LAYOUT_UNDEFINED,
-				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-				context->state->texture->subresourceRange()) });
-
-		this->memory_manager = std::make_unique<MemoryPageManager>(context, this->image);
-
-		context->state->image = this->image->image;
-	}
-
-	void pipeline(Visitor* context)
-	{
-		context->state->imageLayout = this->layout;
-	}
-
-	void render(RenderVisitor* context)
-	{
-		this->memory_manager->updateBindings(context);
-	}
-
-private:
-	std::shared_ptr<VulkanImage> image;
-	std::shared_ptr<VulkanMemory> image_memory;
-
-	VkSampleCountFlagBits sample_count;
-	VkImageTiling tiling;
-	VkImageUsageFlags usage_flags;
-	VkSharingMode sharing_mode;
-	VkImageCreateFlags create_flags;
-	VkImageLayout layout;
-
-	std::unique_ptr<MemoryPageManager> memory_manager;
 };

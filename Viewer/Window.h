@@ -39,7 +39,7 @@ public:
 		}
 	};
 
-	Window()
+	Window(int width, int height)
 	{
 		static Init init;
 		this->hInstance = GetModuleHandle(NULL);
@@ -49,7 +49,7 @@ public:
 			_T("Vulkan 3D Window App"),
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT,
-			1920, 1080,
+			width, height,
 			NULL,
 			NULL,
 			this->hInstance,
@@ -150,7 +150,8 @@ class VulkanWindow : public Window {
 public:
 	virtual ~VulkanWindow() = default;
 
-	VulkanWindow(std::shared_ptr<Node> scene)
+	VulkanWindow(VkExtent2D extent, std::shared_ptr<Node> scene) :
+		Window(extent.width, extent.height)
 	{
 		devicevisitor.instance_extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 		devicevisitor.instance_extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
@@ -160,40 +161,16 @@ public:
 		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 		devicevisitor.instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
-		this->state = std::make_shared<State>();
-
-		allocvisitor.state = this->state;
-		resizevisitor.state = this->state;
-		rendervisitor.state = this->state;
-		pipelinevisitor.state = this->state;
-		recordvisitor.state = this->state;
-		presentvisitor.state = this->state;
-		eventvisitor.state = this->state;
-		devicevisitor.state = this->state;
-
 		devicevisitor.visit(scene.get());
 
-		this->state->vulkan = std::make_shared<VulkanInstance>(
+		state->vulkan = std::make_shared<VulkanInstance>(
 			"Innovator",
 			devicevisitor.instance_layers,
 			devicevisitor.instance_extensions);
 
-		surface = std::make_shared<VulkanSurface>(
-			this->state->vulkan,
-			this->hWnd,
-			this->hInstance);
-
-		auto swapchain = std::make_shared<Swapchain>(surface, VK_PRESENT_MODE_FIFO_KHR);
-
-		this->scene = std::make_shared<Group>();
-		this->scene->children = {
-			scene,
-			swapchain
-		};
-
 #ifdef DEBUG
 		auto debugcb = std::make_unique<VulkanDebugCallback>(
-			this->state->vulkan,
+			state->vulkan,
 			VK_DEBUG_REPORT_WARNING_BIT_EXT |
 			VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
 			VK_DEBUG_REPORT_ERROR_BIT_EXT |
@@ -205,25 +182,39 @@ public:
 #endif
 		devicevisitor.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
-		this->state->device = std::make_shared<VulkanDevice>(
-			this->state->vulkan,
-			devicevisitor.device_features2,
+		state->device = std::make_shared<VulkanDevice>(
+			state->vulkan,
+			devicevisitor.getDeviceFeatures(),
 			devicevisitor.device_layers,
 			devicevisitor.device_extensions);
 
-		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(this->state->device);
-		this->state->extent = surface_capabilities.currentExtent;
+		state->pipelinecache = std::make_shared<VulkanPipelineCache>(state->device);
+		state->fence = std::make_shared<VulkanFence>(state->device);
+		state->default_command = std::make_shared<VulkanCommandBuffers>(state->device);
+		state->queue = state->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
 
-		this->state->pipelinecache = std::make_shared<VulkanPipelineCache>(this->state->device);
-		this->state->fence = std::make_shared<VulkanFence>(this->state->device);
-		this->state->default_command = std::make_shared<VulkanCommandBuffers>(this->state->device);
-		this->state->queue = this->state->device->getQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+		surface = std::make_shared<VulkanSurface>(
+			state->vulkan,
+			this->hWnd,
+			this->hInstance);
+
+		auto swapchain = std::make_shared<Swapchain>(surface, VK_PRESENT_MODE_FIFO_KHR);
+
+		this->scene = std::make_shared<Group>();
+		this->scene->children = {
+			scene,
+			swapchain
+		};
+
+		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(state->device);
+		state->extent = VkExtent3D{
+			surface_capabilities.currentExtent.width,
+			surface_capabilities.currentExtent.height,
+			1
+		};
 
 		allocvisitor.visit(this->scene.get());
 		pipelinevisitor.visit(this->scene.get());
-		recordvisitor.visit(this->scene.get());
-
-		this->resize(1920, 1080);
 	}
 
 	void redraw() override
@@ -240,16 +231,15 @@ public:
 
 	void resize(int width, int height) override
 	{
-		this->state->extent = VkExtent2D{
+		state->extent = VkExtent3D{
 			static_cast<uint32_t>(width),
-			static_cast<uint32_t>(height)
+			static_cast<uint32_t>(height),
+			1
 		};
 
 		resizevisitor.visit(this->scene.get());
 		recordvisitor.visit(this->scene.get());
 		this->redraw();
-
-		VkSurfaceCapabilitiesKHR surface_capabilities = surface->getSurfaceCapabilities(this->state->device);
 	}
 
 	void mousePressed(int x, int y, int button) override
@@ -271,6 +261,5 @@ public:
 	}
 
 	std::shared_ptr<Group> scene;
-	std::shared_ptr<State> state{ nullptr };
 	std::shared_ptr<VulkanSurface> surface;
 };
