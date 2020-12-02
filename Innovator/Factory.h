@@ -21,7 +21,8 @@ public:
 	virtual uint32_t layers() const = 0;
 	virtual size_t size() const = 0;
 	virtual size_t size(size_t level) const = 0;
-	virtual const unsigned char* data() const = 0;
+	virtual const uint8_t* const_data() const = 0;
+	virtual uint8_t* data() = 0;
 	virtual VkFormat format() const = 0;
 	virtual VkImageType image_type() const = 0;
 	virtual VkImageViewType image_view_type() const = 0;
@@ -145,9 +146,14 @@ public:
 		return this->texture.size(level);
 	}
 
-	const unsigned char* data() const override
+	uint8_t* data() override
 	{
-		return reinterpret_cast<const unsigned char*>(this->texture.data());
+		return reinterpret_cast<uint8_t*>(this->texture.data());
+	}
+
+	const uint8_t* const_data() const override
+	{
+		return reinterpret_cast<const uint8_t*>(this->texture.data());
 	}
 
 	VkFormat format() const override
@@ -171,6 +177,128 @@ public:
 	}
 
 	gli::texture2d texture;
+};
+
+
+class MemoryMappedImage2D : public VulkanTextureImage {
+public:
+	explicit MemoryMappedImage2D(const std::string& filename)
+	{
+#if 0
+		this->texture = gli::load(filename);
+		std::vector<glm::u8vec4> tiles;
+		for (int k = 0; k < 7; k++) {
+			std::cout << "writing lod " << k << std::endl;
+			for (int tile_start_i = 0; tile_start_i < this->texture[k].extent().x; tile_start_i += 128) {
+				for (int tile_start_j = 0; tile_start_j < this->texture[k].extent().y; tile_start_j += 128) {
+					std::cout << "writing tile " << tile_start_i / 128 << " " << tile_start_j / 128 << " extent: " << this->texture[k].extent().x << std::endl;
+					for (int i = tile_start_i; i < tile_start_i + 128; i++) {
+						for (int j = tile_start_j; j < tile_start_j + 128; j++) {
+							glm::uvec4 texel = this->texture.load<gli::u8vec4>(glm::uvec2(j, i), k);
+							tiles.push_back(texel);
+						}
+					}
+				}
+			}
+		}
+
+		std::fstream out("world.bin", std::ios_base::out | std::ios_base::binary);
+		out.write(reinterpret_cast<char*>(tiles.data()), tiles.size() * sizeof(glm::u8vec4));
+
+		glm::u8vec4* dest = reinterpret_cast<glm::u8vec4*>(this->texture.data());
+		std::copy(tiles.data(), tiles.data() + tiles.size(), dest);
+#endif
+		this->num_lods = 6;
+		this->lod0_size = 8192;
+		this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
+	}
+
+	virtual ~MemoryMappedImage2D() = default;
+
+	VkExtent3D extent(size_t level) const override
+	{
+		return {
+		  static_cast<uint32_t>(this->lod0_size >> level),
+		  static_cast<uint32_t>(this->lod0_size >> level),
+		  1,
+		};
+	}
+
+	uint32_t element_size() const override
+	{
+		return sizeof(gli::u8vec4);
+	}
+
+	VkExtent3D brick_size() const override {
+		return VkExtent3D{ 128, 128, 1 };
+	}
+
+	uint32_t base_level() const override
+	{
+		return 0;
+	}
+
+	uint32_t levels() const override
+	{
+		return static_cast<uint32_t>(this->num_lods);
+	}
+
+	uint32_t base_layer() const override
+	{
+		return 0;
+	}
+
+	uint32_t layers() const override
+	{
+		return 1;
+	}
+
+	size_t size() const override
+	{
+		return this->mapped_file.size();
+	}
+
+	size_t size(size_t level) const override
+	{
+		size_t extent = this->lod0_size >> level;
+		size_t num_pixels = extent * extent;
+		return num_pixels * this->element_size();
+	}
+
+	uint8_t* data() override
+	{
+		return reinterpret_cast<uint8_t*>(this->mapped_file.data());
+	}
+
+	const uint8_t* const_data() const override
+	{
+		return reinterpret_cast<const uint8_t*>(this->mapped_file.const_data());
+	}
+
+	VkFormat format() const override
+	{
+		return VK_FORMAT_R8G8B8A8_UNORM;
+	}
+
+	VkImageType image_type() const override
+	{
+		return VK_IMAGE_TYPE_2D;
+	}
+
+	VkImageViewType image_view_type() const override
+	{
+		return VK_IMAGE_VIEW_TYPE_2D;
+	}
+
+	VkImageAspectFlags aspect_mask() const override
+	{
+		return VK_IMAGE_ASPECT_COLOR_BIT;
+	}
+
+	size_t lod0_size;
+	size_t num_lods;
+
+	boost::iostreams::mapped_file mapped_file;
 };
 
 
@@ -253,9 +381,14 @@ public:
 		return num_pixels * this->element_size();
 	}
 
-	const unsigned char* data() const override
+	uint8_t* data() override
 	{
-		return reinterpret_cast<const unsigned char*>(this->mapped_file.const_data());
+		return reinterpret_cast<uint8_t*>(this->mapped_file.data());
+	}
+
+	const uint8_t* const_data() const override
+	{
+		return reinterpret_cast<const uint8_t*>(this->mapped_file.const_data());
 	}
 
 	VkFormat format() const override
@@ -380,9 +513,14 @@ public:
 		return num_pixels * this->element_size();
 	}
 
-	const unsigned char* data() const override
+	uint8_t* data() override
 	{
-		return reinterpret_cast<const unsigned char*>(this->mapped_file.const_data());
+		return reinterpret_cast<uint8_t*>(this->mapped_file.data());
+	}
+
+	const uint8_t* const_data() const override
+	{
+		return reinterpret_cast<const uint8_t*>(this->mapped_file.const_data());
 	}
 
 	VkFormat format() const override

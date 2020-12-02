@@ -2729,7 +2729,7 @@ public:
 			.layerCount = this->texture->subresourceRange().layerCount,
 		};
 
-		if (false) {
+		if (true) {
 			VkDeviceSize width = extent.width / brickExtent.width;
 			VkDeviceSize height = extent.height / brickExtent.height;
 
@@ -2787,7 +2787,7 @@ public:
 		filter(filter),
 		mipmapMode(mipmapMode),
 		addressMode(addressMode),
-		texture(VulkanImageFactory::Create(filename))
+		texture(std::make_shared<MemoryMappedImage2D>(filename))
 	{
 		REGISTER_VISITOR(devicevisitor, SparseTextureImage, device);
 		REGISTER_VISITOR(allocvisitor, SparseTextureImage, alloc);
@@ -2880,7 +2880,7 @@ public:
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 		MemoryMap memmap(this->buffer->memory.get());
-		std::copy(this->texture->data(), this->texture->data() + this->texture->size(), memmap.mem);
+		std::copy(this->texture->const_data(), this->texture->const_data() + this->texture->size(), memmap.mem);
 
 		VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
 

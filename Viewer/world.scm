@@ -136,7 +136,7 @@
                      VK_FILTER_LINEAR
                      VK_SAMPLER_MIPMAP_MODE_LINEAR
                      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-                     "world.ktx")
+                     "world.bin")
 
                   (indexed-shape 
                      (bufferdata-uint32 0 1 2 2 3 0)
