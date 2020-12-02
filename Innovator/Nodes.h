@@ -2671,7 +2671,7 @@ public:
 		VkDeviceSize memoryOffset) :
 		memory(memory),
 		texture(texture),
-		imageExtent(imageExtent),
+		tileExtent(imageExtent),
 		memoryOffset(memoryOffset)
 	{}
 
@@ -2688,13 +2688,15 @@ public:
 		}
 
 		VkOffset3D imageOffset = {
-			int32_t(i * this->imageExtent.width),
-			int32_t(j * this->imageExtent.height),
-			int32_t(k * this->imageExtent.depth)
+			int32_t(i * this->tileExtent.width),
+			int32_t(j * this->tileExtent.height),
+			int32_t(k * this->tileExtent.depth)
 		};
 
+		VkImageSubresourceRange subresourceRange = this->texture->subresourceRange();
+
 		const VkImageSubresource subresource{
-			this->texture->subresourceRange().aspectMask,
+			subresourceRange.aspectMask,
 			mipLevel,
 			0
 		};
@@ -2702,7 +2704,7 @@ public:
 		this->image_memory_bind = {
 			.subresource = subresource,
 			.offset = imageOffset,
-			.extent = this->imageExtent,
+			.extent = this->tileExtent,
 			.memory = this->memory,
 			.memoryOffset = this->memoryOffset,
 			.flags = 0,
@@ -2716,22 +2718,21 @@ public:
 		VkExtent3D extent = this->texture->extent(mipLevel);
 		VkDeviceSize elementSize = this->texture->element_size();
 
-		VkExtent3D brickExtent = this->texture->brick_size();
-		VkDeviceSize brickSize =
-			static_cast<VkDeviceSize>(brickExtent.width) *
-			static_cast<VkDeviceSize>(brickExtent.height) *
-			static_cast<VkDeviceSize>(brickExtent.depth);
-
 		const VkImageSubresourceLayers imageSubresource{
-			.aspectMask = this->texture->subresourceRange().aspectMask,
+			.aspectMask = subresourceRange.aspectMask,
 			.mipLevel = mipLevel,
-			.baseArrayLayer = this->texture->subresourceRange().baseArrayLayer,
-			.layerCount = this->texture->subresourceRange().layerCount,
+			.baseArrayLayer = subresourceRange.baseArrayLayer,
+			.layerCount = subresourceRange.layerCount,
 		};
 
 		if (true) {
-			VkDeviceSize width = extent.width / brickExtent.width;
-			VkDeviceSize height = extent.height / brickExtent.height;
+			VkDeviceSize brickSize =
+				static_cast<VkDeviceSize>(this->tileExtent.width) *
+				static_cast<VkDeviceSize>(this->tileExtent.height) *
+				static_cast<VkDeviceSize>(this->tileExtent.depth);
+
+			VkDeviceSize width = extent.width / this->tileExtent.width;
+			VkDeviceSize height = extent.height / this->tileExtent.height;
 
 			this->buffer_image_copy = {
 				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
@@ -2739,7 +2740,7 @@ public:
 				.bufferImageHeight = 0,
 				.imageSubresource = imageSubresource,
 				.imageOffset = imageOffset,
-				.imageExtent = this->imageExtent,
+				.imageExtent = this->tileExtent,
 			};
 		}
 		else {
@@ -2751,19 +2752,19 @@ public:
 			VkDeviceSize height = extent.height;
 
 			this->buffer_image_copy = {
-				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
+				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * elementSize,
 				.bufferRowLength = extent.width,
 				.bufferImageHeight = extent.height,
 				.imageSubresource = imageSubresource,
 				.imageOffset = imageOffset,
-				.imageExtent = this->imageExtent
+				.imageExtent = this->tileExtent
 			};
 		}
 	}
 
 	VkDeviceMemory memory;
 	VulkanTextureImage* texture;
-	VkExtent3D imageExtent;
+	VkExtent3D tileExtent;
 	VkDeviceSize memoryOffset;
 	VkSparseImageMemoryBind image_memory_bind;
 	VkBufferImageCopy buffer_image_copy;
@@ -2899,14 +2900,12 @@ public:
 			numTiles * pageSize,
 			memory_type_index);
 
-		VkExtent3D imageExtent = sparse_memory_requirement.formatProperties.imageGranularity;
-
 		for (uint32_t i = 0; i < numTiles; i++) {
 			this->reusable_pages.push_back(
 				std::make_shared<MemoryPage>(
 					this->image_memory->memory,
 					this->texture.get(),
-					imageExtent,
+					sparse_memory_requirement.formatProperties.imageGranularity,
 					i * pageSize));
 		}
 	}

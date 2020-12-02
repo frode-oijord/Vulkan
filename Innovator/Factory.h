@@ -14,7 +14,6 @@ public:
 
 	virtual VkExtent3D extent(size_t mip_level) const = 0;
 	virtual uint32_t element_size() const = 0;
-	virtual VkExtent3D brick_size() const = 0;
 	virtual uint32_t base_level() const = 0;
 	virtual uint32_t levels() const = 0;
 	virtual uint32_t base_layer() const = 0;
@@ -110,10 +109,6 @@ public:
 	uint32_t element_size() const override
 	{
 		return 4;
-	}
-
-	VkExtent3D brick_size() const override {
-		return VkExtent3D{ 1, 1, 1 };
 	}
 
 	uint32_t base_level() const override
@@ -229,10 +224,6 @@ public:
 		return sizeof(gli::u8vec4);
 	}
 
-	VkExtent3D brick_size() const override {
-		return VkExtent3D{ 128, 128, 1 };
-	}
-
 	uint32_t base_level() const override
 	{
 		return 0;
@@ -335,12 +326,6 @@ public:
 		  static_cast<uint32_t>(this->lod0_size >> level),
 		  static_cast<uint32_t>(this->lod0_size >> level),
 		  static_cast<uint32_t>(this->lod0_size >> level),
-		};
-	}
-
-	VkExtent3D brick_size() const override {
-		return VkExtent3D{
-		  1, 1, 1
 		};
 	}
 
@@ -467,12 +452,6 @@ public:
 		  static_cast<uint32_t>(this->lod0_size >> level),
 		  static_cast<uint32_t>(this->lod0_size >> level),
 		  static_cast<uint32_t>(this->lod0_size >> level),
-		};
-	}
-
-	VkExtent3D brick_size() const override {
-		return VkExtent3D{
-		  32, 32, 16
 		};
 	}
 
