@@ -2964,11 +2964,11 @@ public:
 			}
 		}
 
+		std::cout << "bind count: " << image_memory_binds.size() << std::endl;
+
 		if (image_memory_binds.empty()) {
 			return;
 		}
-
-		std::cout << "bind count: " << image_memory_binds.size() << std::endl;
 
 		std::vector<VkSparseImageMemoryBindInfo> image_memory_bind_info
 		{ {
@@ -2977,85 +2977,77 @@ public:
 			image_memory_binds.data(),
 		} };
 
-		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos;
+		std::vector<VkSparseImageOpaqueMemoryBindInfo> image_opaque_memory_bind_infos{};
 
-		std::vector<VkSemaphore> wait_semaphores;
-		std::vector<VkSemaphore> signal_semaphores{ this->bind_sparse_finished->semaphore };
+		std::vector<VkSemaphore> bind_sparse_wait_semaphores{};
+		std::vector<VkSemaphore> bind_sparse_signal_semaphores{ this->bind_sparse_finished->semaphore };
 		std::vector<VkSparseBufferMemoryBindInfo> buffer_memory_bind_infos;
 
 		VkBindSparseInfo bind_sparse_info = {
 			.sType = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO,
 			.pNext = nullptr,
-			.waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size()),
-			.pWaitSemaphores = wait_semaphores.data(),
+			.waitSemaphoreCount = static_cast<uint32_t>(bind_sparse_wait_semaphores.size()),
+			.pWaitSemaphores = bind_sparse_wait_semaphores.data(),
 			.bufferBindCount = static_cast<uint32_t>(buffer_memory_bind_infos.size()),
 			.pBufferBinds = buffer_memory_bind_infos.data(),
 			.imageOpaqueBindCount = static_cast<uint32_t>(image_opaque_memory_bind_infos.size()),
 			.pImageOpaqueBinds = image_opaque_memory_bind_infos.data(),
 			.imageBindCount = static_cast<uint32_t>(image_memory_bind_info.size()),
 			.pImageBinds = image_memory_bind_info.data(),
-			.signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
-			.pSignalSemaphores = signal_semaphores.data(),
+			.signalSemaphoreCount = static_cast<uint32_t>(bind_sparse_signal_semaphores.size()),
+			.pSignalSemaphores = bind_sparse_signal_semaphores.data(),
 		};
 
 		vk.QueueBindSparse(this->copy_sparse_queue, 1, &bind_sparse_info, VK_NULL_HANDLE);
 
-		if (regions.empty()) {
-			context->state->wait_semaphores.push_back(this->bind_sparse_finished->semaphore);
-		}
-		else {
-			VkImageSubresourceRange subresourceRange = this->texture->subresourceRange();
+		VkImageSubresourceRange subresourceRange = this->texture->subresourceRange();
 
-			this->copy_sparse_command->begin();
+		this->copy_sparse_command->begin();
 
-			this->copy_sparse_command->pipelineBarrier(
-				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				{
-				  VulkanImage::MemoryBarrier(
-					this->image->image,
-					0,
-					0,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					subresourceRange)
-				});
-
-			vk.CmdCopyBufferToImage(
-				this->copy_sparse_command->buffer(),
-				this->buffer->buffer->buffer,
+		this->copy_sparse_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			{
+			  VulkanImage::MemoryBarrier(
 				this->image->image,
+				0,
+				0,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-				static_cast<uint32_t>(regions.size()),
-				regions.data());
+				subresourceRange)
+			});
 
-			this->copy_sparse_command->pipelineBarrier(
-				VK_PIPELINE_STAGE_TRANSFER_BIT,							// wait for transfer operation (copy)
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,					// block fragment shader where texture is sampled
-				{
-				  VulkanImage::MemoryBarrier(
-					this->image->image,
-					0,
-					0,
-					VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					subresourceRange)
-				});
+		vk.CmdCopyBufferToImage(
+			this->copy_sparse_command->buffer(),
+			this->buffer->buffer->buffer,
+			this->image->image,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			static_cast<uint32_t>(regions.size()),
+			regions.data());
 
-			this->copy_sparse_command->end();
+		this->copy_sparse_command->pipelineBarrier(
+			VK_PIPELINE_STAGE_TRANSFER_BIT,							// wait for transfer operation (copy)
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,					// block fragment shader where texture is sampled
+			{
+			  VulkanImage::MemoryBarrier(
+				this->image->image,
+				0,
+				0,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				subresourceRange)
+			});
 
-			std::vector<VkSemaphore> wait_semaphores{ this->bind_sparse_finished->semaphore };
-			std::vector<VkSemaphore> signal_semaphores{ this->copy_sparse_finished->semaphore };
+		this->copy_sparse_command->end();
 
-			this->copy_sparse_command->submit(
-				this->copy_sparse_queue,
-				VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-				VK_NULL_HANDLE,
-				wait_semaphores,
-				signal_semaphores);
+		std::vector<VkSemaphore> copy_sparse_signal_semaphores{};
 
-			context->state->wait_semaphores.push_back(this->copy_sparse_finished->semaphore);
-		}
+		this->copy_sparse_command->submit(
+			this->copy_sparse_queue,
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+			VK_NULL_HANDLE,
+			bind_sparse_signal_semaphores,			// wait semaphores
+			copy_sparse_signal_semaphores);			// signal semaphores
 	}
 
 
