@@ -2667,11 +2667,15 @@ public:
 	MemoryPage(
 		VkDeviceMemory memory,
 		VulkanTextureImage* texture,
+		VulkanBufferObject* buffer,
 		VkExtent3D imageExtent,
+		VkDeviceSize tileSize,
 		VkDeviceSize memoryOffset) :
 		memory(memory),
 		texture(texture),
+		buffer(buffer),
 		tileExtent(imageExtent),
+		tileSize(tileSize),
 		memoryOffset(memoryOffset)
 	{}
 
@@ -2716,7 +2720,6 @@ public:
 		}
 
 		VkExtent3D extent = this->texture->extent(mipLevel);
-		VkDeviceSize elementSize = this->texture->element_size();
 
 		const VkImageSubresourceLayers imageSubresource{
 			.aspectMask = subresourceRange.aspectMask,
@@ -2726,22 +2729,25 @@ public:
 		};
 
 		if (true) {
-			VkDeviceSize brickSize =
-				static_cast<VkDeviceSize>(this->tileExtent.width) *
-				static_cast<VkDeviceSize>(this->tileExtent.height) *
-				static_cast<VkDeviceSize>(this->tileExtent.depth);
-
 			VkDeviceSize width = extent.width / this->tileExtent.width;
 			VkDeviceSize height = extent.height / this->tileExtent.height;
 
 			this->buffer_image_copy = {
-				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * brickSize * elementSize,
+				.bufferOffset = this->memoryOffset,
 				.bufferRowLength = 0,
 				.bufferImageHeight = 0,
 				.imageSubresource = imageSubresource,
 				.imageOffset = imageOffset,
 				.imageExtent = this->tileExtent,
 			};
+
+			VkDeviceSize bufferOffset = mipOffset + (((k * width) + j) * height + i) * this->tileSize;
+
+			MemoryMap memmap(this->buffer->memory.get());
+			std::copy(
+				this->texture->const_data() + bufferOffset,
+				this->texture->const_data() + bufferOffset + this->tileSize,
+				memmap.mem + this->memoryOffset);
 		}
 		else {
 			VkDeviceSize i = imageOffset.x;
@@ -2750,6 +2756,8 @@ public:
 
 			VkDeviceSize width = extent.width;
 			VkDeviceSize height = extent.height;
+
+			VkDeviceSize elementSize = this->texture->element_size();
 
 			this->buffer_image_copy = {
 				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * elementSize,
@@ -2765,9 +2773,11 @@ public:
 	VkDeviceMemory memory;
 	VulkanTextureImage* texture;
 	VkExtent3D tileExtent;
+	VkDeviceSize tileSize;
 	VkDeviceSize memoryOffset;
 	VkSparseImageMemoryBind image_memory_bind;
 	VkBufferImageCopy buffer_image_copy;
+	VulkanBufferObject* buffer;
 };
 
 
@@ -2872,17 +2882,6 @@ public:
 		this->copy_sparse_command = std::make_unique<VulkanCommandBuffers>(context->state->device);
 		this->copy_sparse_queue = context->state->device->getQueue(VK_QUEUE_SPARSE_BINDING_BIT);
 
-		this->buffer = std::make_unique<VulkanBufferObject>(
-			context->state->device,
-			0,
-			this->texture->size(),
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_SHARING_MODE_EXCLUSIVE,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-
-		MemoryMap memmap(this->buffer->memory.get());
-		std::copy(this->texture->const_data(), this->texture->const_data() + this->texture->size(), memmap.mem);
-
 		VkMemoryRequirements memory_requirements = this->image->getMemoryRequirements();
 
 		uint32_t memory_type_index = context->state->device->physical_device.getMemoryTypeIndex(
@@ -2895,6 +2894,14 @@ public:
 		uint32_t numTiles = 1500;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
+		this->buffer = std::make_unique<VulkanBufferObject>(
+			context->state->device,
+			0,
+			numTiles * pageSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
 		this->image_memory = std::make_shared<VulkanMemory>(
 			context->state->device,
 			numTiles * pageSize,
@@ -2905,7 +2912,9 @@ public:
 				std::make_shared<MemoryPage>(
 					this->image_memory->memory,
 					this->texture.get(),
+					this->buffer.get(),
 					sparse_memory_requirement.formatProperties.imageGranularity,
+					pageSize,
 					i * pageSize));
 		}
 	}

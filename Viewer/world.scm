@@ -82,7 +82,7 @@
       (extent2 1920 1080)
       (group
          (viewmatrix 
-            (dvec3 0.5 0.5 3)
+            (dvec3 0 0 3)
             (dvec3 0 0 0)
             (dvec3 0 1 0))
 
