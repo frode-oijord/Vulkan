@@ -2902,7 +2902,7 @@ public:
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
 			this->image->getSparseMemoryRequirements(subresourceRange.aspectMask);
 
-		uint32_t numTiles = 1500;
+		uint32_t numTiles = 1000;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
 		this->buffer = std::make_shared<VulkanBufferObject>(
@@ -2926,7 +2926,7 @@ public:
 			this->buffer);
 
 		for (uint32_t i = 0; i < numTiles; i++) {
-			this->reusable_pages.push_back(std::make_shared<MemoryPage>(shared_data, i * pageSize));
+			this->free_pages.push_back(std::make_shared<MemoryPage>(shared_data, i * pageSize));
 		}
 	}
 
@@ -2952,38 +2952,46 @@ public:
 	{
 		std::set<uint32_t> tiles = context->image->getTiles(context);
 
-		// gather reusable tiles
-		for (auto [key, page] : this->used_image_memory_pages) {
-			if (tiles.contains(key)) {
-				if (!this->unique_reusable_pages.contains(key)) {
-					this->unique_reusable_pages.insert(key);
-					this->reusable_pages.push_back(page);
-				}
+		std::deque<uint32_t> reusable_keys;
+		for (auto [key, page] : this->used_pages) {
+			if (!tiles.contains(key)) {
+				reusable_keys.push_back(key);
 			}
 		}
 
-		for (auto key : this->unique_reusable_pages) {
-			this->used_image_memory_pages.erase(key);
-		}
+		auto get_page = [&]() {
+			if (this->free_pages.empty()) {
+				auto key = reusable_keys.front();
+				reusable_keys.pop_front();
+				auto page = this->used_pages.at(key);
+				this->used_pages.erase(key);
+				return page;
+			}
+			else {
+				auto page = this->free_pages.front();
+				this->free_pages.pop_front();
+				return page;
+			}
+		};
 
 		std::vector<VkBufferImageCopy> regions;
 		std::vector<VkSparseImageMemoryBind> image_memory_binds;
 
-		// bind new tiles or reuse tiles
-		for (auto& key : tiles) {
-			if (!this->used_image_memory_pages.contains(key)) {
-				auto page = this->reusable_pages.front();
-				this->reusable_pages.pop_front();
-				this->unique_reusable_pages.erase(key);
+		for (auto key : tiles) {
+			if (!this->used_pages.contains(key)) {
+				auto page = get_page();
 
 				page->bind(key);
-				this->used_image_memory_pages[key] = page;
+				this->used_pages[key] = page;
+
 				regions.push_back(page->buffer_image_copy);
 				image_memory_binds.push_back(page->image_memory_bind);
 			}
 		}
 
-		std::cout << "bind count: " << image_memory_binds.size() << std::endl;
+		std::cout << "tile count: " << tiles.size();
+		std::cout << " used count: " << this->used_pages.size();
+		std::cout << " bind count: " << image_memory_binds.size() << std::endl;
 
 		if (image_memory_binds.empty()) {
 			return;
@@ -3083,9 +3091,8 @@ public:
 	std::unique_ptr<VulkanImageView> view;
 
 
-	std::map<uint32_t, std::shared_ptr<MemoryPage>> used_image_memory_pages;
-	std::deque<std::shared_ptr<MemoryPage>> reusable_pages;
-	std::set<uint32_t> unique_reusable_pages;
+	std::map<uint32_t, std::shared_ptr<MemoryPage>> used_pages;
+	std::deque<std::shared_ptr<MemoryPage>> free_pages;
 
 	std::unique_ptr<VulkanSemaphore> bind_sparse_finished;
 	std::unique_ptr<VulkanSemaphore> copy_sparse_finished;
