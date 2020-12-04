@@ -56,8 +56,8 @@
             layout(location = 0) in vec3 texCoord;
             layout(location = 0) out uvec4 FragColor;
 
-            const vec3 textureSize = vec3(4096);
-            const vec3 tileSize = vec3(32.0, 32.0, 16.0);
+            const vec3 textureSize = vec3(8192);
+            const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
             float mipmapLevel(vec3 uv)
             {
@@ -142,7 +142,7 @@
                      VK_FILTER_LINEAR
                      VK_SAMPLER_MIPMAP_MODE_LINEAR
                      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-                     "bricked4096.dat")
+                     "bricked8192.dat")
 
                   (slice 0)))))))
 

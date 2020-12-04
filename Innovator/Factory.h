@@ -293,11 +293,11 @@ public:
 };
 
 
-static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<glm::u8vec4>& texels, glm::u8vec4 texel)
+static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<uint8_t>& texels, uint8_t texel)
 {
-	for (size_t i = 0; i < 32; i++) {
+	for (size_t i = 0; i < 64; i++) {
 		for (size_t j = 0; j < 32; j++) {
-			for (size_t k = 0; k < 16; k++) {
+			for (size_t k = 0; k < 32; k++) {
 				texels.push_back(texel);
 			}
 		}
@@ -315,6 +315,7 @@ static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vec
 
 #include <cmath>
 #include <filesystem>
+
 class DebugTextureImageBricked : public VulkanTextureImage {
 public:
 	explicit DebugTextureImageBricked(const std::string& filename)
@@ -337,15 +338,15 @@ public:
 				int count = 0;
 
 				std::cout << std::endl << "writing test " << lod;
-				for (size_t start_k = 0; start_k < lod_size.depth; start_k += 16) {
+				for (size_t start_k = 0; start_k < lod_size.depth; start_k += 32) {
 					std::cout << count++ << " ";
 					for (size_t start_j = 0; start_j < lod_size.height; start_j += 32) {
-						for (size_t start_i = 0; start_i < lod_size.width; start_i += 32) {
-							glm::u8vec4 texel(start_i / 8, start_j / 8, start_k / 8, 255);
+						for (size_t start_i = 0; start_i < lod_size.width; start_i += 64) {
+							uint8_t texel(start_i / 16);
 
-							std::vector<glm::u8vec4> texels;
+							std::vector<uint8_t> texels;
 							write_brick(start_i, start_j, start_k, texels, texel);
-							out.write(reinterpret_cast<char*>(texels.data()), texels.size() * 4);
+							out.write(reinterpret_cast<char*>(texels.data()), texels.size());
 						}
 					}
 				}
@@ -367,7 +368,7 @@ public:
 
 	uint32_t element_size() const override
 	{
-		return 4;
+		return 1;
 	}
 
 	uint32_t base_level() const override
@@ -419,7 +420,7 @@ public:
 
 	VkFormat format() const override
 	{
-		return VK_FORMAT_R8G8B8A8_UNORM;
+		return VK_FORMAT_R8_UNORM;
 	}
 
 	VkImageType image_type() const override
@@ -440,7 +441,7 @@ public:
 	boost::iostreams::mapped_file mapped_file;
 
 	VkExtent3D lod0_size{
-		4096, 4096, 4096
+		8192, 8192, 8192
 	};
 	size_t num_lods;
 };

@@ -2902,7 +2902,7 @@ public:
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
 			this->image->getSparseMemoryRequirements(subresourceRange.aspectMask);
 
-		uint32_t numTiles = 50000;
+		uint32_t numTiles = 10000;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
 		this->buffer = std::make_shared<VulkanBufferObject>(
@@ -2950,6 +2950,7 @@ public:
 
 	void render(RenderVisitor* context)
 	{
+		Timer timer("getTiles");
 		std::set<uint32_t> tiles = context->image->getTiles(context);
 
 		std::deque<uint32_t> reusable_keys;
