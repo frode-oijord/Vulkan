@@ -2809,7 +2809,7 @@ public:
 		filter(filter),
 		mipmapMode(mipmapMode),
 		addressMode(addressMode),
-		texture(std::make_shared<MemoryMappedImage2D>(filename))
+		texture(std::make_shared<DebugTextureImageBricked>(filename))
 	{
 		REGISTER_VISITOR(devicevisitor, SparseTextureImage, device);
 		REGISTER_VISITOR(allocvisitor, SparseTextureImage, alloc);
@@ -2902,7 +2902,7 @@ public:
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
 			this->image->getSparseMemoryRequirements(subresourceRange.aspectMask);
 
-		uint32_t numTiles = 1000;
+		uint32_t numTiles = 50000;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
 		this->buffer = std::make_shared<VulkanBufferObject>(
