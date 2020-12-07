@@ -96,9 +96,7 @@ const VkStructureType VkStructureTypeMap<VkPhysicalDeviceBufferDeviceAddressFeat
 
 class DeviceVisitor : public Visitor {
 public:
-	DeviceVisitor::DeviceVisitor(std::shared_ptr<State> state) :
-		Visitor(state)
-	{}
+	DeviceVisitor(std::shared_ptr<State> state) : Visitor(state) {}
 
 	template<typename T>
 	T& getFeatures(VkStructureType type = VkStructureTypeMap<T>::type)

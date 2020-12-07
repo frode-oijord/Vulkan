@@ -1771,16 +1771,16 @@ public:
 			.pCode = code.data(),
 		};
 
-		THROW_ON_ERROR(vk.CreateShaderModule(this->device->device, &create_info, nullptr, &this->module));
+		THROW_ON_ERROR(vk.CreateShaderModule(this->device->device, &create_info, nullptr, &this->shadermodule));
 	}
 
 	~VulkanShaderModule()
 	{
-		vk.DestroyShaderModule(this->device->device, this->module, nullptr);
+		vk.DestroyShaderModule(this->device->device, this->shadermodule, nullptr);
 	}
 
 	std::shared_ptr<VulkanDevice> device;
-	VkShaderModule module{ 0 };
+	VkShaderModule shadermodule{ 0 };
 };
 
 

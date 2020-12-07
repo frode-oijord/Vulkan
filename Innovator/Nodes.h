@@ -646,12 +646,12 @@ public:
 
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
-		shaderc::SpvCompilationResult module = compiler.CompileGlslToSpv(glsl, kind, "", options);
+		shaderc::SpvCompilationResult spv = compiler.CompileGlslToSpv(glsl, kind, "", options);
 
-		if (module.GetCompilationStatus() != shaderc_compilation_status_success) {
-			throw std::runtime_error(module.GetErrorMessage());
+		if (spv.GetCompilationStatus() != shaderc_compilation_status_success) {
+			throw std::runtime_error(spv.GetErrorMessage());
 		}
-		this->spv = { module.cbegin(), module.cend() };
+		this->spv = { spv.cbegin(), spv.cend() };
 	}
 
 	void device(DeviceVisitor* context)
@@ -682,7 +682,7 @@ public:
 			.pNext = nullptr,
 			.flags = 0,
 			.stage = this->stage,
-			.module = this->shader->module,
+			.module = this->shader->shadermodule,
 			.pName = "main",
 			.pSpecializationInfo = nullptr,
 			});
