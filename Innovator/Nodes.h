@@ -193,6 +193,29 @@ public:
 };
 
 
+class Translate : public Node {
+public:
+	IMPLEMENT_VISITABLE;
+	Translate() = default;
+	virtual ~Translate() = default;
+
+	Translate(const glm::dvec3& t, const glm::dvec3& s)
+	{
+		REGISTER_VISITOR(rendervisitor, ModelMatrix, render);
+
+		this->mat = glm::scale(this->mat, s);
+		this->mat = glm::translate(this->mat, t);
+	}
+
+	void render(CommandVisitor* context)
+	{
+		context->state->ModelMatrix *= this->mat;
+	}
+
+	glm::dmat4 mat{ 1.0 };
+};
+
+
 class TextureMatrix : public Node {
 public:
 	IMPLEMENT_VISITABLE;
@@ -598,6 +621,7 @@ public:
 private:
 	DescriptorSetInfo info;
 };
+
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 class Shader : public Node {
@@ -1784,7 +1808,7 @@ public:
 		};
 	}
 
-	void alloc(CommandVisitor* context)
+	void alloc(Visitor* context)
 	{
 		std::vector<VkImageView> framebuffer_attachments;
 

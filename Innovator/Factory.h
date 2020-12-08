@@ -293,25 +293,21 @@ public:
 };
 
 
-static void write_brick(size_t start_i, size_t start_j, size_t start_k, std::vector<uint8_t>& texels, uint8_t texel)
-{
-	for (size_t i = 0; i < 64; i++) {
-		for (size_t j = 0; j < 32; j++) {
-			for (size_t k = 0; k < 32; k++) {
-				texels.push_back(texel);
-			}
-		}
-	}
-}
-
-// 4096
-// 2048
-// 1024
-// 512
-// 256
-// 128
-// 64
-// 32
+// 16384 x 16384 x 2048
+// 8192 x 8192 x 1024
+// 4096 x 4095 x 512
+// 2048 x 2048 x 256
+// 1024 X 1024 x 128
+// 512 x 512 x 64
+// 256 x 256 x 32
+// 128 x 128 x 16
+// 64 x 64 x 8
+// 32 x 32 x 4
+// 16 x 16 x 2
+// 8 x 8 x 1
+// 4 x 4 x 1
+// 2 x 2 x 1
+// 1 x 1 x 1
 
 #include <cmath>
 #include <filesystem>
@@ -322,10 +318,19 @@ public:
 	{
 		this->num_lods = std::log2(lod0_size.width) + 1;
 		this->num_lods -= 5;
+		//this->num_lods = 7;
 
 		if (!std::filesystem::exists(filename)) {
 			std::cout << "creating file: " << filename << std::endl;
 			std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
+
+			size_t brick_size = 64 * 32 * 32;
+
+			std::vector<uint8_t> black_brick(brick_size);
+			std::vector<uint8_t> white_brick(brick_size);
+
+			std::fill(black_brick.begin(), black_brick.end(), 0);
+			std::fill(white_brick.begin(), white_brick.end(), 255);
 
 			for (size_t lod = 0; lod < this->num_lods; lod++) {
 
@@ -335,18 +340,15 @@ public:
 					.depth = lod0_size.depth >> lod,
 				};
 
-				int count = 0;
+				for (size_t i = 0; i < lod_size.width / 64; i++) {
+					std::cout << "writing line... " << i << std::endl;
+					for (size_t j = 0; j < lod_size.height / 32; j++) {
+						for (size_t k = 0; k < lod_size.depth / 32; k++) {
+							size_t brick_color = ((i & 0x1) == 0) ^ ((j & 0x1) == 0) ^ ((k & 0x1) == 0);
 
-				std::cout << std::endl << "writing test " << lod;
-				for (size_t start_k = 0; start_k < lod_size.depth; start_k += 32) {
-					std::cout << count++ << " ";
-					for (size_t start_j = 0; start_j < lod_size.height; start_j += 32) {
-						for (size_t start_i = 0; start_i < lod_size.width; start_i += 64) {
-							uint8_t texel(start_i / 16);
-
-							std::vector<uint8_t> texels;
-							write_brick(start_i, start_j, start_k, texels, texel);
-							out.write(reinterpret_cast<char*>(texels.data()), texels.size());
+							(brick_color) ?
+								out.write(reinterpret_cast<char*>(white_brick.data()), white_brick.size()) :
+								out.write(reinterpret_cast<char*>(black_brick.data()), black_brick.size());
 						}
 					}
 				}

@@ -58,7 +58,7 @@ EventVisitor::visit(ViewMatrix* node)
 		dx[1] /= this->state->extent.height;
 		dx *= 20.0;
 		switch (this->button) {
-			// case 0: node->orbit(dx); break;
+		//case 0: node->orbit(dx); break;
 		case 1: node->pan(dx); break;
 		case 2: node->zoom(dx[1]); break;
 		default: break;

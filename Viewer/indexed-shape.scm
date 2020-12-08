@@ -1,5 +1,5 @@
-(define indexed-shape (indices vertices)
-    (group
+(define indexed-shape (indices vertices topology)
+    (separator
         vertices
         (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
         (gpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_DST_BIT VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
@@ -31,4 +31,4 @@
             (uint32 0)
             (int32 0)
             (uint32 0)
-            VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)))
+            topology)))

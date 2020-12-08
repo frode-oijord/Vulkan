@@ -34,8 +34,7 @@ int main(int argc, char* argv[])
 	bpo::notify(vm);
 
 	try {
-		//VulkanImageFactory::Register<GliTextureImage>();
-		VulkanImageFactory::Register<DebugTextureImageBricked>();
+		VulkanImageFactory::Register<GliTextureImage>();
 		scm::env_ptr global_env = scm::global_env();
 		global_env->outer = innovator_env();
 

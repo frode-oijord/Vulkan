@@ -61,4 +61,5 @@
 
             (indexed-shape 
                (bufferdata-uint32 0 1 2 2 3 0)
-               (bufferdata-float -1 -1 0  1 -1 0  1 1 0  -1 1 0))))))
+               (bufferdata-float -1 -1 0  1 -1 0  1 1 0  -1 1 0)
+               VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)))))

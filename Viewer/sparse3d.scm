@@ -5,8 +5,26 @@
    (define slice (z) 
       (indexed-shape 
          (bufferdata-uint32 0 1 2 2 3 0)
-         (bufferdata-float 0 0 z 1 0 z 1 1 z 0 1 z)))
+         (bufferdata-float 0 0 z 1 0 z 1 1 z 0 1 z)
+         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
 
+   (define cube () 
+      (indexed-shape 
+         (bufferdata-uint32 
+            0 1 1 3 3 2 2 0
+            4 5 5 7 7 6 6 4
+            0 4 1 5 2 6 3 7)
+         (bufferdata-float 
+            0 0 0
+            0 0 1
+            0 1 0
+            0 1 1
+            1 0 0
+            1 0 1
+            1 1 0
+            1 1 1)
+         VK_PRIMITIVE_TOPOLOGY_LINE_LIST))
+  
    (define lod-renderpass (renderpass
       (renderpass-description
          (renderpass-attachment
@@ -56,6 +74,7 @@
             layout(location = 0) in vec3 texCoord;
             layout(location = 0) out uvec4 FragColor;
 
+            // const vec3 textureSize = vec3(16384, 16384, 2048);
             const vec3 textureSize = vec3(8192);
             const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
@@ -81,68 +100,83 @@
 
          (slice 0)))
 
+   (define vertex-shader
+      (shader VK_SHADER_STAGE_VERTEX_BIT [[
+         #version 450
+
+         layout(std140, binding = 0) uniform Transform {
+            mat4 ModelViewMatrix;
+            mat4 ProjectionMatrix;
+            mat4 TextureMatrix;
+         };
+
+         layout(location = 0) in vec3 Position;
+         layout(location = 0) out vec3 texCoord;
+
+         out gl_PerVertex {
+            vec4 gl_Position;
+         };
+
+         void main() 
+         {
+            texCoord = vec3(TextureMatrix * vec4(Position, 1.0));
+            gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
+         }
+      ]]))
+
    (window
       (extent2 1920 1080)
-      (group
+      (separator
          (viewmatrix 
-            (dvec3 .5 .5  2)
-            (dvec3 .2 .2  0)
-            (dvec3  0  1  0))
+            (dvec3 0 0 2)
+            (dvec3 0 0 0)
+            (dvec3 0 1 0))
 
          (projmatrix 1000 0.001 1.0 0.7)
-         (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
-         (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
 
-         (shader VK_SHADER_STAGE_VERTEX_BIT [[
-            #version 450
-
-            layout(std140, binding = 0) uniform Transform {
-               mat4 ModelViewMatrix;
-               mat4 ProjectionMatrix;
-               mat4 TextureMatrix;
-            };
-
-            layout(location = 0) in vec3 Position;
-            layout(location = 0) out vec3 texCoord;
-
-            out gl_PerVertex {
-               vec4 gl_Position;
-            };
-
-            void main() 
-            {
-               texCoord = vec3(TextureMatrix * vec4(Position, 1.0));
-               gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
-            }
-         ]])
+         vertex-shader
 
          (separator 
-            (extent (uint32 120) (uint32 68))
+            (extent (uint32 240) (uint32 136))
+            (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
+            (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
             lod-renderpass
             (offscreen-image))
 
          (separator 
             (main-renderpass
                (group
+                  (separator
+                     (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
+                        #version 450
+
+                        layout(binding = 1) uniform sampler3D Texture;
+                        layout(location = 0) in vec3 texCoord;
+                        layout(location = 0) out vec4 FragColor;
+
+                        void main() {
+                           FragColor = texture(Texture, texCoord);
+                        }
+                     ]])
+
+                     (sparsetextureimage 
+                        (uint32 1)
+                        (shaderstageflags VK_SHADER_STAGE_FRAGMENT_BIT)
+                        VK_FILTER_LINEAR
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
+                        "bricked8192.dat")
+
+                     (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
+                     (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
+                     (slice 0))
+
                   (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
                      #version 450
-
-                     layout(binding = 1) uniform sampler3D Texture;
-                     layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out vec4 FragColor;
-
                      void main() {
-                        FragColor = texture(Texture, texCoord);
+                        FragColor = vec4(1.0);
                      }
                   ]])
 
-                  (sparsetextureimage 
-                     (uint32 1)
-                     (shaderstageflags VK_SHADER_STAGE_FRAGMENT_BIT)
-                     VK_FILTER_LINEAR
-                     VK_SAMPLER_MIPMAP_MODE_LINEAR
-                     VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE
-                     "bricked8192.dat")
-
-                  (slice 0)))))))
-
+                  (cube)))))))

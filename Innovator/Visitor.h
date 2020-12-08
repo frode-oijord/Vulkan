@@ -151,6 +151,6 @@ inline DeviceVisitor devicevisitor(state);
 inline CommandVisitor allocvisitor(state);
 inline CommandVisitor resizevisitor(state);
 inline Visitor pipelinevisitor(state);
-inline RenderVisitor rendervisitor(state);
 inline Visitor recordvisitor(state);
+inline RenderVisitor rendervisitor(state);
 inline Visitor presentvisitor(state);
