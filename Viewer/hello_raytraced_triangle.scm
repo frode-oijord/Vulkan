@@ -1,4 +1,5 @@
 (window 
+   (extent2 1920 1080)
    (group
       (viewmatrix 
          (dvec3 0 0 3)

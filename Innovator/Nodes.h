@@ -1507,23 +1507,18 @@ public:
 			VK_NULL_HANDLE,
 			VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
 
-		vk.CmdBindDescriptorSets(this->command->buffer(),
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			this->pipeline_layout->layout,
-			0,
-			static_cast<uint32_t>(this->descriptor_sets->descriptor_sets.size()),
-			this->descriptor_sets->descriptor_sets.data(),
-			0,
-			nullptr);
-
-		vk.CmdBindPipeline(this->command->buffer(),
-			VK_PIPELINE_BIND_POINT_GRAPHICS,
-			this->graphics_pipeline->pipeline);
+		this->descriptor_sets->bind(this->command->buffer(), this->pipeline_layout->layout);
+		this->graphics_pipeline->bind(this->command->buffer());
 
 		std::vector<VkRect2D> scissors{ {
 			{ 0, 0 },
 			VkExtent2D{ context->state->extent.width, context->state->extent.width }
 		} };
+
+		vk.CmdSetScissor(this->command->buffer(),
+			0,
+			static_cast<uint32_t>(scissors.size()),
+			scissors.data());
 
 		std::vector<VkViewport> viewports{ {
 			.x = 0.0f,
@@ -1533,11 +1528,6 @@ public:
 			.minDepth = 0.0f,
 			.maxDepth = 1.0f
 		} };
-
-		vk.CmdSetScissor(this->command->buffer(),
-			0,
-			static_cast<uint32_t>(scissors.size()),
-			scissors.data());
 
 		vk.CmdSetViewport(this->command->buffer(),
 			0,

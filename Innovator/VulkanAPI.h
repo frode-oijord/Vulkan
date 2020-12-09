@@ -1101,6 +1101,19 @@ public:
 			static_cast<uint32_t>(descriptor_copies.size()), descriptor_copies.data());
 	}
 
+	void bind(VkCommandBuffer command, VkPipelineLayout layout)
+	{
+		vk.CmdBindDescriptorSets(
+			command,
+			VK_PIPELINE_BIND_POINT_GRAPHICS,
+			layout,
+			0,
+			static_cast<uint32_t>(this->descriptor_sets.size()),
+			this->descriptor_sets.data(),
+			0,
+			nullptr);
+	}
+
 	std::shared_ptr<VulkanDevice> device;
 	std::shared_ptr<VulkanDescriptorPool> pool;
 	std::vector<VkDescriptorSet> descriptor_sets;
@@ -2142,6 +2155,11 @@ public:
 	~VulkanGraphicsPipeline()
 	{
 		vk.DestroyPipeline(this->device->device, this->pipeline, nullptr);
+	}
+
+	void bind(VkCommandBuffer command)
+	{
+		vk.CmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, this->pipeline);
 	}
 
 	std::shared_ptr<VulkanDevice> device;

@@ -73,7 +73,7 @@ EventVisitor::visit(class TextureMatrix* node)
 	if (this->move && this->press) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		double translation = dx[1] * 0.001;
-		glm::dvec3 t(0, 0, translation);
+		glm::dvec3 t(0, translation, 0);
 		switch (this->button) {
 		case 0: {
 			node->mat = glm::translate(node->mat, t);
@@ -91,7 +91,7 @@ EventVisitor::visit(class ModelMatrix* node)
 	if (this->move && this->press) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		double translation = dx[1] * 0.001;
-		glm::dvec3 t(0, 0, translation);
+		glm::dvec3 t(0, translation, 0);
 		switch (this->button) {
 		case 0: {
 			node->mat = glm::translate(node->mat, t);

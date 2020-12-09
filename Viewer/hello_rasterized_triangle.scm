@@ -1,8 +1,10 @@
 (begin
-   (import "main-renderpass.scm")
+   (import "create-renderpass.scm")
 
    (window 
-      (main-renderpass 
+      (extent2 1920 1080)
+      (create-renderpass 
+         VK_FORMAT_B8G8R8A8_UNORM
          (group
             (viewmatrix 
                (dvec3 0 0 3)

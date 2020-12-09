@@ -318,7 +318,7 @@ public:
 	{
 		//this->num_lods = std::log2(lod0_size.width) + 1;
 		//this->num_lods -= 5;
-		this->num_lods = 6;
+		this->num_lods = 7;
 
 		if (!std::filesystem::exists(filename)) {
 			std::cout << "creating file: " << filename << std::endl;
@@ -443,7 +443,7 @@ public:
 	boost::iostreams::mapped_file mapped_file;
 
 	VkExtent3D lod0_size{
-		8192, 8192, 1024
+		16384, 16384, 2048
 	};
 	size_t num_lods;
 };
