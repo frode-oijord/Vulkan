@@ -52,13 +52,13 @@ EventVisitor::EventVisitor(std::shared_ptr<State> state) :
 void
 EventVisitor::visit(ViewMatrix* node)
 {
-	if (this->move && this->press) {
+	if (this->move && this->press && !this->interact) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		dx[0] /= this->state->extent.width;
 		dx[1] /= this->state->extent.height;
 		dx *= 20.0;
 		switch (this->button) {
-		//case 0: node->orbit(dx); break;
+		case 0: node->orbit(dx); break;
 		case 1: node->pan(dx); break;
 		case 2: node->zoom(dx[1]); break;
 		default: break;
@@ -70,7 +70,7 @@ EventVisitor::visit(ViewMatrix* node)
 void
 EventVisitor::visit(class TextureMatrix* node)
 {
-	if (this->move && this->press) {
+	if (this->move && this->press && this->interact) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		double translation = dx[1] * 0.001;
 		glm::dvec3 t(0, translation, 0);
@@ -88,7 +88,7 @@ EventVisitor::visit(class TextureMatrix* node)
 void
 EventVisitor::visit(class ModelMatrix* node)
 {
-	if (this->move && this->press) {
+	if (this->move && this->press && this->interact) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
 		double translation = dx[1] * 0.001;
 		glm::dvec3 t(0, translation, 0);

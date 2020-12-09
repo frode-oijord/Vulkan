@@ -67,6 +67,7 @@ public:
 	virtual void mousePressed(int x, int y, int button) = 0;
 	virtual void mouseReleased() = 0;
 	virtual void mouseMoved(int x, int y) = 0;
+	virtual void keyPressed(int key) = 0;
 
 	LRESULT CALLBACK wndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
@@ -80,6 +81,11 @@ public:
 			break;
 		case WM_SIZE:
 			this->resize(LOWORD(lParam), HIWORD(lParam));
+			break;
+		case WM_KEYDOWN:
+			if (wParam == VK_ESCAPE) {
+				this->keyPressed(0);
+			}
 			break;
 		case WM_LBUTTONDOWN:
 			this->mousePressed(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 0);
@@ -252,12 +258,17 @@ public:
 		eventvisitor.mouseReleased(this->scene.get());
 	}
 
-	void mouseMoved(int x, int y)
+	void mouseMoved(int x, int y) override
 	{
 		eventvisitor.mouseMoved(this->scene.get(), x, y);
 		if (eventvisitor.press) {
 			this->redraw();
 		}
+	}
+
+	void keyPressed(int key) override
+	{
+		eventvisitor.keyPressed(key);
 	}
 
 	std::shared_ptr<Group> scene;

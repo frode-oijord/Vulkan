@@ -79,11 +79,17 @@ public:
 		this->move = false;
 	}
 
-	bool press;
-	bool move;
-	int button;
-	glm::dvec2 currpos;
-	glm::dvec2 prevpos;
+	void keyPressed(int key)
+	{
+		this->interact = !this->interact;
+	}
+
+	bool interact{ false };
+	bool press{ false };
+	bool move{ false };
+	int button{ 0 };
+	glm::dvec2 currpos = glm::dvec2(0);
+	glm::dvec2 prevpos = glm::dvec2(0);
 };
 
 
