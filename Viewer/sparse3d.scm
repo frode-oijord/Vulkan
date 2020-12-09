@@ -74,8 +74,8 @@
             layout(location = 0) in vec3 texCoord;
             layout(location = 0) out uvec4 FragColor;
 
-            // const vec3 textureSize = vec3(16384, 16384, 2048);
-            const vec3 textureSize = vec3(8192);
+            const vec3 textureSize = vec3(8192, 8192, 1024);
+            // const vec3 textureSize = vec3(8192);
             const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
             float mipmapLevel(vec3 uv)
@@ -98,7 +98,7 @@
             }
          ]])
 
-         (slice 0)))
+         (slice 0.5)))
 
    (define vertex-shader
       (shader VK_SHADER_STAGE_VERTEX_BIT [[
@@ -165,11 +165,11 @@
                         VK_FILTER_LINEAR
                         VK_SAMPLER_MIPMAP_MODE_LINEAR
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
-                        "bricked8192.dat")
+                        "bricked1024.dat")
 
                      (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
                      (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
-                     (slice 0))
+                     (slice 0.5))
 
                   (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
                      #version 450

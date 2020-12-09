@@ -2700,7 +2700,12 @@ public:
 		tileSize(tileSize),
 		buffer(std::move(buffer)),
 		buffermemory(std::make_shared<MemoryMap>(this->buffer->memory.get()))
-	{}
+	{
+		mipOffsets.push_back(0);
+		for (uint32_t m = 0; m < this->texture->levels() - 1; m++) {
+			mipOffsets.push_back(mipOffsets[m] + this->texture->size(m));
+		}
+	}
 
 	~SharedMemoryPageData() = default;
 
@@ -2710,6 +2715,7 @@ public:
 	VkDeviceSize tileSize;
 	std::shared_ptr<VulkanBufferObject> buffer;
 	std::shared_ptr<MemoryMap> buffermemory;
+	std::vector<VkDeviceSize> mipOffsets;
 };
 
 
@@ -2727,9 +2733,16 @@ public:
 		uint32_t k = key >> 8 & 0xFF;
 		uint32_t mipLevel = key & 0xFF;
 
-		if (mipLevel >= self->texture->levels()) {
-			throw std::runtime_error("invalid mip level");
-		}
+		VkExtent3D extent = self->texture->extent(mipLevel);
+		VkDeviceSize width = extent.width / self->tileExtent.width;
+		VkDeviceSize height = extent.height / self->tileExtent.height;
+		VkDeviceSize depth = extent.depth / self->tileExtent.depth;
+
+		assert(i < width && j < height && k < depth);
+		assert(mipLevel < self->texture->levels());
+
+		VkDeviceSize bufferOffset = self->mipOffsets[mipLevel] + (((k * height) + j) * width + i) * self->tileSize;
+		assert(bufferOffset + self->tileSize <= self->texture->size());
 
 		VkOffset3D imageOffset = {
 			int32_t(i * self->tileExtent.width),
@@ -2754,13 +2767,6 @@ public:
 			.flags = 0,
 		};
 
-		VkDeviceSize mipOffset = 0;
-		for (uint32_t m = 0; m < mipLevel; m++) {
-			mipOffset += self->texture->size(m);
-		}
-
-		VkExtent3D extent = self->texture->extent(mipLevel);
-
 		const VkImageSubresourceLayers imageSubresource{
 			.aspectMask = subresourceRange.aspectMask,
 			.mipLevel = mipLevel,
@@ -2768,45 +2774,37 @@ public:
 			.layerCount = subresourceRange.layerCount,
 		};
 
-		if (true) {
-			VkDeviceSize width = extent.width / self->tileExtent.width;
-			VkDeviceSize height = extent.height / self->tileExtent.height;
+		this->buffer_image_copy = {
+			.bufferOffset = this->memoryOffset,
+			.bufferRowLength = 0,
+			.bufferImageHeight = 0,
+			.imageSubresource = imageSubresource,
+			.imageOffset = imageOffset,
+			.imageExtent = self->tileExtent,
+		};
 
-			this->buffer_image_copy = {
-				.bufferOffset = this->memoryOffset,
-				.bufferRowLength = 0,
-				.bufferImageHeight = 0,
-				.imageSubresource = imageSubresource,
-				.imageOffset = imageOffset,
-				.imageExtent = self->tileExtent,
-			};
+		std::copy(
+			self->texture->const_data() + bufferOffset,
+			self->texture->const_data() + bufferOffset + self->tileSize,
+			self->buffermemory->mem + this->memoryOffset);
 
-			VkDeviceSize bufferOffset = mipOffset + (((k * width) + j) * height + i) * self->tileSize;
+		//VkDeviceSize i = imageOffset.x;
+		//VkDeviceSize j = imageOffset.y;
+		//VkDeviceSize k = imageOffset.z;
 
-			std::copy(
-				self->texture->const_data() + bufferOffset,
-				self->texture->const_data() + bufferOffset + self->tileSize,
-				self->buffermemory->mem + this->memoryOffset);
-		}
-		else {
-			VkDeviceSize i = imageOffset.x;
-			VkDeviceSize j = imageOffset.y;
-			VkDeviceSize k = imageOffset.z;
+		//VkDeviceSize width = extent.width;
+		//VkDeviceSize height = extent.height;
 
-			VkDeviceSize width = extent.width;
-			VkDeviceSize height = extent.height;
+		//VkDeviceSize elementSize = self->texture->element_size();
 
-			VkDeviceSize elementSize = self->texture->element_size();
-
-			this->buffer_image_copy = {
-				.bufferOffset = mipOffset + (((k * width) + j) * height + i) * elementSize,
-				.bufferRowLength = extent.width,
-				.bufferImageHeight = extent.height,
-				.imageSubresource = imageSubresource,
-				.imageOffset = imageOffset,
-				.imageExtent = self->tileExtent
-			};
-		}
+		//this->buffer_image_copy = {
+		//	.bufferOffset = mipOffset + (((k * width) + j) * height + i) * elementSize,
+		//	.bufferRowLength = extent.width,
+		//	.bufferImageHeight = extent.height,
+		//	.imageSubresource = imageSubresource,
+		//	.imageOffset = imageOffset,
+		//	.imageExtent = self->tileExtent
+		//};
 	}
 
 	std::shared_ptr<SharedMemoryPageData> self{ nullptr };

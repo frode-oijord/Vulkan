@@ -316,9 +316,9 @@ class DebugTextureImageBricked : public VulkanTextureImage {
 public:
 	explicit DebugTextureImageBricked(const std::string& filename)
 	{
-		this->num_lods = std::log2(lod0_size.width) + 1;
-		this->num_lods -= 5;
-		//this->num_lods = 7;
+		//this->num_lods = std::log2(lod0_size.width) + 1;
+		//this->num_lods -= 5;
+		this->num_lods = 6;
 
 		if (!std::filesystem::exists(filename)) {
 			std::cout << "creating file: " << filename << std::endl;
@@ -340,10 +340,10 @@ public:
 					.depth = lod0_size.depth >> lod,
 				};
 
-				for (size_t i = 0; i < lod_size.width / 64; i++) {
-					std::cout << "writing line... " << i << std::endl;
+				for (size_t k = 0; k < lod_size.depth / 32; k++) {
+					std::cout << "writing line... " << k << std::endl;
 					for (size_t j = 0; j < lod_size.height / 32; j++) {
-						for (size_t k = 0; k < lod_size.depth / 32; k++) {
+						for (size_t i = 0; i < lod_size.width / 64; i++) {
 							size_t brick_color = ((i & 0x1) == 0) ^ ((j & 0x1) == 0) ^ ((k & 0x1) == 0);
 
 							(brick_color) ?
@@ -443,7 +443,7 @@ public:
 	boost::iostreams::mapped_file mapped_file;
 
 	VkExtent3D lod0_size{
-		8192, 8192, 8192
+		8192, 8192, 1024
 	};
 	size_t num_lods;
 };
