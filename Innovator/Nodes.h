@@ -2801,24 +2801,6 @@ public:
 			self->texture->const_data() + bufferOffset,
 			self->texture->const_data() + bufferOffset + self->tileSize,
 			self->buffermemory->mem + this->memoryOffset);
-
-		//VkDeviceSize i = imageOffset.x;
-		//VkDeviceSize j = imageOffset.y;
-		//VkDeviceSize k = imageOffset.z;
-
-		//VkDeviceSize width = extent.width;
-		//VkDeviceSize height = extent.height;
-
-		//VkDeviceSize elementSize = self->texture->element_size();
-
-		//this->buffer_image_copy = {
-		//	.bufferOffset = mipOffset + (((k * width) + j) * height + i) * elementSize,
-		//	.bufferRowLength = extent.width,
-		//	.bufferImageHeight = extent.height,
-		//	.imageSubresource = imageSubresource,
-		//	.imageOffset = imageOffset,
-		//	.imageExtent = self->tileExtent
-		//};
 	}
 
 	std::shared_ptr<SharedMemoryPageData> self{ nullptr };
