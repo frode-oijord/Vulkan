@@ -318,42 +318,42 @@ public:
 	{
 		//this->num_lods = std::log2(lod0_size.width) + 1;
 		//this->num_lods -= 5;
-		this->num_lods = 7;
+		this->num_lods = 5;
 
-		if (!std::filesystem::exists(filename)) {
-			std::cout << "creating file: " << filename << std::endl;
-			std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
+		//if (!std::filesystem::exists(filename)) {
+		//	std::cout << "creating file: " << filename << std::endl;
+		//	std::fstream out(filename, std::ios_base::out | std::ios_base::binary);
 
-			size_t brick_size = 64 * 32 * 32;
+		//	size_t brick_size = 64 * 32 * 32;
 
-			std::vector<uint8_t> black_brick(brick_size);
-			std::vector<uint8_t> white_brick(brick_size);
+		//	std::vector<uint8_t> black_brick(brick_size);
+		//	std::vector<uint8_t> white_brick(brick_size);
 
-			std::fill(black_brick.begin(), black_brick.end(), 0);
-			std::fill(white_brick.begin(), white_brick.end(), 255);
+		//	std::fill(black_brick.begin(), black_brick.end(), 0);
+		//	std::fill(white_brick.begin(), white_brick.end(), 255);
 
-			for (size_t lod = 0; lod < this->num_lods; lod++) {
+		//	for (size_t lod = 0; lod < this->num_lods; lod++) {
 
-				VkExtent3D lod_size{
-					.width = lod0_size.width >> lod,
-					.height = lod0_size.height >> lod,
-					.depth = lod0_size.depth >> lod,
-				};
+		//		VkExtent3D lod_size{
+		//			.width = lod0_size.width >> lod,
+		//			.height = lod0_size.height >> lod,
+		//			.depth = lod0_size.depth >> lod,
+		//		};
 
-				for (size_t k = 0; k < lod_size.depth / 32; k++) {
-					std::cout << "writing line... " << k << std::endl;
-					for (size_t j = 0; j < lod_size.height / 32; j++) {
-						for (size_t i = 0; i < lod_size.width / 64; i++) {
-							size_t brick_color = ((i & 0x1) == 0) ^ ((j & 0x1) == 0) ^ ((k & 0x1) == 0);
+		//		for (size_t k = 0; k < lod_size.depth / 32; k++) {
+		//			std::cout << "writing line... " << k << std::endl;
+		//			for (size_t j = 0; j < lod_size.height / 32; j++) {
+		//				for (size_t i = 0; i < lod_size.width / 64; i++) {
+		//					size_t brick_color = ((i & 0x1) == 0) ^ ((j & 0x1) == 0) ^ ((k & 0x1) == 0);
 
-							(brick_color) ?
-								out.write(reinterpret_cast<char*>(white_brick.data()), white_brick.size()) :
-								out.write(reinterpret_cast<char*>(black_brick.data()), black_brick.size());
-						}
-					}
-				}
-			}
-		}
+		//					(brick_color) ?
+		//						out.write(reinterpret_cast<char*>(white_brick.data()), white_brick.size()) :
+		//						out.write(reinterpret_cast<char*>(black_brick.data()), black_brick.size());
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
 		this->mapped_file.open(filename, boost::iostreams::mapped_file_base::mapmode::readonly);
 	}
 
@@ -422,7 +422,7 @@ public:
 
 	VkFormat format() const override
 	{
-		return VK_FORMAT_R8_UNORM;
+		return VK_FORMAT_R8_SNORM;
 	}
 
 	VkImageType image_type() const override
@@ -443,7 +443,7 @@ public:
 	boost::iostreams::mapped_file mapped_file;
 
 	VkExtent3D lod0_size{
-		16384, 16384, 2048
+		2048, 8192, 1024
 	};
 	size_t num_lods;
 };

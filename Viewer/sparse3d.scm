@@ -12,6 +12,16 @@
             0 y 1)
          VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
 
+   (define zslice (z) 
+      (indexed-shape 
+         (bufferdata-uint32 0 3 2 2 1 0)
+         (bufferdata-float 
+            0 0 z
+            1 0 z
+            1 1 z
+            0 1 z)
+         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
+
    (define cube () 
       (indexed-shape 
          (bufferdata-uint32 
@@ -20,13 +30,13 @@
             0 4 1 5 2 6 3 7)
          (bufferdata-float 
             0 0 0
-            0 0 0.125
+            0 0 1
             0 1 0
-            0 1 0.125
+            0 1 1
             1 0 0
-            1 0 0.125
+            1 0 1
             1 1 0
-            1 1 0.125)
+            1 1 1)
          VK_PRIMITIVE_TOPOLOGY_LINE_LIST))
 
    (window
@@ -64,7 +74,7 @@
 
          (separator 
             (extent (uint32 240) (uint32 136))
-            (modelmatrix (dvec3 0 0 0) (dvec3 1 1 0.125))
+            (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
             (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
             (create-renderpass
                VK_FORMAT_R8G8B8A8_UINT
@@ -75,7 +85,8 @@
                      layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out uvec4 FragColor;
 
-                     const vec3 textureSize = vec3(16384, 16384, 2048);
+                     const vec3 textureSize = vec3(2048, 8192, 1024);
+                     //const vec3 textureSize = vec3(1024);
                      const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
                      float mipmapLevel(vec3 uv)
@@ -105,7 +116,7 @@
                VK_FORMAT_B8G8R8A8_UNORM
                (group
                   (separator
-                     (modelmatrix (dvec3 0 0 0) (dvec3 1 1 0.125))
+                     (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
                      (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
 
                      (sparsetextureimage 
@@ -114,7 +125,7 @@
                         VK_FILTER_LINEAR
                         VK_SAMPLER_MIPMAP_MODE_LINEAR
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
-                        "bricked16384.dat")
+                        "D:/zgy/omnia.dat")
 
                      (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
                         #version 450
@@ -124,7 +135,8 @@
                         layout(location = 0) out vec4 FragColor;
 
                         void main() {
-                           FragColor = texture(Texture, texCoord);
+                           vec3 color = texture(Texture, texCoord).rrr;
+                           FragColor = vec4(color * 0.5 + 0.5, 1.0);
                         }
                      ]])
                      (slice 0.5))

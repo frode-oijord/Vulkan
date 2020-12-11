@@ -73,7 +73,7 @@ struct State {
 	std::vector<VkAccelerationStructureKHR> top_level_acceleration_structures;
 	std::vector<VkAccelerationStructureKHR> bottom_level_acceleration_structures;
 	std::vector<VkPipelineShaderStageCreateInfo> shader_stage_infos;
-	std::vector<VkPushConstantRange> push_constant_ranges;
+	std::vector<VkPushConstantRange> pushConstantRanges;
 	std::vector<VkVertexInputBindingDescription> vertex_input_bindings;
 	std::vector<VkVertexInputAttributeDescription> vertex_attributes;
 	

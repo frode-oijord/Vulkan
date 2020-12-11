@@ -19,6 +19,7 @@
 #include <vector>
 #include <utility>
 #include <fstream>
+#include <algorithm>
 #include <filesystem>
 namespace fs = std::filesystem;
 
@@ -479,6 +480,7 @@ private:
 	VkDescriptorBufferInfo descriptor_buffer_info{};
 };
 
+
 class IndexBufferDescription : public Node {
 public:
 	IMPLEMENT_VISITABLE;
@@ -623,7 +625,6 @@ private:
 };
 
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 class Shader : public Node {
 public:
 	IMPLEMENT_VISITABLE;
@@ -727,7 +728,7 @@ public:
 	VkShaderStageFlagBits stage;
 	std::unique_ptr<VulkanShaderModule> shader;
 };
-#endif
+
 
 #ifdef VK_KHR_ray_tracing
 
@@ -1058,7 +1059,7 @@ public:
 		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
 			context->state->device,
 			descriptor_set_layouts,
-			context->state->push_constant_ranges);
+			context->state->pushConstantRanges);
 
 		this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
 			context->state->device,
@@ -1340,7 +1341,7 @@ public:
 		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
 			context->state->device,
 			descriptor_set_layouts,
-			context->state->push_constant_ranges);
+			context->state->pushConstantRanges);
 
 		this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
 			context->state->device,
@@ -1470,10 +1471,16 @@ public:
 			this->descriptor_set_layout->layout
 		};
 
+		//context->state->pushConstantRanges.push_back({
+		//	VK_SHADER_STAGE_FRAGMENT_BIT,
+		//	0,
+		//	sizeof(glm::vec3) * 1,
+		//});
+
 		this->pipeline_layout = std::make_unique<VulkanPipelineLayout>(
 			context->state->device,
 			descriptor_set_layouts,
-			context->state->push_constant_ranges);
+			context->state->pushConstantRanges);
 
 		this->descriptor_sets = std::make_unique<VulkanDescriptorSets>(
 			context->state->device,
@@ -1546,6 +1553,17 @@ public:
 
 	void render(Visitor* context)
 	{
+		//std::vector<glm::vec3> push_constants;
+		//push_constants.push_back(glm::vec3(2048, 8192, 1024));
+
+		//vk.CmdPushConstants(
+		//	context->state->command->buffer(),
+		//	this->pipeline_layout->layout,
+		//	VK_SHADER_STAGE_FRAGMENT_BIT,
+		//	0,
+		//	push_constants.size() * sizeof(glm::vec3),
+		//	push_constants.data());
+
 		vk.CmdExecuteCommands(
 			context->state->command->buffer(),
 			static_cast<uint32_t>(this->command->buffers.size()),
@@ -2061,8 +2079,9 @@ public:
 			{.depthStencil = { 1.0f, 0 } }
 		};
 
-		this->render_command->begin();
 		{
+			VulkanCommandBuffers::Scope render_command_scope(this->render_command.get());
+
 			VulkanRenderPassScope renderpass_scope(
 				this->renderpass->renderpass,
 				this->framebuffer->framebuffer,
@@ -2074,7 +2093,6 @@ public:
 
 			Group::visit(context);
 		}
-		this->render_command->end();
 
 		this->render_command->submit(
 			this->render_queue,
@@ -2721,17 +2739,23 @@ public:
 		uint32_t i = key >> 24 & 0xFF;
 		uint32_t j = key >> 16 & 0xFF;
 		uint32_t k = key >> 8 & 0xFF;
-		uint32_t mipLevel = key & 0xFF;
+		uint32_t level = key & 0xFF;
 
-		VkExtent3D extent = self->texture->extent(mipLevel);
+		level = std::clamp(level, self->texture->base_level(), self->texture->levels() - 1);
+		VkExtent3D extent = self->texture->extent(level);
+
 		VkDeviceSize width = extent.width / self->tileExtent.width;
 		VkDeviceSize height = extent.height / self->tileExtent.height;
 		VkDeviceSize depth = extent.depth / self->tileExtent.depth;
 
-		assert(i < width && j < height && k < depth);
-		assert(mipLevel < self->texture->levels());
+		i = std::clamp(i, 0u, (uint32_t)width - 1);
+		j = std::clamp(j, 0u, (uint32_t)height - 1);
+		k = std::clamp(k, 0u, (uint32_t)depth - 1);
 
-		VkDeviceSize bufferOffset = self->mipOffsets[mipLevel] + (((k * height) + j) * width + i) * self->tileSize;
+		assert(i < width && j < height && k < depth);
+		assert(level < self->texture->levels());
+
+		VkDeviceSize bufferOffset = self->mipOffsets[level] + (((k * height) + j) * width + i) * self->tileSize;
 		assert(bufferOffset + self->tileSize <= self->texture->size());
 
 		VkOffset3D imageOffset = {
@@ -2744,7 +2768,7 @@ public:
 
 		const VkImageSubresource subresource{
 			subresourceRange.aspectMask,
-			mipLevel,
+			level,
 			0
 		};
 
@@ -2759,7 +2783,7 @@ public:
 
 		const VkImageSubresourceLayers imageSubresource{
 			.aspectMask = subresourceRange.aspectMask,
-			.mipLevel = mipLevel,
+			.mipLevel = level,
 			.baseArrayLayer = subresourceRange.baseArrayLayer,
 			.layerCount = subresourceRange.layerCount,
 		};
@@ -2914,20 +2938,19 @@ public:
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
 			this->image->getSparseMemoryRequirements(subresourceRange.aspectMask);
 
-		uint32_t numTiles = 10000;
 		VkDeviceSize pageSize = memory_requirements.alignment;
 
 		this->buffer = std::make_shared<VulkanBufferObject>(
 			context->state->device,
 			0,
-			numTiles * pageSize,
+			this->numTiles * pageSize,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_SHARING_MODE_EXCLUSIVE,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 		auto image_memory = std::make_shared<VulkanMemory>(
 			context->state->device,
-			numTiles * pageSize,
+			this->numTiles * pageSize,
 			memory_type_index);
 
 		auto shared_data = std::make_shared<SharedMemoryPageData>(
@@ -2937,7 +2960,7 @@ public:
 			pageSize,
 			this->buffer);
 
-		for (uint32_t i = 0; i < numTiles; i++) {
+		for (uint32_t i = 0; i < this->numTiles; i++) {
 			this->free_pages.push_back(std::make_shared<MemoryPage>(shared_data, i * pageSize));
 		}
 	}
@@ -3097,6 +3120,7 @@ public:
 	VkSamplerMipmapMode mipmapMode;
 	VkSamplerAddressMode addressMode;
 
+	uint32_t numTiles{ 2048 }; // 128 mb cache size
 	std::shared_ptr<VulkanTextureImage> texture;
 	std::unique_ptr<VulkanSampler> sampler;
 	std::unique_ptr<VulkanImage> image;

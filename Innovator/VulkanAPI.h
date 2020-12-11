@@ -1941,7 +1941,7 @@ public:
 	VulkanPipelineLayout(
 		std::shared_ptr<VulkanDevice> device,
 		const std::vector<VkDescriptorSetLayout>& setlayouts,
-		const std::vector<VkPushConstantRange>& pushconstantranges) :
+		const std::vector<VkPushConstantRange>& pushConstantRanges) :
 		device(std::move(device))
 	{
 		VkPipelineLayoutCreateInfo create_info{
@@ -1950,8 +1950,8 @@ public:
 			.flags = 0,
 			.setLayoutCount = static_cast<uint32_t>(setlayouts.size()),
 			.pSetLayouts = setlayouts.data(),
-			.pushConstantRangeCount = static_cast<uint32_t>(pushconstantranges.size()),
-			.pPushConstantRanges = pushconstantranges.data(),
+			.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
+			.pPushConstantRanges = pushConstantRanges.data(),
 		};
 
 		THROW_ON_ERROR(vk.CreatePipelineLayout(this->device->device, &create_info, nullptr, &this->layout));
