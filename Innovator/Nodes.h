@@ -2694,9 +2694,9 @@ public:
 };
 
 
-class SharedMemoryPageData {
+class TextureMemoryData {
 public:
-	SharedMemoryPageData(
+	TextureMemoryData(
 		std::shared_ptr<VulkanMemory> imagememory,
 		std::shared_ptr<VulkanTextureImage> texture,
 		VkExtent3D tileExtent,
@@ -2715,7 +2715,7 @@ public:
 		}
 	}
 
-	~SharedMemoryPageData() = default;
+	~TextureMemoryData() = default;
 
 	std::shared_ptr<VulkanMemory> imagememory;
 	std::shared_ptr<VulkanTextureImage> texture;
@@ -2727,48 +2727,71 @@ public:
 };
 
 
+class MemoryTile {
+public:
+	explicit MemoryTile(uint32_t key) :
+		key(key),
+		i(key >> 24 & 0xFF),
+		j(key >> 16 & 0xFF),
+		k(key >> 8 & 0xFF),
+		l(key >> 0 & 0xFF)
+	{}
+
+	MemoryTile(uint8_t i, uint8_t j, uint8_t k, uint8_t l) :
+		key(i << 24 | j << 16 | k << 8 | l),
+		i(i),
+		j(j),
+		k(k),
+		l(l)
+	{}
+
+
+	VkDeviceSize bufferOffset(TextureMemoryData* self)
+	{
+		this->l = std::clamp(this->l, uint8_t(self->texture->base_level()), uint8_t(self->texture->levels() - 1));
+		VkExtent3D lodextent = self->texture->extent(this->l);
+
+		VkDeviceSize ni = lodextent.width / self->tileExtent.width;
+		VkDeviceSize nj = lodextent.height / self->tileExtent.height;
+		VkDeviceSize nk = lodextent.depth / self->tileExtent.depth;
+
+		this->i = std::clamp(this->i, uint8_t(0), uint8_t(ni - 1));
+		this->j = std::clamp(this->j, uint8_t(0), uint8_t(nj - 1));
+		this->k = std::clamp(this->k, uint8_t(0), uint8_t(nk - 1));
+
+		VkDeviceSize bufferOffset = self->mipOffsets[this->l] + (this->i + ni * this->j + ni * nj * this->k) * self->tileSize;
+
+		assert(bufferOffset + self->tileSize <= self->texture->size());
+		return bufferOffset;
+	}
+
+	uint8_t i, j, k, l;
+	uint32_t key;
+};
+
+
 class MemoryPage {
 public:
-	MemoryPage(std::shared_ptr<SharedMemoryPageData> self, VkDeviceSize memoryOffset) :
+	MemoryPage(std::shared_ptr<TextureMemoryData> self, VkDeviceSize memoryOffset) :
 		self(std::move(self)), memoryOffset(memoryOffset)
 	{}
 
 
-	void bind(uint32_t key)
+	void bind(uint32_t k)
 	{
-		uint32_t i = key >> 24 & 0xFF;
-		uint32_t j = key >> 16 & 0xFF;
-		uint32_t k = key >> 8 & 0xFF;
-		uint32_t level = key & 0xFF;
-
-		level = std::clamp(level, self->texture->base_level(), self->texture->levels() - 1);
-		VkExtent3D extent = self->texture->extent(level);
-
-		VkDeviceSize width = extent.width / self->tileExtent.width;
-		VkDeviceSize height = extent.height / self->tileExtent.height;
-		VkDeviceSize depth = extent.depth / self->tileExtent.depth;
-
-		i = std::clamp(i, 0u, (uint32_t)width - 1);
-		j = std::clamp(j, 0u, (uint32_t)height - 1);
-		k = std::clamp(k, 0u, (uint32_t)depth - 1);
-
-		assert(i < width && j < height && k < depth);
-		assert(level < self->texture->levels());
-
-		VkDeviceSize bufferOffset = self->mipOffsets[level] + (((k * height) + j) * width + i) * self->tileSize;
-		assert(bufferOffset + self->tileSize <= self->texture->size());
+		MemoryTile tile(k);
 
 		VkOffset3D imageOffset = {
-			int32_t(i * self->tileExtent.width),
-			int32_t(j * self->tileExtent.height),
-			int32_t(k * self->tileExtent.depth)
+			int32_t(tile.i * self->tileExtent.width),
+			int32_t(tile.j * self->tileExtent.height),
+			int32_t(tile.k * self->tileExtent.depth)
 		};
 
 		VkImageSubresourceRange subresourceRange = self->texture->subresourceRange();
 
 		const VkImageSubresource subresource{
 			subresourceRange.aspectMask,
-			level,
+			tile.l,
 			0
 		};
 
@@ -2783,7 +2806,7 @@ public:
 
 		const VkImageSubresourceLayers imageSubresource{
 			.aspectMask = subresourceRange.aspectMask,
-			.mipLevel = level,
+			.mipLevel = tile.l,
 			.baseArrayLayer = subresourceRange.baseArrayLayer,
 			.layerCount = subresourceRange.layerCount,
 		};
@@ -2797,13 +2820,15 @@ public:
 			.imageExtent = self->tileExtent,
 		};
 
+		VkDeviceSize bufferOffset = tile.bufferOffset(self.get());
+
 		std::copy(
 			self->texture->const_data() + bufferOffset,
 			self->texture->const_data() + bufferOffset + self->tileSize,
 			self->buffermemory->mem + this->memoryOffset);
 	}
 
-	std::shared_ptr<SharedMemoryPageData> self{ nullptr };
+	std::shared_ptr<TextureMemoryData> self{ nullptr };
 	VkDeviceSize memoryOffset{ 0 };
 	VkSparseImageMemoryBind image_memory_bind{};
 	VkBufferImageCopy buffer_image_copy{};
@@ -2935,7 +2960,7 @@ public:
 			this->numTiles * pageSize,
 			memory_type_index);
 
-		auto shared_data = std::make_shared<SharedMemoryPageData>(
+		auto shared_data = std::make_shared<TextureMemoryData>(
 			image_memory,
 			this->texture,
 			sparse_memory_requirement.formatProperties.imageGranularity,
@@ -3102,7 +3127,8 @@ public:
 	VkSamplerMipmapMode mipmapMode;
 	VkSamplerAddressMode addressMode;
 
-	uint32_t numTiles{ 2048 }; // 128 mb cache size
+	//uint32_t numTiles{ 2048 }; // 128 mb cache size
+	uint32_t numTiles{ 8192 }; // 512 mb cache size
 	std::shared_ptr<VulkanTextureImage> texture;
 	std::unique_ptr<VulkanSampler> sampler;
 	std::unique_ptr<VulkanImage> image;

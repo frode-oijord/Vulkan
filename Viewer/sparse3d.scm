@@ -2,7 +2,17 @@
    (import "indexed-shape.scm")
    (import "create-renderpass.scm")
 
-   (define slice (y) 
+   (define xslice (y) 
+      (indexed-shape 
+         (bufferdata-uint32 0 3 2 2 1 0)
+         (bufferdata-float 
+            y 0 0
+            y 1 0
+            y 1 1
+            y 0 1)
+         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
+
+   (define yslice (y) 
       (indexed-shape 
          (bufferdata-uint32 0 3 2 2 1 0)
          (bufferdata-float 
@@ -43,8 +53,8 @@
       (extent2 1920 1080)
       (separator
          (viewmatrix 
-            (dvec3 0 2 0)
-            (dvec3 0 0 0)
+            (dvec3 -1 5 -2)
+            (dvec3 0.25 2.5 0.5)
             (dvec3 0 0 1))
 
          (projmatrix 1000 0.001 1.0 0.7)
@@ -74,7 +84,7 @@
 
          (separator 
             (extent (uint32 240) (uint32 136))
-            (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
+            (modelmatrix (dvec3 0 0 0) (dvec3 1 4 2))
             (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
             (create-renderpass
                VK_FORMAT_R8G8B8A8_UINT
@@ -85,8 +95,7 @@
                      layout(location = 0) in vec3 texCoord;
                      layout(location = 0) out uvec4 FragColor;
 
-                     const vec3 textureSize = vec3(2048, 8192, 1024);
-                     //const vec3 textureSize = vec3(1024);
+                     const vec3 textureSize = vec3(1024, 4096, 2048);
                      const vec3 tileSize = vec3(64.0, 32.0, 32.0);
 
                      float mipmapLevel(vec3 uv)
@@ -108,16 +117,18 @@
                         FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip + 1);
                      }
                   ]])
-               (slice 0.5)))
+                  (xslice 0.5)
+                  (yslice 0.5)
+                  (zslice 0.5)))
             (offscreen-image))
 
          (separator 
             (create-renderpass
                VK_FORMAT_B8G8R8A8_UNORM
                (group
-                  (separator
-                     (modelmatrix (dvec3 0 0 0) (dvec3 1 1 1))
+                     (modelmatrix (dvec3 0 0 0) (dvec3 1 4 2))
                      (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
+                  (separator
 
                      (sparsetextureimage 
                         (uint32 1)
@@ -125,7 +136,7 @@
                         VK_FILTER_LINEAR
                         VK_SAMPLER_MIPMAP_MODE_LINEAR
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
-                        "D:/zgy/omnia.dat")
+                        "D:/zgy/beagle.dat")
 
                      (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
                         #version 450
@@ -139,7 +150,9 @@
                            FragColor = vec4(color * 0.5 + 0.5, 1.0);
                         }
                      ]])
-                     (slice 0.5))
+                     (xslice 0.5)
+                     (yslice 0.5)
+                     (zslice 0.5))
 
                   (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
                      #version 450
