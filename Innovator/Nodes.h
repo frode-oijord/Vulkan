@@ -3010,30 +3010,30 @@ public:
 		VkSparseImageMemoryRequirements sparse_memory_requirement =
 			this->image->getSparseMemoryRequirements(subresourceRange.aspectMask);
 
-		VkDeviceSize pageSize = memory_requirements.alignment;
+		this->pageSize = memory_requirements.alignment;
 
 		this->buffer = std::make_shared<VulkanBufferObject>(
 			context->state->device,
 			0,
-			this->numTiles * pageSize,
+			this->numTiles * this->pageSize,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_SHARING_MODE_EXCLUSIVE,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 		auto image_memory = std::make_shared<VulkanMemory>(
 			context->state->device,
-			this->numTiles * pageSize,
+			this->numTiles * this->pageSize,
 			memory_type_index);
 
 		auto shared_data = std::make_shared<TextureMemoryData>(
 			image_memory,
 			this->texture,
 			sparse_memory_requirement.formatProperties.imageGranularity,
-			pageSize,
+			this->pageSize,
 			this->buffer);
 
 		for (uint32_t i = 0; i < this->numTiles; i++) {
-			this->free_pages.push_back(std::make_shared<MemoryPage>(shared_data, i * pageSize));
+			this->free_pages.push_back(std::make_shared<MemoryPage>(shared_data, i * this->pageSize));
 		}
 	}
 
@@ -3057,8 +3057,15 @@ public:
 
 	void render(RenderVisitor* context)
 	{
+		if (!this->updatelod) {
+			return;
+		}
+
 		Timer timer("getTiles");
 		std::set<uint32_t> tiles = context->image->getTiles(context);
+
+		std::vector<VkBufferImageCopy> regions;
+		std::vector<VkSparseImageMemoryBind> image_memory_binds;
 
 		std::deque<uint32_t> reusable_keys;
 		for (auto [key, page] : this->used_pages) {
@@ -3066,6 +3073,17 @@ public:
 				reusable_keys.push_back(key);
 			}
 		}
+
+		//// erase reusable keys to show lod eval
+		//for (auto key : reusable_keys) {
+		//	auto page = this->used_pages.at(key);
+		//	page->image_memory_bind.memory = nullptr;
+		//	image_memory_binds.push_back(page->image_memory_bind);
+		//	this->free_pages.push_back(page);
+		//	this->used_pages.erase(key);
+		//}
+
+		//reusable_keys.clear();
 
 		auto get_page = [&]() {
 			if (this->free_pages.empty()) {
@@ -3082,9 +3100,6 @@ public:
 			}
 		};
 
-		std::vector<VkBufferImageCopy> regions;
-		std::vector<VkSparseImageMemoryBind> image_memory_binds;
-
 		for (auto key : tiles) {
 			if (!this->used_pages.contains(key)) {
 				auto page = get_page();
@@ -3098,8 +3113,11 @@ public:
 		}
 
 		std::cout << "tile count: " << tiles.size();
-		std::cout << " used count: " << this->used_pages.size();
-		std::cout << " bind count: " << image_memory_binds.size() << std::endl;
+		float mb = (this->pageSize * tiles.size()) / (1024.0f * 1024.0f);
+		std::cout << " (" << mb << " mb)" << std::endl;
+
+		//std::cout << " used count: " << this->used_pages.size();
+		//std::cout << " bind count: " << image_memory_binds.size() << std::endl;
 
 		if (image_memory_binds.empty()) {
 			return;
@@ -3185,6 +3203,7 @@ public:
 			copy_sparse_signal_semaphores);			// signal semaphores
 	}
 
+	bool updatelod{ true };
 
 	uint32_t binding;
 	VkShaderStageFlags stageFlags;
@@ -3194,6 +3213,7 @@ public:
 
 	//uint32_t numTiles{ 2048 }; // 128 mb cache size
 	uint32_t numTiles{ 8192 }; // 512 mb cache size
+	VkDeviceSize pageSize{ 0 };
 	std::shared_ptr<VulkanTextureImage> texture;
 	std::unique_ptr<VulkanSampler> sampler;
 	std::unique_ptr<VulkanImage> image;

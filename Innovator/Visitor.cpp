@@ -37,6 +37,10 @@ CommandVisitor::visit(Node* node)
 EventVisitor::EventVisitor(std::shared_ptr<State> state) :
 	Visitor(state)
 {
+	this->register_callback<SparseTextureImage>([this](SparseTextureImage* node) {
+		this->visit(node);
+		});
+
 	this->register_callback<ViewMatrix>([this](ViewMatrix* node) {
 		this->visit(node);
 		});
@@ -46,6 +50,13 @@ EventVisitor::EventVisitor(std::shared_ptr<State> state) :
 	this->register_callback<TextureMatrix>([this](TextureMatrix* node) {
 		this->visit(node);
 		});
+}
+
+
+void 
+EventVisitor::visit(SparseTextureImage* node)
+{
+	node->updatelod = this->updatelod;
 }
 
 
@@ -72,11 +83,15 @@ EventVisitor::visit(class TextureMatrix* node)
 {
 	if (this->move && this->press && this->interact) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
-		double translation = dx[1] * 0.25;
-		glm::dvec3 t(0, translation, 0);
+		double d = dx[1] * 0.25;
+		glm::dvec3 t(0, d, 0);
 		switch (this->button) {
 		case 0: {
 			node->mat = glm::translate(node->mat, t);
+			break;
+		}
+		case 2: {
+			node->mat = glm::rotate(node->mat, d * 0.1, glm::dvec3(0, 0, 1));
 			break;
 		}
 		default: break;
@@ -90,11 +105,15 @@ EventVisitor::visit(class ModelMatrix* node)
 {
 	if (this->move && this->press && this->interact) {
 		glm::dvec2 dx = this->prevpos - this->currpos;
-		double translation = dx[1] * 0.25;
-		glm::dvec3 t(0, translation, 0);
+		double d = dx[1] * 0.25;
+		glm::dvec3 t(0, d, 0);
 		switch (this->button) {
 		case 0: {
 			node->mat = glm::translate(node->mat, t);
+			break;
+		}
+		case 2: {
+			node->mat = glm::rotate(node->mat, d * 0.1, glm::dvec3(0, 0, 1));
 			break;
 		}
 		default: break;

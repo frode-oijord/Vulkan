@@ -86,6 +86,9 @@ public:
 			if (wParam == VK_ESCAPE) {
 				this->keyPressed(0);
 			}
+			else if (wParam == VK_SPACE) {
+				this->keyPressed(1);
+			}
 			break;
 		case WM_LBUTTONDOWN:
 			this->mousePressed(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), 0);

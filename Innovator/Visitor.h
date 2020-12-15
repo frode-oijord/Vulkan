@@ -52,6 +52,7 @@ private:
 	void visit(class ViewMatrix* node);
 	void visit(class ModelMatrix* node);
 	void visit(class TextureMatrix* node);
+	void visit(class SparseTextureImage* node);
 
 public:
 	void mousePressed(Node* root, int x, int y, int button)
@@ -81,10 +82,21 @@ public:
 
 	void keyPressed(int key)
 	{
-		this->interact = !this->interact;
+		switch (key) {
+		case 0:
+			this->interact = !this->interact;
+			break;
+		case 1:
+			this->updatelod = !this->updatelod;
+			break;
+		default:
+			break;
+		}
+
 	}
 
 	bool interact{ false };
+	bool updatelod{ true };
 	bool press{ false };
 	bool move{ false };
 	int button{ 0 };
