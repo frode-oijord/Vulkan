@@ -337,6 +337,71 @@ private:
 };
 
 
+class STLBufferData : public BufferData {
+public:
+	IMPLEMENT_VISITABLE
+	STLBufferData() = delete;
+	virtual ~STLBufferData() = default;
+
+	explicit STLBufferData(std::string filename) :
+		filename(std::move(filename))
+	{
+		REGISTER_VISITOR(allocvisitor, STLBufferData, update);
+		REGISTER_VISITOR(pipelinevisitor, STLBufferData, update);
+		REGISTER_VISITOR(recordvisitor, STLBufferData, update);
+		REGISTER_VISITOR(rendervisitor, STLBufferData, update);
+
+		std::uintmax_t file_size = fs::file_size(fs::current_path() / this->filename);
+		std::cout << "std::file_size reported size of: " << file_size << std::endl;
+
+		size_t num_triangles = (file_size - 84) / 50;
+		std::cout << "num triangles should be " << num_triangles << std::endl;
+
+		this->values_size = num_triangles * 36;
+	}
+
+	void copy(char* dst) const override
+	{
+		std::ifstream input(this->filename, std::ios::binary);
+		// header is first 80 bytes
+		char header[80];
+		input.read(header, 80);
+		std::cout << "header: " << std::string(header) << std::endl;
+
+		// num triangles is next 4 bytes after header
+		uint32_t num_triangles;
+		input.read(reinterpret_cast<char*>(&num_triangles), 4);
+		std::cout << "num triangles: " << num_triangles << std::endl;
+
+		char normal[12];
+		char attrib[2];
+		for (size_t i = 0; i < num_triangles; i++) {
+			input.read(normal, 12); // skip normal
+			input.read(dst + i * 36, 36);
+			input.read(attrib, 2);  // skip attribute
+		}
+	}
+
+	std::string filename;
+	size_t values_size;
+
+	size_t size() const override
+	{
+		return this->values_size;
+	}
+
+	size_t stride() const override
+	{
+		return sizeof(float);
+	}
+
+	void update(Visitor* context)
+	{
+		context->state->bufferdata = this;
+	}
+};
+
+
 class CpuMemoryBuffer : public Node {
 public:
 	IMPLEMENT_VISITABLE;
@@ -2781,6 +2846,8 @@ public:
 	{
 		MemoryTile tile(k);
 
+		VkDeviceSize bufferOffset = tile.bufferOffset(self.get());
+
 		VkOffset3D imageOffset = {
 			int32_t(tile.i * self->tileExtent.width),
 			int32_t(tile.j * self->tileExtent.height),
@@ -2819,8 +2886,6 @@ public:
 			.imageOffset = imageOffset,
 			.imageExtent = self->tileExtent,
 		};
-
-		VkDeviceSize bufferOffset = tile.bufferOffset(self.get());
 
 		std::copy(
 			self->texture->const_data() + bufferOffset,

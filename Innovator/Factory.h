@@ -318,7 +318,7 @@ public:
 	{
 		//this->num_lods = std::log2(lod0_size.width) + 1;
 		//this->num_lods -= 5;
-		this->num_lods = 4;
+		this->num_lods = 5;
 
 		//if (!std::filesystem::exists(filename)) {
 		//	std::cout << "creating file: " << filename << std::endl;

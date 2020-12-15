@@ -181,6 +181,7 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageLayout, VkImageUsageFlags, VkImageAspectFlags>) });
 	innovator_env->inner.insert({ "shader", fun_ptr(node<Shader, VkShaderStageFlagBits, std::string>) });
 	innovator_env->inner.insert({ "texturedata", fun_ptr(node<TextureData, std::string>) });
+	innovator_env->inner.insert({ "stldata", fun_ptr(node<STLBufferData, std::string>) });
 	innovator_env->inner.insert({ "textureimage", fun_ptr(node<TextureImage, uint32_t, VkShaderStageFlags, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, std::string>) });
 	innovator_env->inner.insert({ "sparsetextureimage", fun_ptr(node<SparseTextureImage, uint32_t, VkShaderStageFlags, VkFilter, VkSamplerMipmapMode, VkSamplerAddressMode, std::string>) });
 	innovator_env->inner.insert({ "rtxbuffer", fun_ptr(shared_from_node_list<RTXbuffer, std::shared_ptr<Node>>) });

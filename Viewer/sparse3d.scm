@@ -1,4 +1,5 @@
 (begin
+   (import "stl-shape.scm")
    (import "indexed-shape.scm")
    (import "create-renderpass.scm")
 
@@ -40,13 +41,13 @@
             0 4 1 5 2 6 3 7)
          (bufferdata-float 
             0 0 0
-            0 0 1
-            0 1 0
-            0 1 1
+            0 0 2
+            0 4 0
+            0 4 2
             1 0 0
-            1 0 1
-            1 1 0
-            1 1 1)
+            1 0 2
+            1 4 0
+            1 4 2)
          VK_PRIMITIVE_TOPOLOGY_LINE_LIST))
 
    (window
@@ -84,8 +85,9 @@
 
          (separator 
             (extent (uint32 240) (uint32 136))
-            (modelmatrix (dvec3 0 0 0) (dvec3 1 4 2))
-            (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
+            (modelmatrix (dvec3 25 50 0) (dvec3 .02 .02 .02))
+            (texturematrix (dvec3 25 50 0) (dvec3 .02 .005 .01))
+
             (create-renderpass
                VK_FORMAT_R8G8B8A8_UINT
                (group
@@ -117,18 +119,17 @@
                         FragColor = uvec4(ijk.x >> mip, ijk.y >> mip, ijk.z >> mip, mip + 1);
                      }
                   ]])
-                  (xslice 0.5)
-                  (yslice 0.5)
-                  (zslice 0.5)))
+                  (stl-shape)
+                  ))
             (offscreen-image))
 
          (separator 
             (create-renderpass
                VK_FORMAT_B8G8R8A8_UNORM
                (group
-                     (modelmatrix (dvec3 0 0 0) (dvec3 1 4 2))
-                     (texturematrix (dvec3 0 0 0) (dvec3 1 1 1))
                   (separator
+                     (modelmatrix (dvec3 25 50 0) (dvec3 .02 .02 .02))
+                     (texturematrix (dvec3 25 50 0) (dvec3 .02 .005 .01))
 
                      (sparsetextureimage 
                         (uint32 1)
@@ -150,17 +151,17 @@
                            FragColor = vec4(color * 0.5 + 0.5, 1.0);
                         }
                      ]])
-                     (xslice 0.5)
-                     (yslice 0.5)
-                     (zslice 0.5))
 
-                  (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
-                     #version 450
-                     layout(location = 0) in vec3 texCoord;
-                     layout(location = 0) out vec4 FragColor;
-                     void main() {
-                        FragColor = vec4(texCoord, 1.0);
-                     }
-                  ]])
+                     (stl-shape)
+                     )
 
-                  (cube)))))))
+                  (separator
+                     (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
+                        #version 450
+                        layout(location = 0) in vec3 texCoord;
+                        layout(location = 0) out vec4 FragColor;
+                        void main() {
+                           FragColor = vec4(texCoord, 1.0);
+                        }
+                     ]])
+                     (cube))))))))
