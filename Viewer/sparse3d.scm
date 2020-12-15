@@ -54,8 +54,8 @@
       (extent2 1920 1080)
       (separator
          (viewmatrix 
-            (dvec3 -1 5 -2)
-            (dvec3 0.25 2.5 0.5)
+            (dvec3 0 5 0)
+            (dvec3 0 0 0)
             (dvec3 0 0 1))
 
          (projmatrix 1000 0.001 1.0 0.7)
@@ -71,6 +71,7 @@
 
             layout(location = 0) in vec3 Position;
             layout(location = 0) out vec3 texCoord;
+            layout(location = 1) out vec4 viewPos;
 
             out gl_PerVertex {
                vec4 gl_Position;
@@ -79,7 +80,8 @@
             void main() 
             {
                texCoord = vec3(TextureMatrix * vec4(Position, 1.0));
-               gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Position, 1.0);
+               viewPos = ModelViewMatrix * vec4(Position, 1.0);
+               gl_Position = ProjectionMatrix * viewPos;
             }
          ]])
 
@@ -144,11 +146,16 @@
 
                         layout(binding = 1) uniform sampler3D Texture;
                         layout(location = 0) in vec3 texCoord;
+                        layout(location = 1) in vec4 viewPos;
                         layout(location = 0) out vec4 FragColor;
 
                         void main() {
+                           vec3 dx = dFdx(viewPos.xyz);
+                           vec3 dy = dFdy(viewPos.xyz);
+                           vec3 n = normalize(cross(dx, dy));
+
                            vec3 color = texture(Texture, texCoord).rrr;
-                           FragColor = vec4(color * 0.5 + 0.5, 1.0);
+                           FragColor = vec4(n.z * color * 0.5 + 0.5, 1.0);
                         }
                      ]])
 
