@@ -171,6 +171,8 @@ public:
 };
 
 
+#include <numbers>
+
 class ModelMatrix : public Node {
 public:
 	IMPLEMENT_VISITABLE;
@@ -182,29 +184,7 @@ public:
 		REGISTER_VISITOR(rendervisitor, ModelMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
-		this->mat = glm::translate(this->mat, t);
-	}
-
-	void render(CommandVisitor* context)
-	{
-		context->state->ModelMatrix *= this->mat;
-	}
-
-	glm::dmat4 mat{ 1.0 };
-};
-
-
-class Translate : public Node {
-public:
-	IMPLEMENT_VISITABLE;
-	Translate() = default;
-	virtual ~Translate() = default;
-
-	Translate(const glm::dvec3& t, const glm::dvec3& s)
-	{
-		REGISTER_VISITOR(rendervisitor, ModelMatrix, render);
-
-		this->mat = glm::scale(this->mat, s);
+		this->mat = glm::rotate(this->mat, -std::numbers::pi / 2, glm::dvec3(0, 1, 0));
 		this->mat = glm::translate(this->mat, t);
 	}
 
@@ -228,6 +208,7 @@ public:
 		REGISTER_VISITOR(rendervisitor, TextureMatrix, render);
 
 		this->mat = glm::scale(this->mat, s);
+		this->mat = glm::rotate(this->mat, -std::numbers::pi / 2, glm::dvec3(0, 1, 0));
 		this->mat = glm::translate(this->mat, t);
 	}
 
@@ -2140,7 +2121,7 @@ public:
 		};
 
 		const std::vector<VkClearValue> clearvalues{
-			{.color = { 0.0f, 0.0f, 0.0f, 0.0f } },
+			{.color = { 1.0f, 1.0f, 1.0f, 0.0f } },
 			{.depthStencil = { 1.0f, 0 } }
 		};
 
@@ -3211,8 +3192,8 @@ public:
 	VkSamplerMipmapMode mipmapMode;
 	VkSamplerAddressMode addressMode;
 
-	//uint32_t numTiles{ 2048 }; // 128 mb cache size
-	uint32_t numTiles{ 8192 }; // 512 mb cache size
+	uint32_t numTiles{ 2048 }; // 128 mb cache size
+	//uint32_t numTiles{ 8192 }; // 512 mb cache size
 	VkDeviceSize pageSize{ 0 };
 	std::shared_ptr<VulkanTextureImage> texture;
 	std::unique_ptr<VulkanSampler> sampler;

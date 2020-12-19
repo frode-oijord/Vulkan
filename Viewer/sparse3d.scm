@@ -87,8 +87,8 @@
 
          (separator 
             (extent (uint32 240) (uint32 136))
-            (modelmatrix (dvec3 25 50 0) (dvec3 .02 .02 .02))
-            (texturematrix (dvec3 25 50 0) (dvec3 .02 .005 .01))
+            (modelmatrix (dvec3 50 50 -50) (dvec3 .02 .02 .02))
+            (texturematrix (dvec3 50 50 -50) (dvec3 .02 .005 .01))
 
             (create-renderpass
                VK_FORMAT_R8G8B8A8_UINT
@@ -130,8 +130,8 @@
                VK_FORMAT_B8G8R8A8_UNORM
                (group
                   (separator
-                     (modelmatrix (dvec3 25 50 0) (dvec3 .02 .02 .02))
-                     (texturematrix (dvec3 25 50 0) (dvec3 .02 .005 .01))
+                     (modelmatrix (dvec3 50 50 -50) (dvec3 .02 .02 .02))
+                     (texturematrix (dvec3 50 50 -50) (dvec3 .02 .005 .01))
 
                      (sparsetextureimage 
                         (uint32 1)
@@ -141,10 +141,20 @@
                         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
                         "D:/zgy/beagle.dat")
 
+                     (textureimage
+                        (uint32 2)
+                        (shaderstageflags VK_SHADER_STAGE_FRAGMENT_BIT)
+                        VK_FILTER_LINEAR
+                        VK_SAMPLER_MIPMAP_MODE_LINEAR
+                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER
+                        "seismic.ktx")
+
                      (shader VK_SHADER_STAGE_FRAGMENT_BIT [[
                         #version 450
 
-                        layout(binding = 1) uniform sampler3D Texture;
+                        layout(binding = 1) uniform sampler3D Seismic;
+                        layout(binding = 2) uniform sampler2D Transfer;
+
                         layout(location = 0) in vec3 texCoord;
                         layout(location = 1) in vec4 viewPos;
                         layout(location = 0) out vec4 FragColor;
@@ -152,10 +162,11 @@
                         void main() {
                            vec3 dx = dFdx(viewPos.xyz);
                            vec3 dy = dFdy(viewPos.xyz);
-                           vec3 n = normalize(cross(dx, dy));
+                           vec3 normal = normalize(cross(dx, dy));
 
-                           vec3 color = texture(Texture, texCoord).rrr;
-                           FragColor = vec4(n.z * color * 0.5 + 0.5, 1.0);
+                           float amplitude = texture(Seismic, texCoord).r * 0.5 + 0.5;
+                           vec3 color = texture(Transfer, vec2(amplitude * 1.025, 0.5)).rgb;
+                           FragColor = vec4(color * normal.z, 1.0);
                         }
                      ]])
 

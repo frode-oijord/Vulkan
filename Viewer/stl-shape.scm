@@ -1,6 +1,6 @@
 (define stl-shape ()
     (separator
-        (stldata "bunny.stl")
+        (define data (stldata "bunny.stl"))
         (cpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
         (gpumemorybuffer (bufferusageflags VK_BUFFER_USAGE_TRANSFER_DST_BIT VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
         (vertexinputattributedescription
@@ -21,7 +21,7 @@
             VK_SHADER_STAGE_VERTEX_BIT)
 
         (drawcommand 
-            (uint32 (* 3 270021))
+            (count data)
             (uint32 1)
             (uint32 0)
             (uint32 0)

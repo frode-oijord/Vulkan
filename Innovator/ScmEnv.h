@@ -175,7 +175,6 @@ env_ptr innovator_env()
 	innovator_env->inner.insert({ "viewmatrix", fun_ptr(node<ViewMatrix, glm::dvec3, glm::dvec3, glm::dvec3>) });
 	innovator_env->inner.insert({ "projmatrix", fun_ptr(node<ProjMatrix, Number, Number, Number, Number>) });
 	innovator_env->inner.insert({ "modelmatrix", fun_ptr(node<ModelMatrix, glm::dvec3, glm::dvec3>) });
-	innovator_env->inner.insert({ "translate", fun_ptr(node<Translate, glm::dvec3, glm::dvec3>) });
 	innovator_env->inner.insert({ "texturematrix", fun_ptr(node<TextureMatrix, glm::dvec3, glm::dvec3>) });
 	innovator_env->inner.insert({ "framebuffer", fun_ptr(shared_from_node_list<Framebuffer, std::shared_ptr<Node>>) });
 	innovator_env->inner.insert({ "framebuffer-attachment", fun_ptr(node<FramebufferAttachment, VkFormat, VkImageLayout, VkImageUsageFlags, VkImageAspectFlags>) });
